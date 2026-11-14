@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-11-14). Partly supersedes the "BLIS is the only source of behaviour" rule of the goal for the landing page. ADR 0001 to 0003 still describe the BLIS replay app, now at `classic.html`.
+Accepted (2026-11-14). Amended by [ADR 0005](0005-remove-blis-replay.md), which removed the BLIS replay app this record refers to.
 
 ## Context
 
@@ -16,7 +16,7 @@ Three of those needs cannot be met by replaying a finished BLIS run:
 
 ## Decision
 
-The landing page (`web/src/live/`) runs its own small simulation in the browser:
+The landing page (`src/live/`, at the time `web/src/live/`) runs its own small simulation in the browser:
 
 - `model.ts`: the formulas of chapter 2 (2N FLOPs, attention term, KV bytes per token, four-pool memory budget, roofline step time, throughput curve). A unit test checks them against numbers printed in the book.
 - `sim.ts`: sessions, front-end hops, router policies, autoscaler, pod lifecycle, the decode-first engine step with a token budget, paged KV blocks, prefix reuse, LRU eviction through HBM, DRAM and SSD, and preemption by recomputation (chapter 3).

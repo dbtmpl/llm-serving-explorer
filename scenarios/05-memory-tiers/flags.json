@@ -1,9 +1,0 @@
-{
-  "title": "05 · Memory Tiers (GPU HBM ↔ CPU DRAM)",
-  "subtitle": "Offload evicted KV blocks to host CPU DRAM and reload them on later prefix hits",
-  "recommended_views": ["memory-tiers", "kv-cache", "timeline"],
-  "scenario": "scenario.yaml",
-  "workload_spec": "workload.yaml",
-  "num_requests": 45,
-  "seed": 42
-}

@@ -1,18 +1,26 @@
 # Glossary
 
-- **BLIS (Blackbox Inference Simulator):** The discrete-event simulator (`github.com/inference-sim/inference-sim`) pinned in `engine/` that models the end-to-end llm-d + vLLM serving stack.
-- **EPP (Endpoint Picker):** The `llm-d` router component embedded inside BLIS (`sim/llmd`) that performs admission control, flow control, and scored endpoint selection.
-- **Scenario:** A YAML specification (`kind: Scenario` + `kind: Deployment`) defining the model, hardware, cluster topology, parallelism, engine configuration, and optional offload/router settings.
-- **Event File (`.ndjson` / `.ndjson.gz`):** A deterministic newline-delimited JSON stream emitted by BLIS via `--events-output` (starting with a `header` record followed by time-ordered simulation events), conforming to `schema/events.schema.json`.
-- **Replay Core:** The pure TypeScript state machine (`web/src/replay`) with `apply(state, event) -> state`, periodic snapshots, and `stateAt(t)` for deterministic scrubbing without re-simulating anything.
-- **KV Block:** A fixed-size page of `block_size` tokens (default `16`) in GPU HBM or offload memory. In `blis-vllm`, a block is in one of three states: **used** (actively referenced, `RefCnt > 0`), **cached** (unpinned `RefCnt == 0`, still holding a prefix hash for reuse until LRU eviction), or **free** (unassigned).
-- **Prefix Caching:** Reusing previously computed KV blocks across requests that share an identical leading token block chain. Shared active blocks have `RefCnt > 1`.
-- **Eviction:** Removing a cached, unpinned KV block's hash from the prefix cache (either dropping it or offloading it to a lower memory tier) to make room for a new allocation.
-- **Preemption:** Evicting a running request back to the waiting queue and freeing its KV blocks when the engine runs out of free blocks mid-generation.
-- **Chunked Prefill:** Splitting a long prompt prefill across multiple engine steps (`max_num_batched_tokens`) so shorter decode/prefill requests can share GPU batches.
-- **Continuous Batching:** Iteration-level scheduling (`max_num_seqs > 1`) where requests can join or leave the running batch on every forward step rather than waiting for an entire batch to finish.
-- **P/D Disaggregation (Prefill/Decode Split):** Separating prefill pods and decode pods into distinct pools, transferring computed KV cache blocks between them (`kv.transfer`).
-- **Tensor Parallelism (TP):** Sharding a single pod's model weights and KV cache heads across `tp` GPUs within the pod.
-- **Arithmetic Intensity (AI):** `FLOPs / BytesMoved` for a GPU step, plotted on the Roofline chart against the GPU's peak compute (`TFlopsPeak`) and HBM bandwidth (`BwPeakTBs`) limits.
-- **TTFT (Time to First Token):** Time from request arrival at the gateway to emission of its first output token.
-- **TPOT (Time Per Output Token) / ITL (Inter-Token Latency):** Mean time per generated token after the first token (`(E2E - TTFT) / (output_tokens - 1)`).
+- **Session:** One user conversation. It sends a first request and may send follow-up turns, go idle or leave.
+- **Gateway:** The front end that assembles the prompt (history plus the new message) and turns it into tokens.
+- **Router:** The component that picks a pod for each request. Modelled on llm-d's endpoint picker (EPP), which scores pods on prefix-cache affinity, queue depth and KV utilisation.
+- **Pod:** One running copy of the inference engine with its GPUs. Pods are created, load weights, become ready, drain and terminate.
+- **Engine step:** One forward pass over the current batch. Every running sequence advances by one decode token or one prefill chunk.
+- **Continuous batching:** Iteration-level scheduling in which requests join and leave the running batch at every engine step, instead of waiting for a whole batch to finish.
+- **`max_num_seqs`:** The most sequences a pod runs in one step (vLLM's name for the batch-slot limit).
+- **Prefill:** Processing the prompt tokens to build the request's KV cache. Compute-bound.
+- **Decode:** Generating output tokens one step at a time, reading the whole KV cache each step. Memory-bandwidth-bound.
+- **Chunked prefill:** Splitting a long prefill across several steps under a token budget so decodes are not stalled behind it.
+- **KV cache:** The attention keys and values stored per token so earlier tokens are not recomputed.
+- **KV block:** A fixed-size page of KV cache (16 tokens here). A block is used, cached (unreferenced but still reusable) or free.
+- **Prefix caching:** Reusing KV blocks across requests that share the same leading tokens.
+- **Eviction:** Dropping a cached KV block, or moving it to a lower memory tier, to make room.
+- **Preemption:** Taking a running request out of the batch and freeing its KV blocks when memory runs out. The request is recomputed later.
+- **HBM:** High-bandwidth memory, the GPU's own memory. Holds the weights and the KV cache.
+- **Memory tiers:** The places KV can live below HBM: host DRAM, local SSD and a remote pool shared by all pods.
+- **P/D disaggregation:** Running prefill and decode on separate pools of pods and transferring the KV cache between them.
+- **Tensor parallelism (TP):** Splitting one model's weights and KV cache across several GPUs in a pod.
+- **Arithmetic intensity:** FLOPs per byte moved in a step. Compared with the GPU's ridge point, it says whether the step is compute-bound or memory-bound.
+- **Roofline:** The model that bounds step time by the slower of compute (FLOPs ÷ peak FLOP/s) and memory traffic (bytes ÷ bandwidth).
+- **Speculative decoding:** A small draft model proposes several tokens and the target model verifies them in one pass.
+- **TTFT:** Time to first token, from arrival to the first output token.
+- **TPOT:** Time per output token after the first. Also called inter-token latency (ITL).

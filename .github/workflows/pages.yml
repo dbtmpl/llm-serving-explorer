@@ -1,6 +1,6 @@
 name: Deploy to GitHub Pages
 
-# Manual trigger only. Add a push trigger once the repository is public and Pages is enabled.
+# Manual trigger only. Add a push trigger once Pages is enabled for the repository.
 on:
   workflow_dispatch:
 
@@ -17,82 +17,35 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
+      - uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v4
         with:
           version: 12
 
-      - name: Setup Node.js 22
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: pnpm
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: engine/go.mod
-          cache-dependency-path: engine/go.sum
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Apply engine patch
-        run: pnpm engine:patch
+      - uses: actions/configure-pages@v5
 
-      - name: Build browser WASM
-        run: pnpm build:wasm
+      - name: Build
+        run: VITE_BASE_PATH="/${{ github.event.repository.name }}/" pnpm build
 
-      # Only the packages the patch touches. Upstream's sim/workload tests need about
-      # 15 GB of memory, which is more than a hosted runner has.
-      - name: Run Go engine tests
-        working-directory: engine
-        run: go test ./sim ./sim/cluster
-
-      # The local-runner tests use this binary; building it here keeps their setup hook fast.
-      - name: Build native BLIS binary
-        working-directory: engine
-        run: go build -o /tmp/blis-local-runner .
-
-      - name: Typecheck web app
-        run: pnpm --filter @llm-viz/web typecheck
-
-      - name: Run unit & integration tests
-        run: pnpm test
-
-      - name: Configure GitHub Pages
-        id: pages
-        uses: actions/configure-pages@v5
-
-      - name: Build static site for GitHub Pages
-        run: |
-          REPO_NAME="${{ github.event.repository.name }}"
-          OWNER_ROOT="${{ github.repository_owner }}.github.io"
-          if [ -z "${REPO_NAME}" ] || [ "${REPO_NAME}" = "${OWNER_ROOT}" ]; then
-            BASE_PATH="/"
-          else
-            BASE_PATH="/${REPO_NAME}/"
-          fi
-          echo "Building @llm-viz/web with VITE_BASE_PATH=${BASE_PATH}"
-          VITE_BASE_PATH="${BASE_PATH}" pnpm --filter @llm-viz/web build
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v3
         with:
-          path: ./web/dist
+          path: ./dist
 
   deploy:
+    needs: build
+    runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
     steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
+      - id: deployment
         uses: actions/deploy-pages@v4
