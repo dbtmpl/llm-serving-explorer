@@ -1,7 +1,7 @@
 /** Short explanations that appear next to the node where something just happened. */
-import { fmtGB, fmtInt, fmtMs } from "./model.js";
+import { fmtGB, fmtInt, fmtMs } from "./format.js";
 import type { Target } from "./render.js";
-import type { SimEvent, World } from "./sim.js";
+import type { SimEvent, World } from "../sim/index.js";
 
 export interface Callout {
   key: string;

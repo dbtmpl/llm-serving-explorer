@@ -1,5 +1,7 @@
 # Glossary
 
+- **Concept:** A decision a serving stack has to make, such as how to route or what to evict. Each has a module under `src/sim/`.
+- **Approach:** One published or deployed way of making that decision. Implemented in its own file, with its sources.
 - **Session:** One user conversation. It sends a first request and may send follow-up turns, go idle or leave.
 - **Gateway:** The front end that assembles the prompt (history plus the new message) and turns it into tokens.
 - **Router:** The component that picks a pod for each request. Modelled on llm-d's endpoint picker (EPP), which scores pods on prefix-cache affinity, queue depth and KV utilisation.

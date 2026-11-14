@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useReducer, useRef, useState, type ReactNode } from "react";
 import { STEP_KINDS, calloutFor, type Callout } from "./callouts.js";
 import { TOUR, TourArt } from "./Tutorial.js";
-import { ARCHITECTURES, DEFAULT_ARCH } from "./architectures.js";
 import { Inspector } from "./Inspector.js";
-import { GPUS, MODELS, fmtInt, fmtMs } from "./model.js";
+import { fmtInt, fmtMs } from "./format.js";
 import { C, Scene, type Target } from "./render.js";
-import { DEFAULT_PARAMS, advance, costPerMTok, createWorld, kvFill, livePods, median, setParam, spawnBurst, tokensPerSecond, type Params, type World } from "./sim.js";
+import { ARCHITECTURES, DEFAULT_ARCH, DEFAULT_PARAMS, GPUS, MODELS, advance, costPerMTok, createWorld, kvFill, livePods, median, setParam, spawnBurst, tokensPerSecond, type Params, type World } from "../sim/index.js";
 import "./live.css";
 
 const SPEEDS = [0.02, 0.05, 0.1, 0.25, 0.5, 1];
