@@ -35,7 +35,7 @@ function Stack({ parts }: { parts: { label: string; value: number; color: string
   );
 }
 
-/** Log-log roofline (2.5) of the replica with the current step's operating point. */
+/** Log-log roofline of the replica with the current step's operating point. */
 function Roofline({ pod }: { pod: Pod }) {
   const W = 276;
   const H = 150;
@@ -85,7 +85,7 @@ function Roofline({ pod }: { pod: Pod }) {
   );
 }
 
-/** Saturating decode throughput against the batch (2.12), with the pod's current batch marked. */
+/** Saturating decode throughput against the batch, with the pod's current batch marked. */
 function Throughput({ pod, w, L }: { pod: Pod; w: World; L: number }) {
   const W = 276;
   const H = 110;
