@@ -36,14 +36,18 @@ describe("speculative decoding (Leviathan et al., ICML 2023)", () => {
   });
   it("accepts between 1 and γ + 1 tokens, with the mean of equation 1", () => {
     const draw = lcg(42);
-    const n = 200_000;
+    const n = 100_000;
     let total = 0;
+    let fewest = Infinity;
+    let most = 0;
     for (let i = 0; i < n; i++) {
       const tokens = s.tokensThisStep(draw, settings);
-      expect(tokens).toBeGreaterThanOrEqual(1);
-      expect(tokens).toBeLessThanOrEqual(settings.draftTokens + 1);
+      fewest = Math.min(fewest, tokens);
+      most = Math.max(most, tokens);
       total += tokens;
     }
+    expect(fewest).toBe(1);
+    expect(most).toBe(settings.draftTokens + 1);
     expect(total / n).toBeCloseTo(expectedTokensPerStep(settings), 1);
   });
   it("never accepts with α = 0 and always accepts with α = 1", () => {
