@@ -409,6 +409,7 @@ body,
   border-left: 1px solid var(--line);
   white-space: nowrap;
   min-width: 56px;
+  flex: 0 0 auto;
 }
 .lv-hud > div:first-child {
   border-left: 0;
