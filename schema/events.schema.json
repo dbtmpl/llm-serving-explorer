@@ -1,0 +1,754 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://inference-viz.dev/schema/events/v1",
+  "title": "BLIS Event Stream Record v1",
+  "description": "Versioned NDJSON record schema for LLM inference visualization driven by BLIS.",
+  "oneOf": [
+    { "$ref": "#/$defs/HeaderRecord" },
+    { "$ref": "#/$defs/RequestArrivedEvent" },
+    { "$ref": "#/$defs/RequestAdmittedEvent" },
+    { "$ref": "#/$defs/RequestRejectedEvent" },
+    { "$ref": "#/$defs/RequestRoutedEvent" },
+    { "$ref": "#/$defs/RequestQueuedEvent" },
+    { "$ref": "#/$defs/RequestScheduledEvent" },
+    { "$ref": "#/$defs/RequestPrefillEvent" },
+    { "$ref": "#/$defs/RequestDecodeStepEvent" },
+    { "$ref": "#/$defs/RequestPreemptedEvent" },
+    { "$ref": "#/$defs/RequestFinishedEvent" },
+    { "$ref": "#/$defs/RequestTimedOutEvent" },
+    { "$ref": "#/$defs/BatchStepEvent" },
+    { "$ref": "#/$defs/KVBlockAllocatedEvent" },
+    { "$ref": "#/$defs/KVBlockCachedEvent" },
+    { "$ref": "#/$defs/KVBlockEvictedEvent" },
+    { "$ref": "#/$defs/KVBlockMovedEvent" },
+    { "$ref": "#/$defs/KVTransferEvent" },
+    { "$ref": "#/$defs/PodCreatedEvent" },
+    { "$ref": "#/$defs/PodLoadingEvent" },
+    { "$ref": "#/$defs/PodReadyEvent" },
+    { "$ref": "#/$defs/PodDrainingEvent" },
+    { "$ref": "#/$defs/PodTerminatedEvent" },
+    { "$ref": "#/$defs/MetricsSnapshotEvent" }
+  ],
+  "$defs": {
+    "BaseEventFields": {
+      "type": "object",
+      "required": ["seq", "t_us", "type"],
+      "properties": {
+        "seq": { "type": "integer", "minimum": 0 },
+        "t_us": { "type": "integer", "minimum": 0 },
+        "type": { "type": "string" }
+      }
+    },
+    "GPUSpecs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["memory_gib", "tflops_peak", "tflops_fp8", "bw_peak_tbs", "sm_count"],
+      "properties": {
+        "memory_gib": { "type": "number", "exclusiveMinimum": 0 },
+        "tflops_peak": { "type": "number", "exclusiveMinimum": 0 },
+        "tflops_fp8": { "type": "number", "minimum": 0 },
+        "bw_peak_tbs": { "type": "number", "exclusiveMinimum": 0 },
+        "sm_count": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "MemoryBreakdownBytes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["weights", "activation_peak", "cuda_graph", "comm_buffers"],
+      "properties": {
+        "weights": { "type": "integer", "minimum": 0 },
+        "activation_peak": { "type": "integer", "minimum": 0 },
+        "cuda_graph": { "type": "integer", "minimum": 0 },
+        "comm_buffers": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "PoolConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "replicas",
+        "tp",
+        "pp",
+        "dp",
+        "gpus_per_pod",
+        "gpu_type",
+        "gpu_specs",
+        "memory_breakdown_bytes",
+        "kv_blocks_per_gpu",
+        "kv_block_size_tokens",
+        "max_num_seqs",
+        "max_num_batched_tokens",
+        "max_model_len"
+      ],
+      "properties": {
+        "role": { "type": "string", "enum": ["colocated", "prefill", "decode", "encode"] },
+        "replicas": { "type": "integer", "minimum": 0 },
+        "tp": { "type": "integer", "minimum": 1 },
+        "pp": { "type": "integer", "minimum": 1 },
+        "dp": { "type": "integer", "minimum": 1 },
+        "gpus_per_pod": { "type": "integer", "minimum": 1 },
+        "gpu_type": { "type": "string", "minLength": 1 },
+        "gpu_specs": { "$ref": "#/$defs/GPUSpecs" },
+        "memory_breakdown_bytes": { "$ref": "#/$defs/MemoryBreakdownBytes" },
+        "kv_blocks_per_gpu": { "type": "integer", "minimum": 1 },
+        "kv_block_size_tokens": { "type": "integer", "minimum": 1 },
+        "max_num_seqs": { "type": "integer", "minimum": 1 },
+        "max_num_batched_tokens": { "type": "integer", "minimum": 1 },
+        "max_model_len": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "InitialPod": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pod_id", "pool_role", "gpu_ids", "tp_degree", "state"],
+      "properties": {
+        "pod_id": { "type": "string", "minLength": 1 },
+        "pool_role": { "type": "string", "enum": ["colocated", "prefill", "decode", "encode"] },
+        "gpu_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "tp_degree": { "type": "integer", "minimum": 1 },
+        "state": { "type": "string", "enum": ["loading", "ready", "draining", "terminated"] }
+      }
+    },
+    "HeaderRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "schema_version", "blis", "scenario", "topology"],
+      "properties": {
+        "type": { "const": "header" },
+        "schema_version": { "const": "1.0" },
+        "blis": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["commit", "vllm_version", "llmd_version", "stack_versions"],
+          "properties": {
+            "commit": { "type": "string", "minLength": 7 },
+            "vllm_version": { "type": "string", "minLength": 1 },
+            "llmd_version": { "type": "string", "minLength": 1 },
+            "stack_versions": {
+              "type": "object",
+              "additionalProperties": { "type": "string" }
+            }
+          }
+        },
+        "scenario": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "model", "hardware", "flags", "seed", "horizon_us"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "model": { "type": "string", "minLength": 1 },
+            "hardware": { "type": "string", "minLength": 1 },
+            "flags": { "type": "object" },
+            "seed": { "type": "integer" },
+            "horizon_us": { "type": "integer", "minimum": 0 },
+            "routing_policy": { "type": "string" }
+          }
+        },
+        "topology": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["gateway_latency_us", "pools", "tiers", "initial_pods"],
+          "properties": {
+            "gateway_latency_us": { "type": "integer", "minimum": 0 },
+            "pools": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/PoolConfig" }
+            },
+            "tiers": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "gpu_hbm_blocks",
+                "cpu_ram_blocks",
+                "cpu_ram_bytes",
+                "local_ssd_modelled",
+                "remote_store_modelled",
+                "unmodelled_notes"
+              ],
+              "properties": {
+                "gpu_hbm_blocks": { "type": "integer", "minimum": 0 },
+                "cpu_ram_blocks": { "type": "integer", "minimum": 0 },
+                "cpu_ram_bytes": { "type": "integer", "minimum": 0 },
+                "local_ssd_modelled": { "type": "boolean" },
+                "remote_store_modelled": { "type": "boolean" },
+                "unmodelled_notes": {
+                  "type": "object",
+                  "additionalProperties": { "type": "string" }
+                }
+              }
+            },
+            "initial_pods": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/InitialPod" }
+            }
+          }
+        }
+      }
+    },
+    "RequestArrivedEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seq", "t_us", "type", "req_id", "prompt_tokens", "max_output_tokens"],
+      "properties": {
+        "seq": { "type": "integer", "minimum": 0 },
+        "t_us": { "type": "integer", "minimum": 0 },
+        "type": { "const": "request.arrived" },
+        "req_id": { "type": "string", "minLength": 1 },
+        "prompt_tokens": { "type": "integer", "minimum": 0 },
+        "max_output_tokens": { "type": "integer", "minimum": 0 },
+        "prefix_group": { "type": "string" },
+        "prefix_tokens": { "type": "integer", "minimum": 0 },
+        "block_hashes": { "type": "array", "items": { "type": "string" } },
+        "slo_class": { "type": "string" },
+        "session_id": { "type": "string" }
+      }
+    },
+    "RequestAdmittedEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seq", "t_us", "type", "req_id"],
+      "properties": {
+        "seq": { "type": "integer", "minimum": 0 },
+        "t_us": { "type": "integer", "minimum": 0 },
+        "type": { "const": "request.admitted" },
+        "req_id": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string" }
+      }
+    },
+    "RequestRejectedEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seq", "t_us", "type", "req_id", "reason", "stage"],
+      "properties": {
+        "seq": { "type": "integer", "minimum": 0 },
+        "t_us": { "type": "integer", "minimum": 0 },
+        "type": { "const": "request.rejected" },
+        "req_id": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string" },
+        "stage": {
+          "type": "string",
+          "enum": ["admission", "flow_control", "routing", "unservable", "decode_kv"]
+        }
+      }
+    },
+    "CandidateScore": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pod_id", "score", "queue_depth", "batch_size", "kv_utilization", "free_kv_blocks"],
+      "properties": {
+        "pod_id": { "type": "string", "minLength": 1 },
+        "score": { "type": "number" },
+        "scorer_breakdown": {
+          "type": "object",
+          "additionalProperties": { "type": "number" }
+        },
+        "queue_depth": { "type": "integer", "minimum": 0 },
+        "batch_size": { "type": "integer", "minimum": 0 },
+        "in_flight_requests": { "type": "integer", "minimum": 0 },
+        "kv_utilization": { "type": "number", "minimum": 0, "maximum": 1 },
+        "free_kv_blocks": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "RequestRoutedEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seq", "t_us", "type", "req_id", "chosen_pod", "disaggregate"],
+      "properties": {
+        "seq": { "type": "integer", "minimum": 0 },
+        "t_us": { "type": "integer", "minimum": 0 },
+        "type": { "const": "request.routed" },
+        "req_id": { "type": "string", "minLength": 1 },
+        "chosen_pod": { "type": "string", "minLength": 1 },
+        "prefill_pod": { "type": "string" },
+        "decode_pod": { "type": "string" },
+        "disaggregate": { "type": "boolean" },
+        "reason": { "type": "string" },
+        "scores": {
+          "type": "object",
+          "additionalProperties": { "type": "number" }
+        },
+        "candidates": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/CandidateScore" }
+        },
+        "regret": { "type": "number" }
+      }
+    },
+    "RequestQueuedEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seq", "t_us", "type", "req_id", "pod_id", "queue_depth"],
+      "properties": {
+        "seq": { "type": "integer", "minimum": 0 },
+        "t_us": { "type": "integer", "minimum": 0 },
+        "type": { "const": "request.queued" },
+        "req_id": { "type": "string", "minLength": 1 },
+        "pod_id": { "type": "string", "minLength": 1 },
+        "queue_depth": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "RequestScheduledEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seq", "t_us", "type", "req_id", "pod_id", "cached_tokens", "prefix_lookup"],
+      "properties": {
+        "seq": { "type": "integer", "minimum": 0 },
+        "t_us": { "type": "integer", "minimum": 0 },
+        "type": { "const": "request.scheduled" },
+        "req_id": { "type": "string", "minLength": 1 },
+        "pod_id": { "type": "string", "minLength": 1 },
+        "cached_tokens": { "type": "integer", "minimum": 0 },
+        "cpu_hit_tokens": { "type": "integer", "minimum": 0 },
+        "prefix_lookup": { "type": "boolean" }
+      }
+    },
+    "RequestPrefillEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "seq",
+        "t_us",
+        "type",
+        "req_id",
+        "pod_id",
+        "batch_id",
+        "tokens_processed",
+        "computed_after",
+        "prompt_tokens",
+        "duration_us"
+      ],
+      "properties": {
+        "seq": { "type": "integer", "minimum": 0 },
+        "t_us": { "type": "integer", "minimum": 0 },
+        "type": { "const": "request.prefill" },
+        "req_id": { "type": "string", "minLength": 1 },
+        "pod_id": { "type": "string", "minLength": 1 },
+        "batch_id": { "type": "integer", "minimum": 0 },
+        "tokens_processed": { "type": "integer", "minimum": 0 },
+        "computed_after": { "type": "integer", "minimum": 0 },
+        "prompt_tokens": { "type": "integer", "minimum": 0 },
+        "duration_us": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "RequestDecodeStepEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "seq",
+        "t_us",
+        "type",
+        "req_id",
+        "pod_id",
+        "batch_id",
+        "tokens_emitted",
+        "total_emitted",
+        "is_first_token",
+        "duration_us"
+      ],
+      "properties": {
+        "seq": { "type": "integer", "minimum": 0 },
+        "t_us": { "type": "integer", "minimum": 0 },
+        "type": { "const": "request.decode_step" },
+        "req_id": { "type": "string", "minLength": 1 },
+        "pod_id": { "type": "string", "minLength": 1 },
+        "batch_id": { "type": "integer", "minimum": 0 },
+        "tokens_emitted": { "type": "integer", "minimum": 0 },
+        "total_emitted": { "type": "integer", "minimum": 0 },
+        "is_first_token": { "type": "boolean" },
+        "duration_us": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "RequestPreemptedEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seq", "t_us", "type", "req_id", "pod_id", "reason", "freed_blocks"],
+      "properties": {
+        "seq": { "type": "integer", "minimum": 0 },
+        "t_us": { "type": "integer", "minimum": 0 },
+        "type": { "const": "request.preempted" },
+        "req_id": { "type": "string", "minLength": 1 },
+        "pod_id": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string" },
+        "computed_tokens_lost": { "type": "integer", "minimum": 0 },
+        "freed_blocks": { "type": "array", "items": { "type": "integer", "minimum": 0 } }
+      }
+    },
+    "RequestFinishedEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "seq",
+        "t_us",
+        "type",
+        "req_id",
+        "pod_id",
+        "reason",
+        "output_tokens",
+        "ttft_us",
+        "e2e_us",
+        "tpot_us"
+      ],
+      "properties": {
+        "seq": { "type": "integer", "minimum": 0 },
+        "t_us": { "type": "integer", "minimum": 0 },
+        "type": { "const": "request.finished" },
+        "req_id": { "type": "string", "minLength": 1 },
+        "pod_id": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string", "enum": ["stop", "length", "abort", "error"] },
+        "output_tokens": { "type": "integer", "minimum": 0 },
+        "ttft_us": { "type": "integer", "minimum": 0 },
+        "e2e_us": { "type": "integer", "minimum": 0 },
+        "tpot_us": { "type": "number", "minimum": 0 }
+      }
+    },
+    "RequestTimedOutEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seq", "t_us", "type", "req_id", "stage", "elapsed_us"],
+      "properties": {
+        "seq": { "type": "integer", "minimum": 0 },
+        "t_us": { "type": "integer", "minimum": 0 },
+        "type": { "const": "request.timed_out" },
+        "req_id": { "type": "string", "minLength": 1 },
+        "pod_id": { "type": "string" },
+        "stage": { "type": "string", "enum": ["gateway", "engine"] },
+        "elapsed_us": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "BatchMember": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["req_id", "role", "tokens", "computed_before"],
+      "properties": {
+        "req_id": { "type": "string", "minLength": 1 },
+        "role": { "type": "string", "enum": ["prefill", "decode"] },
+        "tokens": { "type": "integer", "minimum": 1 },
+        "computed_before": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "RooflinePoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "flops",
+        "bytes_moved",
+        "arithmetic_intensity",
+        "achieved_tflops",
+        "achieved_bw_tbs",
+        "bottleneck",
+        "derived"
+      ],
+      "properties": {
+        "flops": { "type": "number", "minimum": 0 },
+        "bytes_moved": { "type": "number", "minimum": 0 },
+        "arithmetic_intensity": { "type": "number", "minimum": 0 },
+        "achieved_tflops": { "type": "number", "minimum": 0 },
+        "achieved_bw_tbs": { "type": "number", "minimum": 0 },
+        "bottleneck": { "type": "string" },
+        "per_resource_us": {
+          "type": "object",
+          "additionalProperties": { "type": "number" }
+        },
+        "derived": { "type": "boolean" }
+      }
+    },
+    "BatchStepEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "seq",
+        "t_us",
+        "type",
+        "pod_id",
+        "batch_id",
+        "phase",
+        "members",
+        "prefill_tokens",
+        "decode_tokens",
+        "total_tokens",
+        "duration_us",
+        "roofline"
+      ],
+      "properties": {
+        "seq": { "type": "integer", "minimum": 0 },
+        "t_us": { "type": "integer", "minimum": 0 },
+        "type": { "const": "batch.step" },
+        "pod_id": { "type": "string", "minLength": 1 },
+        "batch_id": { "type": "integer", "minimum": 0 },
+        "phase": { "type": "string", "enum": ["prefill", "decode", "mixed"] },
+        "members": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/BatchMember" }
+        },
+        "prefill_tokens": { "type": "integer", "minimum": 0 },
+        "decode_tokens": { "type": "integer", "minimum": 0 },
+        "total_tokens": { "type": "integer", "minimum": 0 },
+        "duration_us": { "type": "integer", "minimum": 1 },
+        "roofline": { "$ref": "#/$defs/RooflinePoint" }
+      }
+    },
+    "KVBlockAllocatedEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seq", "t_us", "type", "pod_id", "gpu_indices", "block_ids", "req_id", "tier"],
+      "properties": {
+        "seq": { "type": "integer", "minimum": 0 },
+        "t_us": { "type": "integer", "minimum": 0 },
+        "type": { "const": "kv.block.allocated" },
+        "pod_id": { "type": "string", "minLength": 1 },
+        "gpu_indices": { "type": "array", "items": { "type": "integer", "minimum": 0 }, "minItems": 1 },
+        "block_ids": { "type": "array", "items": { "type": "integer", "minimum": 0 }, "minItems": 1 },
+        "req_id": { "type": "string", "minLength": 1 },
+        "block_hashes": { "type": "array", "items": { "type": "string" } },
+        "tier": { "type": "string", "enum": ["gpu", "cpu_dram"] },
+        "shared_with_reqs": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "KVBlockCachedEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seq", "t_us", "type", "pod_id", "gpu_indices", "block_ids", "block_hashes", "tier"],
+      "properties": {
+        "seq": { "type": "integer", "minimum": 0 },
+        "t_us": { "type": "integer", "minimum": 0 },
+        "type": { "const": "kv.block.cached" },
+        "pod_id": { "type": "string", "minLength": 1 },
+        "gpu_indices": { "type": "array", "items": { "type": "integer", "minimum": 0 }, "minItems": 1 },
+        "block_ids": { "type": "array", "items": { "type": "integer", "minimum": 0 }, "minItems": 1 },
+        "block_hashes": { "type": "array", "items": { "type": "string" } },
+        "prev_owner_req_id": { "type": "string" },
+        "tier": { "type": "string", "enum": ["gpu", "cpu_dram"] }
+      }
+    },
+    "KVBlockEvictedEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "seq",
+        "t_us",
+        "type",
+        "pod_id",
+        "gpu_indices",
+        "block_ids",
+        "tier",
+        "destination",
+        "reason"
+      ],
+      "properties": {
+        "seq": { "type": "integer", "minimum": 0 },
+        "t_us": { "type": "integer", "minimum": 0 },
+        "type": { "const": "kv.block.evicted" },
+        "pod_id": { "type": "string", "minLength": 1 },
+        "gpu_indices": { "type": "array", "items": { "type": "integer", "minimum": 0 }, "minItems": 1 },
+        "block_ids": { "type": "array", "items": { "type": "integer", "minimum": 0 }, "minItems": 1 },
+        "block_hashes": { "type": "array", "items": { "type": "string" } },
+        "tier": { "type": "string", "enum": ["gpu", "cpu_dram"] },
+        "destination": { "type": "string", "enum": ["dropped", "cpu_dram"] },
+        "reason": { "type": "string", "minLength": 1 },
+        "triggered_by_req_id": { "type": "string" }
+      }
+    },
+    "KVBlockMovedEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "seq",
+        "t_us",
+        "type",
+        "pod_id",
+        "transfer_id",
+        "req_id",
+        "from_tier",
+        "to_tier",
+        "direction",
+        "block_ids",
+        "num_blocks",
+        "tokens",
+        "duration_us",
+        "status"
+      ],
+      "properties": {
+        "seq": { "type": "integer", "minimum": 0 },
+        "t_us": { "type": "integer", "minimum": 0 },
+        "type": { "const": "kv.block.moved" },
+        "pod_id": { "type": "string", "minLength": 1 },
+        "transfer_id": { "type": "integer", "minimum": 0 },
+        "req_id": { "type": "string", "minLength": 1 },
+        "from_tier": { "type": "string", "enum": ["gpu", "cpu_dram"] },
+        "to_tier": { "type": "string", "enum": ["gpu", "cpu_dram"] },
+        "direction": { "type": "string", "enum": ["offload", "load"] },
+        "block_ids": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
+        "num_blocks": { "type": "integer", "minimum": 0 },
+        "tokens": { "type": "integer", "minimum": 0 },
+        "duration_us": { "type": "integer", "minimum": 0 },
+        "status": { "type": "string", "enum": ["started", "completed"] }
+      }
+    },
+    "KVTransferEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "seq",
+        "t_us",
+        "type",
+        "req_id",
+        "from_pod",
+        "to_pod",
+        "num_kv_blocks",
+        "pulled_kv_blocks",
+        "duration_us",
+        "status"
+      ],
+      "properties": {
+        "seq": { "type": "integer", "minimum": 0 },
+        "t_us": { "type": "integer", "minimum": 0 },
+        "type": { "const": "kv.transfer" },
+        "transfer_id": { "type": "integer", "minimum": 0 },
+        "req_id": { "type": "string", "minLength": 1 },
+        "from_pod": { "type": "string", "minLength": 1 },
+        "to_pod": { "type": "string", "minLength": 1 },
+        "num_kv_blocks": { "type": "integer", "minimum": 0 },
+        "pulled_kv_blocks": { "type": "integer", "minimum": 0 },
+        "duration_us": { "type": "integer", "minimum": 0 },
+        "status": { "type": "string", "enum": ["started", "completed"] }
+      }
+    },
+    "PodCreatedEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seq", "t_us", "type", "pod_id", "pool_role", "gpu_ids", "tp_degree"],
+      "properties": {
+        "seq": { "type": "integer", "minimum": 0 },
+        "t_us": { "type": "integer", "minimum": 0 },
+        "type": { "const": "pod.created" },
+        "pod_id": { "type": "string", "minLength": 1 },
+        "pool_role": { "type": "string", "enum": ["colocated", "prefill", "decode", "encode"] },
+        "gpu_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "tp_degree": { "type": "integer", "minimum": 1 },
+        "node_id": { "type": "string" }
+      }
+    },
+    "PodLoadingEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seq", "t_us", "type", "pod_id", "pool_role"],
+      "properties": {
+        "seq": { "type": "integer", "minimum": 0 },
+        "t_us": { "type": "integer", "minimum": 0 },
+        "type": { "const": "pod.loading" },
+        "pod_id": { "type": "string", "minLength": 1 },
+        "pool_role": { "type": "string", "enum": ["colocated", "prefill", "decode", "encode"] }
+      }
+    },
+    "PodReadyEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seq", "t_us", "type", "pod_id", "pool_role"],
+      "properties": {
+        "seq": { "type": "integer", "minimum": 0 },
+        "t_us": { "type": "integer", "minimum": 0 },
+        "type": { "const": "pod.ready" },
+        "pod_id": { "type": "string", "minLength": 1 },
+        "pool_role": { "type": "string", "enum": ["colocated", "prefill", "decode", "encode"] }
+      }
+    },
+    "PodDrainingEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seq", "t_us", "type", "pod_id", "pool_role"],
+      "properties": {
+        "seq": { "type": "integer", "minimum": 0 },
+        "t_us": { "type": "integer", "minimum": 0 },
+        "type": { "const": "pod.draining" },
+        "pod_id": { "type": "string", "minLength": 1 },
+        "pool_role": { "type": "string", "enum": ["colocated", "prefill", "decode", "encode"] },
+        "reason": { "type": "string" }
+      }
+    },
+    "PodTerminatedEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seq", "t_us", "type", "pod_id", "pool_role"],
+      "properties": {
+        "seq": { "type": "integer", "minimum": 0 },
+        "t_us": { "type": "integer", "minimum": 0 },
+        "type": { "const": "pod.terminated" },
+        "pod_id": { "type": "string", "minLength": 1 },
+        "pool_role": { "type": "string", "enum": ["colocated", "prefill", "decode", "encode"] }
+      }
+    },
+    "InstanceMetricsSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pod_id",
+        "state",
+        "queue_depth",
+        "batch_size",
+        "kv_used_blocks",
+        "kv_cached_blocks",
+        "kv_free_blocks",
+        "kv_total_blocks",
+        "preemptions",
+        "completed_requests"
+      ],
+      "properties": {
+        "pod_id": { "type": "string", "minLength": 1 },
+        "state": { "type": "string", "enum": ["loading", "warming_up", "ready", "active", "draining", "terminated"] },
+        "queue_depth": { "type": "integer", "minimum": 0 },
+        "batch_size": { "type": "integer", "minimum": 0 },
+        "kv_used_blocks": { "type": "integer", "minimum": 0 },
+        "kv_cached_blocks": { "type": "integer", "minimum": 0 },
+        "kv_free_blocks": { "type": "integer", "minimum": 0 },
+        "kv_total_blocks": { "type": "integer", "minimum": 0 },
+        "cpu_used_blocks": { "type": "integer", "minimum": 0 },
+        "cpu_total_blocks": { "type": "integer", "minimum": 0 },
+        "preemptions": { "type": "integer", "minimum": 0 },
+        "completed_requests": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "MetricsSnapshotEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "seq",
+        "t_us",
+        "type",
+        "is_final",
+        "gateway_queue_depth",
+        "completed_requests",
+        "preemptions",
+        "rejected_requests",
+        "timed_out_requests",
+        "dropped_requests",
+        "ttft_mean_ms",
+        "tpot_mean_ms",
+        "output_tok_s",
+        "prefix_cache_hit_rate",
+        "instances"
+      ],
+      "properties": {
+        "seq": { "type": "integer", "minimum": 0 },
+        "t_us": { "type": "integer", "minimum": 0 },
+        "type": { "const": "metrics.snapshot" },
+        "is_final": { "type": "boolean" },
+        "gateway_queue_depth": { "type": "integer", "minimum": 0 },
+        "completed_requests": { "type": "integer", "minimum": 0 },
+        "preemptions": { "type": "integer", "minimum": 0 },
+        "rejected_requests": { "type": "integer", "minimum": 0 },
+        "timed_out_requests": { "type": "integer", "minimum": 0 },
+        "dropped_requests": { "type": "integer", "minimum": 0 },
+        "ttft_mean_ms": { "type": "number", "minimum": 0 },
+        "tpot_mean_ms": { "type": "number", "minimum": 0 },
+        "output_tok_s": { "type": "number", "minimum": 0 },
+        "prefix_cache_hit_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "instances": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/InstanceMetricsSnapshot" }
+        }
+      }
+    }
+  }
+}

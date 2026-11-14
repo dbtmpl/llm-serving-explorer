@@ -1,0 +1,13 @@
+{
+  "title": "08 · Cache-Affinity Overload & Queue Skew",
+  "subtitle": "See how aggressive prefix affinity creates hot-spot queues on 2 pods while peer pods sit nearly idle",
+  "recommended_views": ["routing-gateway", "scheduler-queue", "compare"],
+  "scenario": "scenario.yaml",
+  "workload_spec": "workload.yaml",
+  "num_instances": 4,
+  "seed": 42,
+  "compare_variant": {
+    "label": "In-Flight Load Balanced (active-request-scorer)",
+    "scenario": "baseline.scenario.yaml"
+  }
+}

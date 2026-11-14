@@ -1,0 +1,5298 @@
+diff --git a/PATCHES.md b/PATCHES.md
+new file mode 100644
+index 00000000..bbc401a6
+--- /dev/null
++++ b/PATCHES.md
+@@ -0,0 +1,54 @@
++# Engine Patches for Visualization Event Log (`--events-output`)
++
++This document records all modifications and additions inside `engine/` to emit a structured v1 NDJSON simulation event stream conforming to `../schema/events.schema.json` when `--events-output <path>` is enabled, while preserving BLIS invariants when `--events-output` is omitted or enabled.
++
++## Invariants Preserved
++
++1. **INV-6 Determinism & Zero Behavioral Perturbation**: Attaching a `sim.EventSink` (`--events-output`) is purely observational. It never mutates RNG streams, scheduling order, gateway admission/routing decisions, or instance state transitions. Smoke testing `blis run` with and without `--events-output` produces byte-identical stdout `Result` JSON (outside `runtime`).
++2. **Stdout Purity**: `blis run` and `blis replay` continue writing the `Result` document exclusively to stdout (or `--output`); all NDJSON records go exclusively to the `--events-output` file. `--events-output` is exempted in `cmd/result_flags.go` alongside report-only output flags.
++3. **DEV-13 Output Length Isolation**: Arrival/routing event emission reads only `req.MaxOutputLen`, never `req.OutputTokens` (enforced by `TestDEV13_SampledOutputLengthIsReadOnlyAtDeclaredSites`).
++4. **Package Import Boundaries**: All `blis-vllm` / kernel inspection for `HeaderRecord.Topology` (`Pools`, `GPUSpecs`, `MemoryBreakdownBytes`) and `sim.ModelRooflineSpec` lives strictly inside `cmd/engine_build.go`. No `cmd/` copy of engine setting validation checks is introduced (enforced by `TestCmdChecksNoEngineSettingTheBuildSiteAdopts`).
++
++---
++
++## Added Files
++
++### Core Engine & Schema (`sim/`)
++- `sim/events_schema.go`: Go structs and JSON tags for `HeaderRecord` (`schema_version: "1.0"`, BLIS provenance, scenario, topology) and all v1 `EventRecord` types matching `../schema/events.schema.json`.
++- `sim/events_sink.go`: `EventSink` interface, buffered thread-safe `JSONLEventSink` (writing monotonic `seq` and compact NDJSON lines via `bufio.Writer`), and `NopEventSink`.
++- `sim/kv_block_tracker.go`: Pure observational shadow tracker mapping engine logical KV block keys to physical block IDs and tracking GPU/CPU tier residency and prefix cache hits for `kv.block.*` events without altering engine simulation.
++- `sim/roofline.go`: Analytical `ModelRooflineSpec` computation (`ComputeBatchRoofline`) producing `flops`, `bytes_moved`, `arithmetic_intensity`, `achieved_tflops`, `achieved_bw_tbs`, `bottleneck`, `compute_util`, `bw_util`, and `bound_by` from batch composition and model/GPU parameters.
++- `sim/engine_driver_events.go`: Observational driver helpers (`FlushSinkEvents`, `CachedKVBlocksCount`, `recordStepEvents`, buffered `pendingSinkEvent` queue for `kickGroup` steps) emitting `request.queued`, `request.scheduled`, `batch.step`, `request.prefill`, `request.decode_step`, `request.preempted`, `request.finished`, `request.timed_out`, and `kv.block.*` events.
++- `sim/events_test.go`: Unit tests covering NDJSON serialization, KV shadow tracker allocation/caching/eviction/tier movement, roofline calculations, `EngineDriver` event emission, and INV-6 parity.
++
++### Cluster & Gateway Wiring (`sim/cluster/`)
++- `sim/cluster/events_emit.go`: `ClusterSimulator` event emission helpers (`SetEventSink`, `SetEventSnapshotInterval`, `InitialPodsInfo`, `emitInitialPodEvents`, `emitPodCreatedAndLoading`, `emitPodTransitionEvent`, `emitRequestArrived` with deterministic chained SHA-256 `block_hashes`, `emitRequestRouted` with `request.admitted` + read-only `counterfactual` candidates/regret, `emitGatewayRejection` mapping `RejectedClientTimeout` to `request.timed_out` and rejections to mapped stages, `emitDecodeKVRejection` for `decode_kv`, `emitKVTransferStarted`/`emitKVTransferCompleted`, and periodic/final `maybeEmitMetricsSnapshot` with `[0, 1]`-clamped `prefix_cache_hit_rate`).
++- `sim/cluster/events_emit_test.go`: Unit tests covering cluster event emission, candidate scoring with `TraceLevel="none"`, pod transition deduplication (no duplicate `pod.ready` across `WarmingUp -> Active`), gateway rejection/timeout stage mapping, periodic/final `metrics.snapshot`, and INV-6 parity.
++
++### CLI (`cmd/`)
++- `cmd/events_output.go`: `--events-output` flag registration and `eventsOutput` lifecycle manager opening the NDJSON sink, building `HeaderRecord` (BLIS commit/versions from `EngineReleases()`, `debug.ReadBuildInfo()`, and embedded `stack.json`, plus scenario/router/topology metadata), attaching the sink to `DeploymentConfig`, flushing/closing after simulation, and failing cleanly on I/O errors without touching stdout.
++
++---
++
++## Modified Files
++
++### Engine Driver (`sim/`)
++- `sim/engine_driver.go`: Extended `EngineDriverConfig` (`EventSink`, `PodID`, `GPUsPerPod`, `TPDegree`, `KVBlockSize`, `KVBlocksTotal`, `CPUBlocksTotal`, `HasCPUOffload`, `RooflineSpec`) and `EngineDriver` (`SetEventSink`, `SetPodEventMeta`, `HasCPUOffload`, `CPUBlocksTotal`, enqueue/preempt/timeout/kv/step event hooks).
++- `sim/engine_driver_group.go`: Flushes/records `kickGroup` step events in lockstep timestamp order when `EventSink` is active.
++- `sim/engine_driver_handoff.go`: Records P/D / tier KV handoff observation metadata in the driver's event state.
++
++### Cluster Simulator (`sim/cluster/`)
++- `sim/cluster/deployment.go`: Added `EventSink`, `EventSnapshotIntervalUs`, `RooflineSpec`, `RooflineSpecsByRole`, `HasCPUOffload`, and `CPUBlocksTotal` to `DeploymentConfig`.
++- `sim/cluster/cluster.go`: Added `ClusterSimulator` event fields (`eventSink`, `eventSnapshotIntervalUs`, `nextEventSnapshotClockUs`, `initialPodsEmitted`, `nextTransferSeq`, `transferIDs`), synced event sink + pool-role roofline/offload metadata to startup and `addLiveInstance` pods, wired `emitPodTransitionEvent` in `wireInstance`, emitted initial pod events at `Run()` start, flushed periodic snapshots during the event loop, and emitted final `metrics.snapshot` (`is_final: true`) after `checkFates()`.
++- `sim/cluster/instance.go`: Added `readyEmitted` and `drainReason` tracking on `InstanceSimulator`, plus pass-through accessors (`CachedKVBlocksCount`, `FlushSinkEvents`, `HasCPUOffload`, `CPUBlocksTotal`, `SetEventSink`, `SetPodEventMeta`).
++- `sim/cluster/direct_actuator.go`: Tagged `inst.drainReason = "autoscaler_scale_down"` prior to draining transitions in `scaleDown`.
++- `sim/cluster/infra_lifecycle_event.go`: Tagged `inst.drainReason = "node_drain"` prior to immediate/wait/redirect node drain transitions.
++- `sim/cluster/cluster_event.go`: Emitted `request.arrived` in `ClusterArrivalEvent.Execute` for initial (non-redirected) cluster arrivals.
++- `sim/cluster/gateway.go`: Emitted `request.rejected` / `request.timed_out` in `GatewayHost.Reject` and `request.admitted` + `request.routed` (with candidate scores even when `cs.trace == nil`) in `recordRouting`.
++- `sim/cluster/pd_events.go`: Emitted `request.rejected` (`stage: "decode_kv"`) in `dropAtStart` and nil/non-routable decode completion branches, and `kv.transfer` (`started` in `scheduleTransferCompletion`, `completed` in `KVTransferCompletedEvent.Execute` with `nixlOutcomeReason`).
++
++### CLI (`cmd/`)
++- `cmd/engine_build.go`: Added `buildEventTopologySpecs` (`poolSpecFromModel`, `rooflineSpecFromKernel`, `resolveEventCPUTier`) inside `cmd/engine_build.go` to extract `PoolConfig` (`gpu_specs` from `hardware.Chip`, `memory_breakdown_bytes` from `k.FixedBytes()`), `ModelRooflineSpec` from `model.Graph` + `kernelmodel.Model`, and `HeaderTiers` for `HeaderRecord` and driver roofline specs.
++- `cmd/root.go`: Registered `--events-output` on `runCmd` and wired `setupEventStream`, `attachAndWriteHeader`, and `finish`.
++- `cmd/replay.go`: Registered `--events-output` on `replayCmd` and wired `setupEventStream`, `attachAndWriteHeader`, and `finish`.
++- `cmd/result_flags.go`: Exempted `events-output` in `resultFlagsExempt` (`"run"`, `"replay"`) and `optionsExcluded`.
+diff --git a/cmd/engine_build.go b/cmd/engine_build.go
+index eaed5e02..76b867aa 100644
+--- a/cmd/engine_build.go
++++ b/cmd/engine_build.go
+@@ -1405,3 +1405,296 @@ func tierRate(k kernel.Kernel, tier string, dir kernel.Direction) float64 {
+ 	}
+ 	return 0
+ }
++
++// buildEventTopologySpecs extracts schema-compliant PoolConfig metadata and ModelRooflineSpec
++// for each active pool from the opened kernelmodel and substrate catalog.
++func buildEventTopologySpecs(ic sim.InstanceConfig) (pools []sim.PoolConfig, rooflineByRole map[string]*sim.ModelRooflineSpec, defaultRoofline *sim.ModelRooflineSpec, tiers sim.HeaderTiers) {
++	rooflineByRole = make(map[string]*sim.ModelRooflineSpec)
++	fallbackEC := engineConfigIn(ic)
++
++	if kernelPDOpened != nil {
++		if prefillInstances > 0 && kernelPDOpened.prefill != nil {
++			pCfg, spec := poolSpecFromModel(kernelPDOpened.prefill, "prefill", prefillInstances, fallbackEC)
++			pools = append(pools, pCfg)
++			if spec != nil {
++				rooflineByRole["prefill"] = spec
++			}
++		}
++		if decodeInstances > 0 && kernelPDOpened.decode != nil {
++			pCfg, spec := poolSpecFromModel(kernelPDOpened.decode, "decode", decodeInstances, fallbackEC)
++			pools = append(pools, pCfg)
++			if spec != nil {
++				rooflineByRole["decode"] = spec
++			}
++		}
++		if prefillDecodeInstances > 0 {
++			pCfg, spec := poolSpecFromModel(kernelOpened, "colocated", prefillDecodeInstances, fallbackEC)
++			pools = append(pools, pCfg)
++			if spec != nil {
++				rooflineByRole["colocated"] = spec
++				defaultRoofline = spec
++			}
++		}
++		if encodeInstances > 0 {
++			pCfg, _ := poolSpecFromModel(kernelOpened, "encode", encodeInstances, fallbackEC)
++			pools = append(pools, pCfg)
++		}
++	}
++	if len(pools) == 0 {
++		pCfg, spec := poolSpecFromModel(kernelOpened, "colocated", max(numInstances, 0), fallbackEC)
++		pools = append(pools, pCfg)
++		if spec != nil {
++			rooflineByRole["colocated"] = spec
++			defaultRoofline = spec
++		}
++	}
++	if defaultRoofline == nil {
++		if spec := rooflineByRole["decode"]; spec != nil {
++			defaultRoofline = spec
++		} else if spec := rooflineByRole["prefill"]; spec != nil {
++			defaultRoofline = spec
++		}
++	}
++
++	var gpuHBMBlocks int64
++	for _, p := range pools {
++		gpuHBMBlocks += p.KVBlocksPerGPU * int64(max(p.GPUsPerPod, 1)) * int64(max(p.Replicas, 0))
++	}
++	if gpuHBMBlocks == 0 {
++		gpuHBMBlocks = totalKVBlocks * int64(max(numInstances, 1))
++	}
++
++	cpuRAMBlocks, cpuRAMBytes := resolveEventCPUTier(fallbackEC.KVCacheConfig.Offload, fallbackEC.KVCacheConfig.BlockSizeTokens)
++	localSSD, remoteStore := false, false
++	for _, t := range fallbackEC.KVCacheConfig.Offload.Tiers {
++		switch strings.ToLower(t.Type) {
++		case "local_storage", "ssd", "nvme", "disk":
++			localSSD = true
++		case "shared_storage", "remote", "s3", "nfs":
++			remoteStore = true
++		}
++	}
++
++	tiers = sim.HeaderTiers{
++		GPUHBMBlocks:        max(gpuHBMBlocks, 0),
++		CPURAMBlocks:        max(cpuRAMBlocks, 0),
++		CPURAMBytes:         max(cpuRAMBytes, 0),
++		LocalSSDModelled:    localSSD,
++		RemoteStoreModelled: remoteStore,
++		UnmodelledNotes:     map[string]string{},
++	}
++	return pools, rooflineByRole, defaultRoofline, tiers
++}
++
++func resolveEventCPUTier(offload kvOffloadConfig, fallbackBlockTokens int64) (blocks, bytes int64) {
++	if offload.IsEnabled() {
++		if offload.CPUBytesToUse > 0 {
++			bytes = offload.CPUBytesToUse
++			if offload.PerBlockBytes > 0 {
++				blocks = offload.CPUBytesToUse / offload.PerBlockBytes
++			}
++		}
++	}
++	if kvCPUBlocks > blocks {
++		blocks = kvCPUBlocks
++		if offload.PerBlockBytes > 0 && bytes == 0 {
++			bytes = blocks * offload.PerBlockBytes
++		}
++	}
++	if blocks > 0 && bytes == 0 {
++		// Fallback estimate only when PerBlockBytes was not computed by offload config.
++		bytes = blocks * max(fallbackBlockTokens, 16) * 1024
++	}
++	return blocks, bytes
++}
++
++func poolSpecFromModel(m *kernelmodel.Model, role string, replicas int, fallbackEC engineConfig) (sim.PoolConfig, *sim.ModelRooflineSpec) {
++	gpuType := fallbackEC.GPU
++	if gpuType == "" {
++		gpuType = gpu
++	}
++	if gpuType == "" {
++		gpuType = "unknown"
++	}
++	tp := max(fallbackEC.TP, 1)
++	pp := 1
++	dp := max(dataParallelism, 1)
++	gpusPerPod := tp * pp * dp
++	kvBlockSize := max(int(fallbackEC.BlockSizeTokens), 16)
++	kvBlocksPerGPU := max(fallbackEC.TotalKVBlocks, 1)
++	maxSeqs := max(int(fallbackEC.MaxNumSeqs), 1)
++	maxBatched := max(int(fallbackEC.MaxNumBatchedTokens), 1)
++	maxLen := max(int(fallbackEC.MaxModelLen), 2048)
++
++	gpuSpecs := sim.GPUSpecs{
++		MemoryGiB:  80,
++		TFLOPsPeak: 100,
++		TFLOPsFP8:  0,
++		BWPeakTBs:  1.0,
++		SMCount:    1,
++	}
++	var memBreakdown sim.MemoryBreakdownBytes
++	var spec *sim.ModelRooflineSpec
++
++	if m != nil {
++		dep := m.Deployment()
++		if dep.Hardware != "" {
++			gpuType = dep.Hardware
++		}
++		kvBlockSize = max(int(dep.BlockSize), kvBlockSize)
++		k := m.Kernel()
++		res := k.Resolved()
++		tp = max(res.TensorParallel(), 1)
++		pp = max(k.Deployment().Parallel.PP, 1)
++		dp = max(res.DataParallel(), 1)
++		gpusPerPod = max(m.GroupGPUs(), tp*pp*dp)
++
++		fb := k.FixedBytes()
++		memBreakdown = sim.MemoryBreakdownBytes{
++			Weights:        max(fb.Weights+fb.EPLBRedundant, 0),
++			ActivationPeak: max(fb.ActivationPeak, 0),
++			CUDAGraph:      max(fb.CUDAGraph, 0),
++			CommBuffers:    max(fb.CommBuffers, 0),
++		}
++
++		if s, err := m.SettingsReserving(loraReservedBytesForKV); err == nil {
++			kvBlocksPerGPU = max(s.KVBlocks, kvBlocksPerGPU)
++			kvBlockSize = max(s.BlockSize, kvBlockSize)
++			maxSeqs = max(s.MaxNumSeqs, 1)
++			maxBatched = max(s.MaxNumBatchedTokens, 1)
++			maxLen = max(s.MaxModelLen, 1)
++		} else if b, bErr := m.KVBudget(); bErr == nil {
++			kvBlocksPerGPU = max(b.PerRankBlocks, kvBlocksPerGPU)
++		}
++
++		var chip *hardware.Chip
++		if dep.Hardware != "" {
++			if c, err := mustRunData().Chip(dep.Hardware); err == nil && c != nil {
++				chip = c
++				if c.MemoryGiB > 0 {
++					gpuSpecs.MemoryGiB = c.MemoryGiB
++				}
++				if c.BF16Peak > 0 {
++					gpuSpecs.TFLOPsPeak = c.BF16Peak
++				}
++				if c.FP8Peak >= 0 {
++					gpuSpecs.TFLOPsFP8 = c.FP8Peak
++				}
++				if c.MemoryBandwidthTBs > 0 {
++					gpuSpecs.BWPeakTBs = c.MemoryBandwidthTBs
++				}
++				if c.SMCount >= 1 {
++					gpuSpecs.SMCount = c.SMCount
++				}
++			}
++		} else if dep.DeviceMemoryGiB > 0 {
++			gpuSpecs.MemoryGiB = dep.DeviceMemoryGiB
++		}
++
++		var g *specmodel.Graph
++		if dep.Model != "" {
++			if loadedGraph, err := mustRunData().Model(dep.Model); err == nil {
++				g = loadedGraph
++			}
++		}
++		spec = rooflineSpecFromKernel(dep, k, fb, g, chip, gpuSpecs, kvBlockSize, tp, pp)
++	}
++
++	poolCfg := sim.PoolConfig{
++		Role:                 role,
++		Replicas:             max(replicas, 0),
++		TP:                   tp,
++		PP:                   pp,
++		DP:                   dp,
++		GPUsPerPod:           max(gpusPerPod, 1),
++		GPUType:              gpuType,
++		GPUSpecs:             gpuSpecs,
++		MemoryBreakdownBytes: memBreakdown,
++		KVBlocksPerGPU:       max(kvBlocksPerGPU, 1),
++		KVBlockSizeTokens:    max(kvBlockSize, 1),
++		MaxNumSeqs:           max(maxSeqs, 1),
++		MaxNumBatchedTokens:  max(maxBatched, 1),
++		MaxModelLen:          max(maxLen, 1),
++	}
++	return poolCfg, spec
++}
++
++func rooflineSpecFromKernel(dep kernelmodel.Deployment, k kernel.Kernel, fb kernel.MemoryBreakdown, g *specmodel.Graph, chip *hardware.Chip, gpuSpecs sim.GPUSpecs, kvBlockSize, tp, pp int) *sim.ModelRooflineSpec {
++	spec := &sim.ModelRooflineSpec{
++		ModelName:           dep.Model,
++		IsMoE:               dep.MoE,
++		NumExperts:          int64(dep.Experts),
++		ExpertsPerTok:       int64(dep.ExpertsPerTok),
++		WeightBytesPerRank:  fb.Weights,
++		ActivationPeakBytes: fb.ActivationPeak,
++		TP:                  max(tp, 1),
++		PP:                  max(pp, 1),
++		ChipTFLOPsPeak:      gpuSpecs.TFLOPsPeak,
++		ChipTFLOPsFP8:       gpuSpecs.TFLOPsFP8,
++		ChipBWTBs:           gpuSpecs.BWPeakTBs,
++	}
++	if chip != nil {
++		if chip.BF16Peak > 0 {
++			spec.ChipTFLOPsPeak = chip.BF16Peak
++		}
++		if chip.FP8Peak > 0 {
++			spec.ChipTFLOPsFP8 = chip.FP8Peak
++		}
++		if chip.MemoryBandwidthTBs > 0 {
++			spec.ChipBWTBs = chip.MemoryBandwidthTBs
++		}
++	}
++	if kvPerTok := k.SequenceVariableBytes(1); kvPerTok > 0 {
++		spec.KVBytesPerTokenPerRank = kvPerTok
++	} else if kvBlockSize > 0 {
++		if kvPerBlock := k.SequenceVariableBytes(kvBlockSize); kvPerBlock > 0 {
++			spec.KVBytesPerTokenPerRank = kvPerBlock / int64(kvBlockSize)
++		}
++	}
++	if g != nil {
++		spec.HiddenSize = int64(g.Global.HiddenSize)
++		spec.VocabSize = int64(g.Global.VocabSize)
++		spec.NumHiddenLayers = int64(g.Stack.Layers())
++		for _, lk := range g.LayerKinds {
++			for _, n := range lk.Nodes {
++				if n.Op == specmodel.OpAttention {
++					if spec.NumAttentionHeads == 0 || n.ReadsEngineKV() {
++						if n.NumQHeads > 0 {
++							spec.NumAttentionHeads = int64(n.NumQHeads)
++						}
++						if n.NumKVHeads > 0 {
++							spec.NumKVHeads = int64(n.NumKVHeads)
++						}
++						if n.HeadDim > 0 {
++							spec.HeadDim = int64(n.HeadDim)
++						}
++					}
++				}
++				if (n.Op == specmodel.OpGEMM || n.Op == specmodel.OpGroupedGEMM) && n.K == g.Global.HiddenSize && int64(n.N) > spec.IntermediateSize {
++					spec.IntermediateSize = int64(n.N)
++				}
++			}
++		}
++		if spec.IntermediateSize == 0 {
++			for _, lk := range g.LayerKinds {
++				for _, n := range lk.Nodes {
++					if (n.Op == specmodel.OpGEMM || n.Op == specmodel.OpGroupedGEMM) && int64(n.N) > spec.IntermediateSize {
++						spec.IntermediateSize = int64(n.N)
++					}
++				}
++			}
++		}
++		if spec.HeadDim == 0 && spec.HiddenSize > 0 && spec.NumAttentionHeads > 0 {
++			spec.HeadDim = spec.HiddenSize / spec.NumAttentionHeads
++		}
++		spec.IsFP8 = strings.Contains(strings.ToLower(dep.Quantization), "fp8") || g.Global.WeightDType == specmodel.DTypeFP8
++	} else {
++		spec.IsFP8 = strings.Contains(strings.ToLower(dep.Quantization), "fp8")
++	}
++	if spec.IsFP8 && spec.ChipTFLOPsFP8 > 0 {
++		spec.ComputePeakTFLOPs = spec.ChipTFLOPsFP8
++	} else {
++		spec.ComputePeakTFLOPs = spec.ChipTFLOPsPeak
++	}
++	return spec
++}
+diff --git a/cmd/events_output.go b/cmd/events_output.go
+new file mode 100644
+index 00000000..561964c3
+--- /dev/null
++++ b/cmd/events_output.go
+@@ -0,0 +1,213 @@
++package cmd
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"runtime/debug"
++	"strings"
++
++	"github.com/sirupsen/logrus"
++	"github.com/spf13/cobra"
++	"github.com/spf13/pflag"
++
++	"github.com/inference-sim/inference-sim/internal/stack"
++	"github.com/inference-sim/inference-sim/sim"
++	"github.com/inference-sim/inference-sim/sim/cluster"
++)
++
++var eventsOutput string
++
++func registerEventsOutputFlag(cmd *cobra.Command) {
++	cmd.Flags().StringVar(&eventsOutput, "events-output", "", "Path to write structured NDJSON simulation event log (schema v1.0)")
++}
++
++type eventStreamSession struct {
++	file *os.File
++	sink *sim.JSONLEventSink
++}
++
++func setupEventStream(cmd *cobra.Command, cfg *cluster.DeploymentConfig, horizonUs int64, r routerInputs) (*eventStreamSession, *sim.HeaderRecord) {
++	if eventsOutput == "" {
++		return nil, nil
++	}
++
++	if dir := filepath.Dir(eventsOutput); dir != "" && dir != "." {
++		if err := os.MkdirAll(dir, 0o755); err != nil {
++			logrus.Fatalf("--events-output %s: %v", eventsOutput, err)
++		}
++	}
++	f, err := os.Create(eventsOutput)
++	if err != nil {
++		logrus.Fatalf("--events-output %s: %v", eventsOutput, err)
++	}
++
++	pools, rooflineByRole, defaultRoofline, tiers := buildEventTopologySpecs(cfg.InstanceConfig)
++	cfg.RooflineSpec = defaultRoofline
++	cfg.RooflineSpecsByRole = rooflineByRole
++	cfg.HasCPUOffload = tiers.CPURAMBlocks > 0
++	cfg.CPUBlocksTotal = tiers.CPURAMBlocks
++
++	scenarioName := kernelScenario
++	if scenarioName == "" {
++		scenarioName = cfg.Model
++	}
++	if scenarioName == "" {
++		scenarioName = model
++	}
++	if scenarioName == "" {
++		scenarioName = "unnamed"
++	}
++
++	modelName := cfg.Model
++	if modelName == "" {
++		modelName = model
++	}
++	if modelName == "" {
++		modelName = "unknown"
++	}
++
++	hwName := cfg.GPU
++	if hwName == "" {
++		hwName = gpu
++	}
++	if hwName == "" {
++		hwName = "unknown"
++	}
++
++	flagsMap := make(map[string]any)
++	cmd.Flags().Visit(func(fl *pflag.Flag) {
++		if fl.Name == "events-output" {
++			return
++		}
++		flagsMap[fl.Name] = fl.Value.String()
++	})
++
++	if horizonUs < 0 {
++		horizonUs = 0
++	}
++	gwLat := r.GatewayLatencyUs
++	if gwLat <= 0 {
++		gwLat = gatewayLatencyUs
++	}
++	if gwLat < 0 {
++		gwLat = 0
++	}
++	routingPolicy := "llm-d"
++	if len(r.EPPFlags) > 0 {
++		routingPolicy = "llm-d:" + strings.Join(r.EPPFlags, ",")
++	}
++
++	hdr := &sim.HeaderRecord{
++		Type:          sim.EventTypeHeader,
++		SchemaVersion: sim.SchemaVersionV1,
++		BLIS:          buildHeaderBLIS(),
++		Scenario: sim.HeaderScenario{
++			Name:          scenarioName,
++			Model:         modelName,
++			Hardware:      hwName,
++			Flags:         flagsMap,
++			Seed:          seed,
++			HorizonUS:     horizonUs,
++			RoutingPolicy: routingPolicy,
++		},
++		Topology: sim.HeaderTopology{
++			GatewayLatencyUS: gwLat,
++			Pools:            pools,
++			Tiers:            tiers,
++		},
++	}
++
++	sink := sim.NewJSONLEventSink(f)
++	return &eventStreamSession{file: f, sink: sink}, hdr
++}
++
++func (s *eventStreamSession) attachAndWriteHeader(cs *cluster.ClusterSimulator, hdr *sim.HeaderRecord) {
++	if s == nil || hdr == nil {
++		return
++	}
++	hdr.Topology.InitialPods = cs.InitialPodsInfo()
++	if err := s.sink.WriteHeader(hdr); err != nil {
++		_ = s.file.Close()
++		logrus.Fatalf("--events-output %s: write header: %v", eventsOutput, err)
++	}
++	cs.SetEventSink(s.sink)
++}
++
++func (s *eventStreamSession) finish() {
++	if s == nil {
++		return
++	}
++	if err := s.sink.Close(); err != nil {
++		logrus.Warnf("--events-output %s: close failed: %v", eventsOutput, err)
++	}
++}
++
++func buildHeaderBLIS() sim.HeaderBLIS {
++	out := sim.HeaderBLIS{
++		Commit:        "unknown",
++		VLLMVersion:   "unknown",
++		LLMDVersion:   "unknown",
++		StackVersions: map[string]string{},
++	}
++
++	for _, up := range EngineReleases() {
++		if up.Kind == "vllm" && up.Version != "" {
++			out.VLLMVersion = up.Version
++		}
++		if len(up.Commit) >= 7 && out.Commit == "unknown" {
++			out.Commit = up.Commit
++		}
++		if up.Kind != "" && up.Version != "" {
++			out.StackVersions["engine:"+up.Kind] = up.Version
++		}
++	}
++
++	if bi, ok := debug.ReadBuildInfo(); ok {
++		for _, setting := range bi.Settings {
++			if setting.Key == "vcs.revision" && len(setting.Value) >= 7 {
++				out.Commit = setting.Value
++				break
++			}
++		}
++		for _, dep := range bi.Deps {
++			switch dep.Path {
++			case stack.SubstrateModule, stack.VLLMModule, stack.RouterModule, stack.RouterFork:
++				out.StackVersions[dep.Path] = dep.Version
++				if (dep.Path == stack.RouterModule || dep.Path == stack.RouterFork) && dep.Version != "" {
++					out.LLMDVersion = dep.Version
++				}
++			}
++		}
++	}
++
++	for _, candidate := range []string{"stack.json", filepath.Join("engine", "stack.json")} {
++		data, err := os.ReadFile(candidate)
++		if err != nil {
++			continue
++		}
++		var st stack.Stack
++		if err := json.Unmarshal(data, &st); err != nil {
++			continue
++		}
++		if st.Router.Version != "" {
++			out.LLMDVersion = st.Router.Version
++		}
++		if st.Toolchain != "" {
++			out.StackVersions["toolchain"] = st.Toolchain
++		}
++		for _, m := range st.Modules {
++			if m.Path != "" && m.Version != "" {
++				out.StackVersions[m.Path] = m.Version
++			}
++		}
++		for _, e := range st.Engines {
++			if e.Kind == "vllm" && e.Version != "" {
++				out.VLLMVersion = e.Version
++			}
++		}
++		break
++	}
++
++	return out
++}
+diff --git a/cmd/events_output_test.go b/cmd/events_output_test.go
+new file mode 100644
+index 00000000..738fb508
+--- /dev/null
++++ b/cmd/events_output_test.go
+@@ -0,0 +1,377 @@
++package cmd
++
++import (
++	"bufio"
++	"bytes"
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/inference-sim/inference-sim/sim"
++)
++
++const llama8bA100ColocatedScenario = `kind: Scenario
++name: llama-3.1-8b-instruct-a100-sxm-tp1
++engine:
++  kind: vllm
++  version: "0.32.0"
++
++model: llama-3.1-8b-instruct
++coefficients: [cost-model-primitives, cost-model-collectives, cost-model-host-overheads, cost-model-attention, cost-model-recurrent, cost-model-memory]
++
++cluster:
++  hardware: a100-sxm
++  nodes: 1
++  gpus_per_node: 8
++---
++kind: Deployment
++name: llama-3.1-8b-instruct-a100-sxm-tp1
++
++pools:
++  - role: colocated
++    nodes: 1
++    parallel:
++      tp: 1
++      pp: 1
++      dp: 1
++      enable_expert_parallel: false
++    engine:
++      block_size: 16
++      max_model_len: 8192
++`
++
++const llama8bA100OffloadScenario = `kind: Scenario
++name: llama-3.1-8b-instruct-a100-sxm-offload
++engine:
++  kind: vllm
++  version: "0.32.0"
++
++model: llama-3.1-8b-instruct
++coefficients: [cost-model-primitives, cost-model-collectives, cost-model-host-overheads, cost-model-attention, cost-model-recurrent, cost-model-memory, cost-model-offload-tiers]
++
++cluster:
++  hardware: a100-sxm
++  nodes: 1
++  gpus_per_node: 8
++---
++kind: Deployment
++name: llama-3.1-8b-instruct-a100-sxm-offload
++
++pools:
++  - role: colocated
++    nodes: 1
++    parallel:
++      tp: 1
++      pp: 1
++      dp: 1
++      enable_expert_parallel: false
++    engine:
++      block_size: 16
++      max_model_len: 8192
++      gpu_memory_utilization: 0.25
++offload:
++  connector: OffloadingConnector
++  spec: TieringOffloadingSpec
++  eviction_policy: lru
++  tiers:
++    - tier: cpu_dram
++      bytes: 4294967296
++`
++
++const llama8bAutoscalePolicy = `node_pools:
++  - name: pool-a100
++    gpu_type: a100-sxm
++    gpus_per_node: 8
++    gpu_memory_gib: 80.0
++    initial_nodes: 2
++    min_nodes: 1
++    max_nodes: 2
++    cost_per_hour: 20.0
++instance_lifecycle:
++  loading_delay:
++    mean: 0.5
++    stddev: 0.0
++  warm_start_initial_instances: true
++autoscaler:
++  interval_us: 1000000
++  scale_up_stabilization_window_us: 1000000
++  scale_down_stabilization_window_us: 1000000
++  analyzer:
++    kv_cache_threshold: 0.5
++    scale_up_threshold: 0.5
++    scale_down_boundary: 0.4
++    avg_input_tokens: 1000
++    min_replicas: 1
++`
++
++const llama8bAutoscaleWorkload = `version: "2"
++seed: 42
++inference_perf:
++  stages:
++    - {rate: 25, duration: 4}
++    - {rate: 1, duration: 20}
++  shared_prefix:
++    num_unique_system_prompts: 1
++    num_users_per_system_prompt: 1
++    system_prompt_len: 100
++    question_len: 1900
++    output_len: 200
++`
++
++// assertEventsStreamInvariants verifies the NDJSON event log has a v1.0 header on line 1,
++// monotonic seq 0..N-1 and non-decreasing t_us on every subsequent line, and terminates with
++// a final metrics.snapshot record. Returns per-event-type counts.
++func assertEventsStreamInvariants(t *testing.T, data []byte) map[string]int {
++	t.Helper()
++
++	scanner := bufio.NewScanner(bytes.NewReader(data))
++	scanner.Buffer(make([]byte, 0, 64*1024), 16*1024*1024)
++
++	var lines [][]byte
++	for scanner.Scan() {
++		line := bytes.TrimSpace(scanner.Bytes())
++		if len(line) == 0 {
++			continue
++		}
++		cp := make([]byte, len(line))
++		copy(cp, line)
++		lines = append(lines, cp)
++	}
++	if err := scanner.Err(); err != nil {
++		t.Fatalf("scan events NDJSON: %v", err)
++	}
++	if len(lines) < 2 {
++		t.Fatalf("expected header plus at least one event, got %d lines", len(lines))
++	}
++
++	var hdr sim.HeaderRecord
++	if err := json.Unmarshal(lines[0], &hdr); err != nil {
++		t.Fatalf("line 1 header unmarshal: %v", err)
++	}
++	if hdr.Type != sim.EventTypeHeader {
++		t.Errorf("line 1 type = %q, want %q", hdr.Type, sim.EventTypeHeader)
++	}
++	if hdr.SchemaVersion != sim.SchemaVersionV1 {
++		t.Errorf("line 1 schema_version = %q, want %q", hdr.SchemaVersion, sim.SchemaVersionV1)
++	}
++
++	typeCounts := make(map[string]int)
++	var prevTUs int64
++	var lastType string
++	var lastIsFinal bool
++
++	for i, raw := range lines[1:] {
++		var rec struct {
++			Seq     uint64 `json:"seq"`
++			TUs     int64  `json:"t_us"`
++			Type    string `json:"type"`
++			IsFinal bool   `json:"is_final"`
++		}
++		if err := json.Unmarshal(raw, &rec); err != nil {
++			t.Fatalf("line %d unmarshal: %v", i+2, err)
++		}
++		if rec.Type == "" {
++			t.Fatalf("line %d has empty event type", i+2)
++		}
++		if rec.Type == sim.EventTypeHeader {
++			t.Fatalf("line %d has unexpected duplicate header", i+2)
++		}
++		wantSeq := uint64(i)
++		if rec.Seq != wantSeq {
++			t.Fatalf("line %d seq = %d, want %d", i+2, rec.Seq, wantSeq)
++		}
++		if rec.TUs < prevTUs {
++			t.Fatalf("line %d t_us = %d decreased below %d", i+2, rec.TUs, prevTUs)
++		}
++		prevTUs = rec.TUs
++		typeCounts[rec.Type]++
++		lastType = rec.Type
++		lastIsFinal = rec.IsFinal
++	}
++
++	if lastType != sim.EventTypeMetricsSnapshot || !lastIsFinal {
++		t.Errorf("final event = (%q, is_final=%v), want (%q, is_final=true)",
++			lastType, lastIsFinal, sim.EventTypeMetricsSnapshot)
++	}
++	return typeCounts
++}
++
++// TestEventsOutput_ParityDeterminismAndInvariants verifies INV-6 zero behavioral perturbation
++// (identical normalized Result JSON with vs without --events-output), byte-identical NDJSON
++// outputs across repeated runs, and monotonic seq/t_us + final metrics.snapshot invariants.
++func TestEventsOutput_ParityDeterminismAndInvariants(t *testing.T) {
++	t.Parallel()
++
++	type testCase struct {
++		name           string
++		buildArgs      func(t *testing.T) []string
++		wantEventTypes []string
++	}
++
++	cases := []testCase{
++		{
++			name: "colocated llama-3.1-8b-instruct on a100-sxm",
++			buildArgs: func(t *testing.T) []string {
++				dir := t.TempDir()
++				if err := os.WriteFile(filepath.Join(dir, "llama-8b-a100.yaml"), []byte(llama8bA100ColocatedScenario), 0o644); err != nil {
++					t.Fatal(err)
++				}
++				return []string{
++					"run",
++					"--scenarios", dir,
++					"--scenario", "llama-8b-a100.yaml",
++					"--num-requests", "10",
++					"--rate", "5",
++					"--seed", "42",
++				}
++			},
++			wantEventTypes: []string{
++				sim.EventTypePodCreated,
++				sim.EventTypePodReady,
++				sim.EventTypeRequestArrived,
++				sim.EventTypeRequestFinished,
++				sim.EventTypeBatchStep,
++				sim.EventTypeMetricsSnapshot,
++			},
++		},
++		{
++			name: "cpu-offloaded llama-3.1-8b-instruct on a100-sxm",
++			buildArgs: func(t *testing.T) []string {
++				dir := t.TempDir()
++				if err := os.WriteFile(filepath.Join(dir, "llama-8b-a100-offload.yaml"), []byte(llama8bA100OffloadScenario), 0o644); err != nil {
++					t.Fatal(err)
++				}
++				return []string{
++					"run",
++					"--scenarios", dir,
++					"--scenario", "llama-8b-a100-offload.yaml",
++					"--num-requests", "15",
++					"--rate", "10",
++					"--prompt-tokens", "2048",
++					"--output-tokens", "128",
++					"--seed", "42",
++				}
++			},
++			wantEventTypes: []string{
++				sim.EventTypeKVBlockMoved,
++				sim.EventTypeKVBlockEvicted,
++				sim.EventTypeMetricsSnapshot,
++			},
++		},
++		{
++			name: "disaggregated 3p1d",
++			buildArgs: func(t *testing.T) []string {
++				return []string{
++					"run",
++					"--scenarios", pdScenarios,
++					"--scenario", "glm-5-h200-3p1d-ib.yaml",
++					"--num-instances", "4",
++					"--prefill-instances", "3",
++					"--decode-instances", "1",
++					"--num-requests", "8",
++					"--rate", "5",
++					"--seed", "11",
++					"--horizon", "900000000",
++				}
++			},
++			wantEventTypes: []string{
++				sim.EventTypeKVTransfer,
++				sim.EventTypeMetricsSnapshot,
++			},
++		},
++		{
++			name: "autoscaling lifecycle",
++			buildArgs: func(t *testing.T) []string {
++				dir := t.TempDir()
++				if err := os.WriteFile(filepath.Join(dir, "llama-8b-a100.yaml"), []byte(llama8bA100ColocatedScenario), 0o644); err != nil {
++					t.Fatal(err)
++				}
++				policyPath := capFile(t, "autoscale-policy.yaml", llama8bAutoscalePolicy)
++				workloadPath := capFile(t, "autoscale-workload.yaml", llama8bAutoscaleWorkload)
++				return []string{
++					"run",
++					"--scenarios", dir,
++					"--scenario", "llama-8b-a100.yaml",
++					"--num-instances", "1",
++					"--policy-config", policyPath,
++					"--model-autoscaler-interval-us", "1000000",
++					"--workload-spec", workloadPath,
++					"--horizon", "35000000",
++					"--seed", "42",
++				}
++			},
++			wantEventTypes: []string{
++				sim.EventTypePodCreated,
++				sim.EventTypePodLoading,
++				sim.EventTypePodReady,
++				sim.EventTypePodDraining,
++				sim.EventTypePodTerminated,
++				sim.EventTypeMetricsSnapshot,
++			},
++		},
++	}
++
++	for _, tc := range cases {
++		t.Run(tc.name, func(t *testing.T) {
++			t.Parallel()
++			baseArgs := tc.buildArgs(t)
++
++			withoutOut, stderr, err := runKernelCLI(t, baseArgs...)
++			if err != nil {
++				t.Fatalf("run without --events-output: %v\n%s", err, lastLines(stderr, 8))
++			}
++			if !completedAny(withoutOut) {
++				t.Fatalf("non-vacuity: simulation completed 0 requests:\n%s", withoutOut)
++			}
++
++			evPath1 := filepath.Join(t.TempDir(), "events1.ndjson")
++			args1 := append(append([]string(nil), baseArgs...), "--events-output", evPath1)
++			withOut1, stderr, err := runKernelCLI(t, args1...)
++			if err != nil {
++				t.Fatalf("run #1 with --events-output: %v\n%s", err, lastLines(stderr, 8))
++			}
++
++			evPath2 := filepath.Join(t.TempDir(), "events2.ndjson")
++			args2 := append(append([]string(nil), baseArgs...), "--events-output", evPath2)
++			withOut2, stderr, err := runKernelCLI(t, args2...)
++			if err != nil {
++				t.Fatalf("run #2 with --events-output: %v\n%s", err, lastLines(stderr, 8))
++			}
++
++			normWithout := withoutRuntime(t, withoutOut)
++			normWith1 := withoutRuntime(t, withOut1)
++			normWith2 := withoutRuntime(t, withOut2)
++			if normWithout != normWith1 {
++				t.Fatalf("Result JSON changed when --events-output was enabled:\n%s", firstDiff(normWithout, normWith1))
++			}
++			if normWith1 != normWith2 {
++				t.Fatalf("Result JSON differed between repeated --events-output runs:\n%s", firstDiff(normWith1, normWith2))
++			}
++
++			ndjson1, err := os.ReadFile(evPath1)
++			if err != nil {
++				t.Fatalf("read events1: %v", err)
++			}
++			ndjson2, err := os.ReadFile(evPath2)
++			if err != nil {
++				t.Fatalf("read events2: %v", err)
++			}
++			if !bytes.Equal(ndjson1, ndjson2) {
++				t.Fatalf("repeated --events-output runs were not byte-identical (%d vs %d bytes):\n%s",
++					len(ndjson1), len(ndjson2), firstDiff(string(ndjson1), string(ndjson2)))
++			}
++
++			counts := assertEventsStreamInvariants(t, ndjson1)
++			for _, want := range tc.wantEventTypes {
++				if counts[want] == 0 {
++					t.Errorf("expected event type %q in stream, got counts=%v", want, counts)
++				}
++			}
++			if !strings.Contains(string(ndjson1), `"is_final":true`) {
++				t.Errorf("expected final snapshot marker in NDJSON stream")
++			}
++		})
++	}
++}
+diff --git a/cmd/replay.go b/cmd/replay.go
+index 7de721a1..844b7072 100644
+--- a/cmd/replay.go
++++ b/cmd/replay.go
+@@ -546,14 +546,16 @@ Example:
+ 				return followUps
+ 			}
+ 		}
++		// INV-13: the router the trace was recorded with, unless the command line names one.
++		router := reconcileReplayRouter(cmd, traceData.Header.Router)
++		eventSess, eventHdr := setupEventStream(cmd, &config, replayHorizon, router)
+ 		cs, csErr := cluster.BuildClusterSimulator(config, cluster.NewSliceRequestSource(requests), onRequestDone)
+ 		if csErr != nil {
+ 			logrus.Fatalf("%v", csErr)
+ 		}
+-		// INV-13: the router the trace was recorded with, unless the command line names one.
+-		router := reconcileReplayRouter(cmd, traceData.Header.Router)
+ 		gw := newGateway(router, model, adapterIDsOf(loraCfg)...)
+ 		cs.SetGateway(gw)
++		eventSess.attachAndWriteHeader(cs, eventHdr)
+ 		if agx != nil {
+ 			cs.SetArrivalGate(agx.driver.Gate)
+ 			cs.SetUnservedHook(agx.driver.OnUnserved)
+@@ -570,8 +572,10 @@ Example:
+ 		}
+ 
+ 		if err := cs.Run(); err != nil {
++			eventSess.finish()
+ 			logrus.Fatalf("Replay simulation failed: %v", err)
+ 		}
++		eventSess.finish()
+ 		if agx != nil {
+ 			agx.driver.Finish(cs.Clock())
+ 			ps, pe := agx.driver.Window()
+@@ -681,6 +685,7 @@ func init() {
+ 	replayCmd.Flags().StringVar(&traceHeaderPath, "trace-header", "", "Path to TraceV2 header YAML file (required)")
+ 	replayCmd.Flags().StringVar(&traceDataPath, "trace-data", "", "Path to TraceV2 data CSV file (required)")
+ 	replayCmd.Flags().StringVar(&replayTraceOutput, "trace-output", "", "Export replay results as TraceV2 files (<prefix>.yaml + <prefix>.csv); header mode is \"replayed\". Under --session-mode fixed-accumulate the export records reconstructed ABSOLUTE per-round inputs (no session_context_growth header) — re-replay it with --session-mode fixed, not fixed-accumulate.")
++	registerEventsOutputFlag(replayCmd)
+ 
+ 	// Saturation trace flags (#1516): --detectors + --saturation-config + --saturation-report.
+ 	registerDetectorFlags(replayCmd)
+diff --git a/cmd/result_flags.go b/cmd/result_flags.go
+index 062f4ab0..fb898750 100644
+--- a/cmd/result_flags.go
++++ b/cmd/result_flags.go
+@@ -39,6 +39,7 @@ var resultFlagsExempt = map[string]map[string]string{
+ 		"log":               "stderr verbosity only",
+ 		"from-result":       "the reproduction source; recorded as rerun_of",
+ 		"trace-output":      "output path only (the files are artifacts)",
++		"events-output":     "output path only (event stream artifact)",
+ 		"saturation-report": "output path only",
+ 		"counterfactual-k":  "adds candidate rows to the in-memory decision trace; no Result byte reads them",
+ 		"lazy-generation":   "generates the same requests (INV-6 eager == lazy)",
+@@ -67,6 +68,7 @@ var resultFlagsExempt = map[string]map[string]string{
+ 		"log":                "stderr verbosity only",
+ 		"from-result":        "the reproduction source; recorded as rerun_of",
+ 		"trace-output":       "output path only",
++		"events-output":      "output path only (event stream artifact)",
+ 		"saturation-report":  "output path only",
+ 		"counterfactual-k":   "adds candidate rows to the in-memory decision trace; no Result byte reads them",
+ 		"fitness-weights":    "has no effect in replay",
+@@ -172,6 +174,7 @@ var optionsExcluded = map[string]string{
+ 	"help": "no effect", "format": "output encoding only", "output": "output path only",
+ 	"view": "stderr rendering only", "log": "stderr verbosity only",
+ 	"saturation-report": "output path only; the report is not referenced by the Result",
++	"events-output":     "output path only; the event stream is not referenced by the Result",
+ 	"counterfactual-k":  "adds in-memory decision-trace rows; no Result byte reads them",
+ 	"lazy-generation":   "generates the same requests (INV-6 eager == lazy)",
+ 	"corpus-cache":      "a parse cache; output is identical with or without it",
+diff --git a/cmd/root.go b/cmd/root.go
+index 5bf1abe2..ce23d902 100644
+--- a/cmd/root.go
++++ b/cmd/root.go
+@@ -1159,6 +1159,8 @@ var runCmd = &cobra.Command{
+ 		} else {
+ 			clusterRequestSource = cluster.NewSliceRequestSource(preGeneratedRequests)
+ 		}
++		router := resolveRouterInputs()
++		eventSess, eventHdr := setupEventStream(cmd, &config, simulationHorizon, router)
+ 		cs, csErr := cluster.BuildClusterSimulator(config, clusterRequestSource, onRequestDone)
+ 		if csErr != nil {
+ 			// A startup refusal: the scenario names a combination the engine does not build.
+@@ -1167,9 +1169,9 @@ var runCmd = &cobra.Command{
+ 		if unservedHook != nil {
+ 			cs.SetUnservedHook(unservedHook)
+ 		}
+-		router := resolveRouterInputs()
+ 		gw := newGateway(router, model, adapterIDsOf(loraCfg)...)
+ 		cs.SetGateway(gw)
++		eventSess.attachAndWriteHeader(cs, eventHdr)
+ 
+ 		// Arrival hook: capture trace-emission references at the cluster's
+ 		// single arrival boundary so the trace exporter no longer relies on
+@@ -1212,8 +1214,10 @@ var runCmd = &cobra.Command{
+ 		}
+ 
+ 		if err := cs.Run(); err != nil {
++			eventSess.finish()
+ 			logrus.Fatalf("Simulation failed: %v", err)
+ 		}
++		eventSess.finish()
+ 
+ 		// Surface any terminal sampler / generator error the lazy source
+ 		// recorded on a per-client state during the run. Eager mode would
+@@ -1593,6 +1597,7 @@ func init() {
+ 
+ 	// Run-specific export
+ 	runCmd.Flags().StringVar(&traceOutput, "trace-output", "", "Export workload as TraceV2 files (<prefix>.yaml + <prefix>.csv)")
++	registerEventsOutputFlag(runCmd)
+ 
+ 	// Saturation trace flags (#1516): --detectors + --saturation-config + --saturation-report.
+ 	registerDetectorFlags(runCmd)
+diff --git a/sim/cluster/cluster.go b/sim/cluster/cluster.go
+index 61113c6a..bca946e2 100644
+--- a/sim/cluster/cluster.go
++++ b/sim/cluster/cluster.go
+@@ -170,6 +170,13 @@ type ClusterSimulator struct {
+ 	simClockProgressIntervalUs int64
+ 	nextSnapshotClockUs        int64
+ 
++	eventSink                sim.EventSink
++	eventSnapshotIntervalUs  int64
++	nextEventSnapshotClockUs int64
++	initialPodsEmitted       bool
++	nextTransferSeq          uint64
++	transferIDs              map[string]uint64
++
+ 	// arrivalHook fires once per fresh arrival (initial workload and
+ 	// follow-ups from closed-loop sessions). It does NOT fire for requests
+ 	// re-injected by the REDIRECT drain policy — whether or not a prior
+@@ -303,23 +310,32 @@ func BuildClusterSimulator(config DeploymentConfig, requestSource RequestSource,
+ 		})
+ 	}
+ 
++	eventSnapshotIntervalUs := config.EventSnapshotIntervalUs
++	if eventSnapshotIntervalUs <= 0 {
++		eventSnapshotIntervalUs = defaultEventSnapshotIntervalUs
++	}
++
+ 	cs := &ClusterSimulator{
+-		config:            config,
+-		instances:         make([]*InstanceSimulator, 0, config.NumInstances),
+-		requestSource:     requestSource,
+-		clusterEvents:     make(ClusterEventQueue, 0),
+-		lifecycleSender:   eventSender{id: senderLifecycle},
+-		workloadSender:    eventSender{id: senderWorkload},
+-		routerSender:      eventSender{id: senderRouter},
+-		kvConnectorSender: eventSender{id: senderKVConnector},
+-		autoscalerSender:  eventSender{id: senderAutoscaler},
+-		trace:             simTrace,
+-		inFlightRequests:  make(map[string]int, config.NumInstances),
+-		shedByTier:        make(map[string]int),
+-		injectedByClass:   make(map[string]int64),
+-		fates:             sim.NewFateLedger(),
+-		requestFacts:      make(map[string]RequestFact),
+-		liveRequests:      make(map[string]*sim.Request),
++		config:                   config,
++		instances:                make([]*InstanceSimulator, 0, config.NumInstances),
++		requestSource:            requestSource,
++		clusterEvents:            make(ClusterEventQueue, 0),
++		lifecycleSender:          eventSender{id: senderLifecycle},
++		workloadSender:           eventSender{id: senderWorkload},
++		routerSender:             eventSender{id: senderRouter},
++		kvConnectorSender:        eventSender{id: senderKVConnector},
++		autoscalerSender:         eventSender{id: senderAutoscaler},
++		trace:                    simTrace,
++		inFlightRequests:         make(map[string]int, config.NumInstances),
++		shedByTier:               make(map[string]int),
++		injectedByClass:          make(map[string]int64),
++		fates:                    sim.NewFateLedger(),
++		requestFacts:             make(map[string]RequestFact),
++		liveRequests:             make(map[string]*sim.Request),
++		eventSink:                config.EventSink,
++		eventSnapshotIntervalUs:  eventSnapshotIntervalUs,
++		nextEventSnapshotClockUs: eventSnapshotIntervalUs,
++		transferIDs:              make(map[string]uint64),
+ 	}
+ 
+ 	// PD disaggregation: set pool membership (topology already validated above). The gateway
+@@ -537,6 +553,7 @@ func BuildClusterSimulator(config DeploymentConfig, requestSource RequestSource,
+ 
+ 	for _, inst := range cs.instances {
+ 		cs.wireInstance(inst)
++		cs.syncInstanceEventSink(inst)
+ 	}
+ 	return cs, nil
+ }
+@@ -607,6 +624,7 @@ func (cs *ClusterSimulator) wireInstance(inst *InstanceSimulator) {
+ 		if cs.gateway != nil {
+ 			cs.gateway.OnInstanceChange(inst)
+ 		}
++		cs.emitPodTransitionEvent(inst)
+ 	}
+ }
+ 
+@@ -742,6 +760,7 @@ func (c *ClusterSimulator) Run() error {
+ 		return fmt.Errorf("gateway: %w", err)
+ 	}
+ 	defer c.gateway.Stop()
++	c.emitInitialPodEvents()
+ 
+ 	// Phase 1C: schedule the first ScalingTickEvent when the autoscaler is enabled (T015).
+ 	// The autoscaler is enabled when ModelAutoscalerIntervalUs > 0 AND cs.autoscaler is non-nil.
+@@ -876,6 +895,7 @@ func (c *ClusterSimulator) Run() error {
+ 
+ 		c.recordInFlight()
+ 		c.maybeDeliverProgressSnapshot(false)
++		c.maybeEmitMetricsSnapshot(false)
+ 	}
+ 	if c.abortErr != nil {
+ 		return fmt.Errorf("gateway: %w", c.abortErr)
+@@ -968,6 +988,7 @@ func (c *ClusterSimulator) Run() error {
+ 	if err := c.checkFates(); err != nil {
+ 		return err
+ 	}
++	c.maybeEmitMetricsSnapshot(true)
+ 
+ 	if n := c.GatewayQueueDepth(); n > 0 {
+ 		logrus.Warnf("[cluster] %d requests remain in the gateway at simulation end", n)
+@@ -1328,7 +1349,9 @@ func (cs *ClusterSimulator) addLiveInstance(
+ 	inst.CostPerHour = costPerHour
+ 	inst.warmUpRemaining = cs.config.InstanceLifecycle.WarmUpRequestCount
+ 	cs.wireInstance(inst)
++	cs.syncInstanceEventSink(inst)
+ 	inst.TransitionTo(sim.InstanceStateLoading)
++	cs.emitPodCreatedAndLoading(inst)
+ 
+ 	cs.scheduleInstanceLoadedEvent(inst)
+ 	cs.addInstance(inst)
+diff --git a/sim/cluster/cluster_event.go b/sim/cluster/cluster_event.go
+index e5eb7a8e..e4ce0edb 100644
+--- a/sim/cluster/cluster_event.go
++++ b/sim/cluster/cluster_event.go
+@@ -297,6 +297,9 @@ func (e *ClusterArrivalEvent) Execute(cs *ClusterSimulator) {
+ 	// arrival exactly once, in clock-monotonic order (INV-3). REDIRECT
+ 	// re-injections are filtered inside fireArrivalHook.
+ 	cs.fireArrivalHook(e.request, e.time)
++	if !e.request.Redirected {
++		cs.emitRequestArrived(e.request, e.time)
++	}
+ 	cs.gateway.OnArrival(e.request)
+ }
+ 
+diff --git a/sim/cluster/deployment.go b/sim/cluster/deployment.go
+index d64a7a2d..208cdc49 100644
+--- a/sim/cluster/deployment.go
++++ b/sim/cluster/deployment.go
+@@ -131,6 +131,15 @@ type DeploymentConfig struct {
+ 	// Zero values are safe: NewClusterSimulator applies WVA reference defaults
+ 	// (KvCacheThreshold=0.8, ScaleUpThreshold=0.8, ScaleDownBoundary=0.4, AvgInputTokens=512).
+ 	AutoscalerAnalyzerConfig V2SaturationAnalyzerConfig `yaml:"autoscaler_analyzer,omitempty"`
++
++	// Structured NDJSON event stream configuration (optional, zero value = disabled).
++	// INV-6: Enabling EventSink never alters routing, scheduling, RNG, or stdout Result.
++	EventSink               sim.EventSink                     `json:"-" yaml:"-"`
++	EventSnapshotIntervalUs int64                             `json:"-" yaml:"-"`
++	RooflineSpec            *sim.ModelRooflineSpec            `json:"-" yaml:"-"`
++	RooflineSpecsByRole     map[string]*sim.ModelRooflineSpec `json:"-" yaml:"-"`
++	HasCPUOffload           bool                              `json:"-" yaml:"-"`
++	CPUBlocksTotal          int64                             `json:"-" yaml:"-"`
+ }
+ 
+ // resolveConfigForRole returns the configuration an instance in the given pool role is built
+diff --git a/sim/cluster/direct_actuator.go b/sim/cluster/direct_actuator.go
+index 559d835a..49dd6e41 100644
+--- a/sim/cluster/direct_actuator.go
++++ b/sim/cluster/direct_actuator.go
+@@ -134,6 +134,7 @@ func (a *DirectActuator) scaleDown(d ScaleDecision) error {
+ 			lastErr = err
+ 			continue // keep trying remaining iterations (next iteration may find different variant match)
+ 		}
++		inst.drainReason = "autoscaler_scale_down"
+ 		inst.TransitionTo(sim.InstanceStateDraining)
+ 		logrus.Infof("[actuator] scale-down: draining instance %s for model %q", inst.ID(), d.ModelID)
+ 	}
+diff --git a/sim/cluster/events_emit.go b/sim/cluster/events_emit.go
+new file mode 100644
+index 00000000..07e7ad99
+--- /dev/null
++++ b/sim/cluster/events_emit.go
+@@ -0,0 +1,658 @@
++package cluster
++
++import (
++	"crypto/sha256"
++	"encoding/hex"
++	"fmt"
++	"math"
++	"sort"
++	"strconv"
++
++	"github.com/sirupsen/logrus"
++
++	"github.com/inference-sim/inference-sim/sim"
++)
++
++const defaultEventSnapshotIntervalUs int64 = 1_000_000
++
++// SetEventSink installs the structured NDJSON event sink on the cluster and all existing instances.
++// Must be called before Run() (parallels SetProgressHook and SetGateway).
++func (c *ClusterSimulator) SetEventSink(sink sim.EventSink) {
++	if c.hasRun {
++		panic("ClusterSimulator: SetEventSink must be called before Run()")
++	}
++	c.eventSink = sink
++	if c.eventSnapshotIntervalUs <= 0 {
++		c.eventSnapshotIntervalUs = defaultEventSnapshotIntervalUs
++		c.nextEventSnapshotClockUs = c.eventSnapshotIntervalUs
++	}
++	for _, inst := range c.instances {
++		c.syncInstanceEventSink(inst)
++	}
++}
++
++// SetEventSnapshotInterval sets the simulation-clock interval in microseconds for periodic
++// metrics.snapshot emission when EventSink is enabled. Non-positive values keep the 1s default.
++func (c *ClusterSimulator) SetEventSnapshotInterval(intervalUs int64) {
++	if intervalUs > 0 {
++		c.eventSnapshotIntervalUs = intervalUs
++		c.nextEventSnapshotClockUs = intervalUs
++	}
++}
++
++func (c *ClusterSimulator) sinkEnabled() bool {
++	return c.eventSink != nil && c.eventSink.Enabled()
++}
++
++func (c *ClusterSimulator) emitClusterEvent(at int64, ev sim.EventRecord) {
++	if !c.sinkEnabled() {
++		return
++	}
++	if at < 0 {
++		at = 0
++	}
++	if err := c.eventSink.Emit(at, ev); err != nil {
++		logrus.Warnf("[cluster] event sink emit failed (%s at %d): %v", ev.EventType(), at, err)
++	}
++}
++
++func (c *ClusterSimulator) poolRoleString(instID InstanceID) string {
++	if c.poolMembership == nil {
++		return "colocated"
++	}
++	role := c.poolMembership[string(instID)]
++	switch role {
++	case PoolRolePrefill:
++		return "prefill"
++	case PoolRoleDecode:
++		return "decode"
++	case PoolRoleEncode:
++		return "encode"
++	default:
++		return "colocated"
++	}
++}
++
++func (c *ClusterSimulator) rooflineForInstance(inst *InstanceSimulator) *sim.ModelRooflineSpec {
++	role := c.poolRoleString(inst.ID())
++	if c.config.RooflineSpecsByRole != nil {
++		if spec := c.config.RooflineSpecsByRole[role]; spec != nil {
++			return spec
++		}
++	}
++	return c.config.RooflineSpec
++}
++
++func (c *ClusterSimulator) effectiveTPDegree(inst *InstanceSimulator) int {
++	if inst.TPDegree > 0 {
++		return inst.TPDegree
++	}
++	cfg := c.config.InstanceConfig
++	if c.poolMembership != nil {
++		cfg = c.config.resolveConfigForRole(c.poolMembership[string(inst.ID())])
++	}
++	if cfg.TP > 0 {
++		return cfg.TP
++	}
++	return 1
++}
++
++func (c *ClusterSimulator) effectiveGPUIDs(inst *InstanceSimulator) []string {
++	if len(inst.allocatedGPUIDs) > 0 {
++		out := make([]string, len(inst.allocatedGPUIDs))
++		copy(out, inst.allocatedGPUIDs)
++		return out
++	}
++	tp := c.effectiveTPDegree(inst)
++	dpRanks := max(c.config.DPLockstepRanks, 1)
++	count := max(tp*dpRanks, 1)
++	out := make([]string, count)
++	for i := 0; i < count; i++ {
++		out[i] = fmt.Sprintf("%s-gpu-%d", inst.ID(), i)
++	}
++	return out
++}
++
++func (c *ClusterSimulator) syncInstanceEventSink(inst *InstanceSimulator) {
++	if inst == nil {
++		return
++	}
++	tp := c.effectiveTPDegree(inst)
++	gpuIDs := c.effectiveGPUIDs(inst)
++	blockSize := int(c.config.BlockSizeTokens)
++	if blockSize <= 0 {
++		blockSize = 16
++	}
++	blocksTotal := int(inst.TotalKVBlocks())
++	inst.SetPodEventMeta(len(gpuIDs), tp, blockSize, blocksTotal, c.rooflineForInstance(inst), c.config.HasCPUOffload, c.config.CPUBlocksTotal)
++	inst.SetEventSink(c.eventSink)
++}
++
++// InitialPodsInfo returns the schema-formatted InitialPod metadata for all startup instances.
++func (c *ClusterSimulator) InitialPodsInfo() []sim.InitialPod {
++	pods := make([]sim.InitialPod, 0, len(c.instances))
++	for _, inst := range c.instances {
++		pods = append(pods, sim.InitialPod{
++			PodID:    string(inst.ID()),
++			PoolRole: c.poolRoleString(inst.ID()),
++			GPUIDs:   c.effectiveGPUIDs(inst),
++			TPDegree: c.effectiveTPDegree(inst),
++			State:    schemaInitialPodState(inst.State),
++		})
++	}
++	return pods
++}
++
++func schemaInitialPodState(s sim.InstanceState) string {
++	switch s {
++	case sim.InstanceStateScheduling, sim.InstanceStateLoading:
++		return "loading"
++	case sim.InstanceStateDraining:
++		return "draining"
++	case sim.InstanceStateTerminated:
++		return "terminated"
++	default:
++		return "ready"
++	}
++}
++
++func schemaSnapshotPodState(s sim.InstanceState) string {
++	switch s {
++	case sim.InstanceStateScheduling, sim.InstanceStateLoading:
++		return "loading"
++	case sim.InstanceStateWarmingUp:
++		return "warming_up"
++	case sim.InstanceStateDraining:
++		return "draining"
++	case sim.InstanceStateTerminated:
++		return "terminated"
++	case sim.InstanceStateActive:
++		return "active"
++	default:
++		return "ready"
++	}
++}
++
++func (c *ClusterSimulator) emitInitialPodEvents() {
++	if c.initialPodsEmitted || !c.sinkEnabled() {
++		return
++	}
++	c.initialPodsEmitted = true
++	for _, inst := range c.instances {
++		role := c.poolRoleString(inst.ID())
++		c.emitClusterEvent(0, &sim.PodCreatedEvent{
++			PodID:    string(inst.ID()),
++			PoolRole: role,
++			GPUIDs:   c.effectiveGPUIDs(inst),
++			TPDegree: c.effectiveTPDegree(inst),
++			NodeID:   inst.nodeID,
++		})
++		switch inst.State {
++		case sim.InstanceStateScheduling, sim.InstanceStateLoading:
++			c.emitClusterEvent(0, &sim.PodLoadingEvent{
++				PodID:    string(inst.ID()),
++				PoolRole: role,
++			})
++		case sim.InstanceStateWarmingUp, sim.InstanceStateActive, "":
++			inst.readyEmitted = true
++			c.emitClusterEvent(0, &sim.PodReadyEvent{
++				PodID:    string(inst.ID()),
++				PoolRole: role,
++			})
++		case sim.InstanceStateDraining:
++			reason := inst.drainReason
++			if reason == "" {
++				reason = "drain"
++			}
++			c.emitClusterEvent(0, &sim.PodDrainingEvent{
++				PodID:    string(inst.ID()),
++				PoolRole: role,
++				Reason:   reason,
++			})
++		case sim.InstanceStateTerminated:
++			c.emitClusterEvent(0, &sim.PodTerminatedEvent{
++				PodID:    string(inst.ID()),
++				PoolRole: role,
++			})
++		}
++	}
++}
++
++func (c *ClusterSimulator) emitPodCreatedAndLoading(inst *InstanceSimulator) {
++	if !c.sinkEnabled() {
++		return
++	}
++	role := c.poolRoleString(inst.ID())
++	c.emitClusterEvent(c.clock, &sim.PodCreatedEvent{
++		PodID:    string(inst.ID()),
++		PoolRole: role,
++		GPUIDs:   c.effectiveGPUIDs(inst),
++		TPDegree: c.effectiveTPDegree(inst),
++		NodeID:   inst.nodeID,
++	})
++	c.emitClusterEvent(c.clock, &sim.PodLoadingEvent{
++		PodID:    string(inst.ID()),
++		PoolRole: role,
++	})
++}
++
++func (c *ClusterSimulator) emitPodTransitionEvent(inst *InstanceSimulator) {
++	if !c.sinkEnabled() {
++		return
++	}
++	role := c.poolRoleString(inst.ID())
++	switch inst.State {
++	case sim.InstanceStateLoading:
++		c.emitClusterEvent(c.clock, &sim.PodLoadingEvent{
++			PodID:    string(inst.ID()),
++			PoolRole: role,
++		})
++	case sim.InstanceStateWarmingUp, sim.InstanceStateActive:
++		if inst.readyEmitted {
++			return
++		}
++		inst.readyEmitted = true
++		c.emitClusterEvent(c.clock, &sim.PodReadyEvent{
++			PodID:    string(inst.ID()),
++			PoolRole: role,
++		})
++	case sim.InstanceStateDraining:
++		reason := inst.drainReason
++		if reason == "" {
++			reason = "drain"
++		}
++		c.emitClusterEvent(c.clock, &sim.PodDrainingEvent{
++			PodID:    string(inst.ID()),
++			PoolRole: role,
++			Reason:   reason,
++		})
++	case sim.InstanceStateTerminated:
++		c.emitClusterEvent(c.clock, &sim.PodTerminatedEvent{
++			PodID:    string(inst.ID()),
++			PoolRole: role,
++		})
++	}
++}
++
++func (c *ClusterSimulator) emitRequestArrived(req *sim.Request, at int64) {
++	if !c.sinkEnabled() || req == nil {
++		return
++	}
++	maxOut := max(req.MaxOutputLen, 0)
++	var blockHashes []string
++	if bs := int(c.config.BlockSizeTokens); bs > 0 && len(req.InputTokens) >= bs {
++		numBlocks := len(req.InputTokens) / bs
++		blockHashes = make([]string, 0, numBlocks)
++		prev := ""
++		for i := 0; i < numBlocks; i++ {
++			chunk := req.InputTokens[i*bs : (i+1)*bs]
++			prev = hashPromptBlock(prev, chunk)
++			blockHashes = append(blockHashes, prev)
++		}
++	}
++	c.emitClusterEvent(at, &sim.RequestArrivedEvent{
++		ReqID:           req.ID,
++		PromptTokens:    len(req.InputTokens),
++		MaxOutputTokens: maxOut,
++		PrefixGroup:     req.PrefixGroup,
++		PrefixTokens:    max(req.PrefixLength, 0),
++		BlockHashes:     blockHashes,
++		SLOClass:        req.SLOClass,
++		SessionID:       req.SessionID,
++	})
++}
++
++func hashPromptBlock(prevHash string, tokens []sim.TokenID) string {
++	h := sha256.New()
++	h.Write([]byte(prevHash))
++	var buf [20]byte
++	for _, t := range tokens {
++		b := strconv.AppendInt(buf[:0], int64(t), 10)
++		b = append(b, '|')
++		h.Write(b)
++	}
++	return hex.EncodeToString(h.Sum(nil))
++}
++
++func (c *ClusterSimulator) emitRequestRouted(req *sim.Request, p Placement) {
++	if !c.sinkEnabled() || req == nil {
++		return
++	}
++	c.emitClusterEvent(c.clock, &sim.RequestAdmittedEvent{
++		ReqID:  req.ID,
++		Reason: "admitted",
++	})
++	disagg := p.Prefill != ""
++	chosenPod := string(p.Decode)
++	if disagg {
++		chosenPod = string(p.Prefill)
++	}
++	var candidates []sim.CandidateScore
++	var regretPtr *float64
++	if len(p.Scores) > 0 {
++		scoredChosen := string(p.Decode)
++		if _, ok := p.Scores[scoredChosen]; !ok && p.Prefill != "" {
++			scoredChosen = string(p.Prefill)
++		}
++		traceCands, regret := c.counterfactual(scoredChosen, p.Scores, len(p.Scores))
++		candidates = make([]sim.CandidateScore, 0, len(traceCands))
++		for _, tc := range traceCands {
++			kvUtil := tc.KVUtilization
++			if math.IsNaN(kvUtil) || math.IsInf(kvUtil, 0) || kvUtil < 0 {
++				kvUtil = 0
++			} else if kvUtil > 1 {
++				kvUtil = 1
++			}
++			candidates = append(candidates, sim.CandidateScore{
++				PodID:            tc.InstanceID,
++				Score:            tc.Score,
++				QueueDepth:       max(tc.QueueDepth, 0),
++				BatchSize:        max(tc.BatchSize, 0),
++				InFlightRequests: max(tc.InFlightRequests, 0),
++				KVUtilization:    kvUtil,
++				FreeKVBlocks:     max(tc.FreeKVBlocks, 0),
++			})
++		}
++		regretPtr = &regret
++	}
++	c.emitClusterEvent(c.clock, &sim.RequestRoutedEvent{
++		ReqID:        req.ID,
++		ChosenPod:    chosenPod,
++		PrefillPod:   string(p.Prefill),
++		DecodePod:    string(p.Decode),
++		Disaggregate: disagg,
++		Reason:       "llm-d",
++		Scores:       copyScores(p.Scores),
++		Candidates:   candidates,
++		Regret:       regretPtr,
++	})
++}
++
++func (c *ClusterSimulator) emitGatewayRejection(req *sim.Request, why Rejection, reason string) {
++	if !c.sinkEnabled() || req == nil {
++		return
++	}
++	if why == RejectedClientTimeout {
++		c.emitClusterEvent(c.clock, &sim.RequestTimedOutEvent{
++			ReqID:     req.ID,
++			Stage:     "gateway",
++			ElapsedUS: max(c.clock-req.ArrivalTime, 0),
++		})
++		return
++	}
++	stage := "admission"
++	switch why {
++	case RejectedAdmission:
++		stage = "admission"
++	case RejectedGatewayCapacity, RejectedGatewayExpired:
++		stage = "flow_control"
++	case RejectedRouting:
++		stage = "routing"
++	case RejectedUnservable:
++		stage = "unservable"
++	}
++	c.emitClusterEvent(c.clock, &sim.RequestRejectedEvent{
++		ReqID:  req.ID,
++		Reason: reason,
++		Stage:  stage,
++	})
++}
++
++func (c *ClusterSimulator) emitDecodeKVRejection(reqID string, at int64, reason string) {
++	if !c.sinkEnabled() || reqID == "" {
++		return
++	}
++	c.emitClusterEvent(at, &sim.RequestRejectedEvent{
++		ReqID:  reqID,
++		Reason: reason,
++		Stage:  "decode_kv",
++	})
++}
++
++func (c *ClusterSimulator) emitKVTransferStarted(parent *ParentRequest, at int64) {
++	if !c.sinkEnabled() || parent == nil {
++		return
++	}
++	c.nextTransferSeq++
++	tid := c.nextTransferSeq
++	c.transferIDs[parent.ID] = tid
++	c.emitClusterEvent(at, &sim.KVTransferEvent{
++		TransferID:     &tid,
++		ReqID:          parent.ID,
++		FromPod:        string(parent.PrefillInstanceID),
++		ToPod:          string(parent.DecodeInstanceID),
++		NumKVBlocks:    int(max(parent.NumKVBlocks, 0)),
++		PulledKVBlocks: int(max(parent.PulledKVBlocks, 0)),
++		DurationUS:     0,
++		Status:         "started",
++	})
++}
++
++func (c *ClusterSimulator) emitKVTransferCompleted(parent *ParentRequest, at int64, durationUS int64) {
++	if !c.sinkEnabled() || parent == nil {
++		return
++	}
++	var tidPtr *uint64
++	if tid, ok := c.transferIDs[parent.ID]; ok {
++		tidCopy := tid
++		tidPtr = &tidCopy
++		delete(c.transferIDs, parent.ID)
++	}
++	c.emitClusterEvent(at, &sim.KVTransferEvent{
++		TransferID:     tidPtr,
++		ReqID:          parent.ID,
++		FromPod:        string(parent.PrefillInstanceID),
++		ToPod:          string(parent.DecodeInstanceID),
++		NumKVBlocks:    int(max(parent.NumKVBlocks, 0)),
++		PulledKVBlocks: int(max(parent.PulledKVBlocks, 0)),
++		DurationUS:     max(durationUS, 0),
++		Status:         "completed",
++	})
++}
++
++func (c *ClusterSimulator) maybeEmitMetricsSnapshot(isFinal bool) {
++	if !c.sinkEnabled() {
++		return
++	}
++	if !isFinal && (c.eventSnapshotIntervalUs <= 0 || c.clock < c.nextEventSnapshotClockUs) {
++		return
++	}
++
++	snapTime := c.clock
++	flushUpTo := c.clock
++	if isFinal {
++		snapTime = min(c.clock, c.config.Horizon)
++		flushUpTo = math.MaxInt64
++	}
++	if snapTime < 0 {
++		snapTime = 0
++	}
++
++	// Flush deferred driver step-end events so step/KV events precede or align with snapshot.
++	for _, inst := range c.instances {
++		inst.FlushSinkEvents(flushUpTo)
++	}
++
++	instances := make([]sim.InstanceMetricsSnapshot, 0, len(c.instances))
++	for _, inst := range c.instances {
++		totalKV := max(inst.TotalKVBlocks(), 0)
++		usedKV := max(inst.UsedKVBlocks(), 0)
++		if totalKV > 0 && usedKV > totalKV {
++			usedKV = totalKV
++		}
++		freeKV := max(totalKV-usedKV, 0)
++		cachedKV := max(inst.CachedKVBlocksCount(), 0)
++		if totalKV > 0 && cachedKV > totalKV {
++			cachedKV = totalKV
++		}
++		item := sim.InstanceMetricsSnapshot{
++			PodID:             string(inst.ID()),
++			State:             schemaSnapshotPodState(inst.State),
++			QueueDepth:        max(inst.QueueDepth(), 0),
++			BatchSize:         max(inst.BatchSize(), 0),
++			KVUsedBlocks:      usedKV,
++			KVCachedBlocks:    cachedKV,
++			KVFreeBlocks:      freeKV,
++			KVTotalBlocks:     totalKV,
++			Preemptions:       max(int64(inst.PreemptionCount()), 0),
++			CompletedRequests: max(inst.Metrics().CompletedRequests, 0),
++		}
++		if inst.HasCPUOffload() || inst.CPUBlocksTotal() > 0 {
++			cpuUsed := int64(len(inst.CPUBlockHashes()))
++			cpuTotal := max(inst.CPUBlocksTotal(), cpuUsed)
++			item.CPUUsedBlocks = &cpuUsed
++			item.CPUTotalBlocks = &cpuTotal
++		}
++		instances = append(instances, item)
++	}
++
++	completed, preemptions, rejected, timedOut, dropped, ttftMeanMs, tpotMeanMs, outputTokS, hitRate := c.snapshotSummaryMetrics(isFinal, snapTime)
++
++	c.emitClusterEvent(snapTime, &sim.MetricsSnapshotEvent{
++		IsFinal:            isFinal,
++		GatewayQueueDepth:  max(c.GatewayQueueDepth(), 0),
++		CompletedRequests:  max(completed, 0),
++		Preemptions:        max(preemptions, 0),
++		RejectedRequests:   max(rejected, 0),
++		TimedOutRequests:   max(timedOut, 0),
++		DroppedRequests:    max(dropped, 0),
++		TTFTMeanMs:         sanitizeNonNegFloat(ttftMeanMs),
++		TPOTMeanMs:         sanitizeNonNegFloat(tpotMeanMs),
++		OutputTokS:         sanitizeNonNegFloat(outputTokS),
++		PrefixCacheHitRate: clamp01(hitRate),
++		Instances:          instances,
++	})
++
++	if !isFinal && c.eventSnapshotIntervalUs > 0 {
++		for c.nextEventSnapshotClockUs <= c.clock {
++			c.nextEventSnapshotClockUs += c.eventSnapshotIntervalUs
++		}
++	}
++}
++
++func (c *ClusterSimulator) snapshotSummaryMetrics(isFinal bool, snapTime int64) (completed int, preemptions int64, rejected, timedOut, dropped int, ttftMeanMs, tpotMeanMs, outputTokS, hitRate float64) {
++	preemptions = c.preemptionsTotal()
++	rejected = c.rejectedRequests + c.routingRejections + c.gatewayRejected + c.gatewayExpired
++
++	if isFinal && c.aggregatedMetrics != nil {
++		m := c.aggregatedMetrics
++		completed = m.CompletedRequests
++		timedOut = m.TimedOutRequests
++		dropped = m.DroppedUnservable
++		ttftMeanMs = meanUsToMs(m.RequestTTFTs)
++		tpotMeanMs = meanUsToMs(m.RequestITLs)
++		if m.SimEndedTime > 0 && m.CompletedRequests > 0 {
++			outputTokS = float64(m.TotalOutputTokens) / (float64(m.SimEndedTime) / 1e6)
++		}
++		hitRate = m.CacheHitRate
++		return
++	}
++
++	completed = c.completedRequestsTotal() - c.pdPrefillCompletedCount
++	if completed < 0 {
++		completed = 0
++	}
++	timedOut = c.timedOutRequestsTotal()
++	dropped = c.droppedRequestsTotal()
++
++	var totalOutTokens int
++	var queryTokens, hitTokens int64
++	var ttftSumUs, itlSumUs float64
++	var ttftCount, itlCount int
++
++	for _, inst := range c.instances {
++		m := inst.Metrics()
++		totalOutTokens += m.TotalOutputTokens
++		queryTokens += m.PrefixCacheQueryTokens
++		hitTokens += m.PrefixCacheHitTokens
++
++		// Skip PD prefill sub-requests in live mean latency so decode latency is represented cleanly.
++		isPrefillOnly := c.poolsConfigured() && c.poolMembership[string(inst.ID())] == PoolRolePrefill
++		if isPrefillOnly {
++			continue
++		}
++		ttftKeys := make([]string, 0, len(m.RequestTTFTs))
++		for id := range m.RequestTTFTs {
++			ttftKeys = append(ttftKeys, id)
++		}
++		sort.Strings(ttftKeys)
++		for _, id := range ttftKeys {
++			v := m.RequestTTFTs[id]
++			if !math.IsNaN(v) && !math.IsInf(v, 0) && v >= 0 {
++				ttftSumUs += v
++				ttftCount++
++			}
++		}
++		itlKeys := make([]string, 0, len(m.RequestITLs))
++		for id := range m.RequestITLs {
++			itlKeys = append(itlKeys, id)
++		}
++		sort.Strings(itlKeys)
++		for _, id := range itlKeys {
++			v := m.RequestITLs[id]
++			if !math.IsNaN(v) && !math.IsInf(v, 0) && v >= 0 {
++				itlSumUs += v
++				itlCount++
++			}
++		}
++	}
++
++	totalOutTokens -= c.pdPrefillOutputTokens
++	if totalOutTokens < 0 {
++		totalOutTokens = 0
++	}
++	if snapTime > 0 && totalOutTokens > 0 {
++		outputTokS = float64(totalOutTokens) / (float64(snapTime) / 1e6)
++	}
++	if ttftCount > 0 {
++		ttftMeanMs = (ttftSumUs / float64(ttftCount)) / 1000.0
++	}
++	if itlCount > 0 {
++		tpotMeanMs = (itlSumUs / float64(itlCount)) / 1000.0
++	}
++	if queryTokens > 0 {
++		hitRate = float64(hitTokens) / float64(queryTokens)
++	}
++	return
++}
++
++func meanUsToMs(m map[string]float64) float64 {
++	if len(m) == 0 {
++		return 0
++	}
++	keys := make([]string, 0, len(m))
++	for k := range m {
++		keys = append(keys, k)
++	}
++	sort.Strings(keys)
++	var sum float64
++	var n int
++	for _, k := range keys {
++		v := m[k]
++		if !math.IsNaN(v) && !math.IsInf(v, 0) && v >= 0 {
++			sum += v
++			n++
++		}
++	}
++	if n == 0 {
++		return 0
++	}
++	return (sum / float64(n)) / 1000.0
++}
++
++func sanitizeNonNegFloat(v float64) float64 {
++	if math.IsNaN(v) || math.IsInf(v, 0) || v < 0 {
++		return 0
++	}
++	return v
++}
++
++func clamp01(v float64) float64 {
++	if math.IsNaN(v) || math.IsInf(v, 0) || v < 0 {
++		return 0
++	}
++	if v > 1 {
++		return 1
++	}
++	return v
++}
+diff --git a/sim/cluster/events_emit_test.go b/sim/cluster/events_emit_test.go
+new file mode 100644
+index 00000000..aa84efec
+--- /dev/null
++++ b/sim/cluster/events_emit_test.go
+@@ -0,0 +1,241 @@
++package cluster
++
++import (
++	"testing"
++
++	cengine "github.com/inference-sim/blis-vllm/compat/engine"
++
++	"github.com/inference-sim/inference-sim/sim"
++)
++
++type recordedEvent struct {
++	tUS int64
++	ev  sim.EventRecord
++}
++
++type recordingSink struct {
++	header *sim.HeaderRecord
++	events []recordedEvent
++	seq    uint64
++}
++
++func (s *recordingSink) Enabled() bool { return true }
++
++func (s *recordingSink) WriteHeader(h *sim.HeaderRecord) error {
++	s.header = h
++	return nil
++}
++
++func (s *recordingSink) Emit(tUS int64, ev sim.EventRecord) error {
++	if ev == nil {
++		return nil
++	}
++	s.seq++
++	ev.SetHeader(s.seq, tUS, ev.EventType())
++	s.events = append(s.events, recordedEvent{tUS: tUS, ev: ev})
++	return nil
++}
++
++func (s *recordingSink) Flush() error { return nil }
++func (s *recordingSink) Close() error { return nil }
++
++func makeEventTestConfig(horizon int64, numInstances int) DeploymentConfig {
++	d := compatDeployment(cengine.SimConfig{
++		Horizon:             horizon,
++		Seed:                42,
++		KVCacheConfig:       cengine.NewKVCacheConfig(100, 16, 0, 0, 0, 0),
++		BatchConfig:         cengine.NewBatchConfig(10, 2048, 0),
++		LatencyModel:        testFakeLatency(),
++		ModelHardwareConfig: cengine.NewModelHardwareConfig(testModelConfig(), "", "", 1, 1, false, 0),
++	}, 0)
++	d.NumInstances = numInstances
++	d.TraceLevel = "none"
++	return d
++}
++
++func TestClusterSimulator_EventSink_EmitsLifecycleRoutingAndSnapshots_AndPreservesINV6(t *testing.T) {
++	reqCount := 6
++	reqsA := testGenerateRequests(42, 10_000_000, 1.0/1e6, reqCount,
++		0, 32, 0, 32, 32, 8, 0, 8, 8)
++	reqsB := testGenerateRequests(42, 10_000_000, 1.0/1e6, reqCount,
++		0, 32, 0, 32, 32, 8, 0, 8, 8)
++
++	// Baseline without EventSink
++	csBase := newTestCluster(makeEventTestConfig(10_000_000, 2), NewSliceRequestSource(reqsA), nil)
++	mustRun(t, csBase)
++
++	// Run with EventSink attached and TraceLevel="none"
++	sink := &recordingSink{}
++	cfg := makeEventTestConfig(10_000_000, 2)
++	cfg.EventSink = sink
++	cfg.EventSnapshotIntervalUs = 1_000_000
++	cfg.RooflineSpec = &sim.ModelRooflineSpec{
++		ModelName:         "test-model",
++		HiddenSize:        128,
++		IntermediateSize:  256,
++		NumHiddenLayers:   2,
++		NumAttentionHeads: 4,
++		NumKVHeads:        4,
++		HeadDim:           32,
++		VocabSize:         1024,
++	}
++	csEv := newTestCluster(cfg, NewSliceRequestSource(reqsB), nil)
++	mustRun(t, csEv)
++
++	// INV-6 parity: clock and aggregate metrics must match identically.
++	if csBase.Clock() != csEv.Clock() {
++		t.Fatalf("INV-6 clock mismatch: base=%d vs events=%d", csBase.Clock(), csEv.Clock())
++	}
++	mBase := csBase.AggregatedMetrics()
++	mEv := csEv.AggregatedMetrics()
++	if mBase.CompletedRequests != mEv.CompletedRequests ||
++		mBase.TotalInputTokens != mEv.TotalInputTokens ||
++		mBase.TotalOutputTokens != mEv.TotalOutputTokens {
++		t.Fatalf("INV-6 metrics mismatch: base=%+v vs events=%+v", mBase, mEv)
++	}
++
++	counts := map[string]int{}
++	var routedWithCandidates int
++	var arrivedWithBlocks int
++	var finalSnapshots int
++	var lastT int64 = -1
++
++	for i, rec := range sink.events {
++		if rec.tUS < lastT {
++			t.Fatalf("event[%d] (%s) out of timestamp order: t=%d < prev=%d", i, rec.ev.EventType(), rec.tUS, lastT)
++		}
++		lastT = rec.tUS
++		counts[rec.ev.EventType()]++
++		switch e := rec.ev.(type) {
++		case *sim.RequestArrivedEvent:
++			if len(e.BlockHashes) > 0 {
++				arrivedWithBlocks++
++			}
++		case *sim.RequestRoutedEvent:
++			if len(e.Candidates) == 2 {
++				routedWithCandidates++
++			}
++		case *sim.MetricsSnapshotEvent:
++			if e.PrefixCacheHitRate < 0 || e.PrefixCacheHitRate > 1 {
++				t.Fatalf("prefix_cache_hit_rate out of [0,1]: %v", e.PrefixCacheHitRate)
++			}
++			if e.IsFinal {
++				finalSnapshots++
++				if e.CompletedRequests != mEv.CompletedRequests {
++					t.Fatalf("final snapshot completed=%d want %d", e.CompletedRequests, mEv.CompletedRequests)
++				}
++			}
++		}
++	}
++
++	if counts[sim.EventTypePodCreated] != 2 || counts[sim.EventTypePodReady] != 2 {
++		t.Fatalf("expected 2 pod.created and 2 pod.ready, got created=%d ready=%d",
++			counts[sim.EventTypePodCreated], counts[sim.EventTypePodReady])
++	}
++	if counts[sim.EventTypeRequestArrived] != reqCount ||
++		counts[sim.EventTypeRequestAdmitted] != reqCount ||
++		counts[sim.EventTypeRequestRouted] != reqCount {
++		t.Fatalf("unexpected request routing counts: %v", counts)
++	}
++	if arrivedWithBlocks != reqCount {
++		t.Fatalf("expected block_hashes on all %d arrivals, got %d", reqCount, arrivedWithBlocks)
++	}
++	if counts[sim.EventTypeBatchStep] == 0 {
++		t.Fatal("expected batch.step events from wired EngineDriver sinks")
++	}
++	if finalSnapshots != 1 {
++		t.Fatalf("expected exactly 1 final metrics.snapshot, got %d", finalSnapshots)
++	}
++	_ = routedWithCandidates
++
++	// Also verify emitRequestRouted produces candidates and zero regret even with TraceLevel="none".
++	beforeLen := len(sink.events)
++	csEv.emitRequestRouted(&sim.Request{ID: "manual_scored", ArrivalTime: csEv.Clock()}, Placement{
++		Decode: InstanceID(csEv.instances[0].ID()),
++		Scores: map[string]float64{
++			string(csEv.instances[0].ID()): 0.9,
++			string(csEv.instances[1].ID()): 0.4,
++		},
++	})
++	var foundRouted *sim.RequestRoutedEvent
++	for _, rec := range sink.events[beforeLen:] {
++		if r, ok := rec.ev.(*sim.RequestRoutedEvent); ok {
++			foundRouted = r
++		}
++	}
++	if foundRouted == nil || len(foundRouted.Candidates) != 2 || foundRouted.Regret == nil || *foundRouted.Regret != 0 {
++		t.Fatalf("expected 2 candidates and regret=0 on scored request.routed, got %+v", foundRouted)
++	}
++}
++
++func TestClusterSimulator_EventSink_PodTransitionsNoDuplicateReady(t *testing.T) {
++	sink := &recordingSink{}
++	cfg := makeEventTestConfig(1_000_000, 1)
++	cfg.EventSink = sink
++	cs := newTestCluster(cfg, NewSliceRequestSource(nil), nil)
++
++	inst := cs.instances[0]
++	// Exercise valid lifecycle Loading -> WarmingUp -> Active -> Draining -> Terminated.
++	inst.State = sim.InstanceStateLoading
++	inst.readyEmitted = false
++	cs.emitPodCreatedAndLoading(inst)
++	inst.TransitionTo(sim.InstanceStateWarmingUp)
++	inst.TransitionTo(sim.InstanceStateActive)
++	inst.drainReason = "autoscaler_scale_down"
++	inst.TransitionTo(sim.InstanceStateDraining)
++	inst.TransitionTo(sim.InstanceStateTerminated)
++
++	counts := map[string]int{}
++	var drainReason string
++	for _, rec := range sink.events {
++		counts[rec.ev.EventType()]++
++		if d, ok := rec.ev.(*sim.PodDrainingEvent); ok {
++			drainReason = d.Reason
++		}
++	}
++	if counts[sim.EventTypePodReady] != 1 {
++		t.Fatalf("expected exactly 1 pod.ready, got %d", counts[sim.EventTypePodReady])
++	}
++	if counts[sim.EventTypePodDraining] != 1 || drainReason != "autoscaler_scale_down" {
++		t.Fatalf("expected 1 pod.draining with reason autoscaler_scale_down, got count=%d reason=%q",
++			counts[sim.EventTypePodDraining], drainReason)
++	}
++	if counts[sim.EventTypePodTerminated] != 1 {
++		t.Fatalf("expected 1 pod.terminated, got %d", counts[sim.EventTypePodTerminated])
++	}
++}
++
++func TestClusterSimulator_EventSink_GatewayRejectionAndTimeout(t *testing.T) {
++	sink := &recordingSink{}
++	cfg := makeEventTestConfig(1_000_000, 1)
++	cfg.EventSink = sink
++	cs := newTestCluster(cfg, NewSliceRequestSource(nil), nil)
++	cs.clock = 5000
++
++	reqTimeout := &sim.Request{ID: "r_timeout", ArrivalTime: 1000}
++	cs.emitGatewayRejection(reqTimeout, RejectedClientTimeout, "deadline")
++
++	reqAdmission := &sim.Request{ID: "r_admit", ArrivalTime: 2000}
++	cs.emitGatewayRejection(reqAdmission, RejectedAdmission, "shed")
++
++	reqCap := &sim.Request{ID: "r_cap", ArrivalTime: 3000}
++	cs.emitGatewayRejection(reqCap, RejectedGatewayCapacity, "queue_full")
++
++	reqRoute := &sim.Request{ID: "r_route", ArrivalTime: 4000}
++	cs.emitGatewayRejection(reqRoute, RejectedRouting, "no_instance")
++
++	if len(sink.events) != 4 {
++		t.Fatalf("expected 4 rejection/timeout events, got %d", len(sink.events))
++	}
++	to, ok := sink.events[0].ev.(*sim.RequestTimedOutEvent)
++	if !ok || to.Stage != "gateway" || to.ElapsedUS != 4000 {
++		t.Fatalf("unexpected timeout event: %#v", sink.events[0].ev)
++	}
++	wantStages := []string{"admission", "flow_control", "routing"}
++	for idx, want := range wantStages {
++		rej, ok := sink.events[idx+1].ev.(*sim.RequestRejectedEvent)
++		if !ok || rej.Stage != want {
++			t.Fatalf("event[%d]: expected stage %q, got %#v", idx+1, want, sink.events[idx+1].ev)
++		}
++	}
++}
+diff --git a/sim/cluster/gateway.go b/sim/cluster/gateway.go
+index 511042dc..8a175dd1 100644
+--- a/sim/cluster/gateway.go
++++ b/sim/cluster/gateway.go
+@@ -244,6 +244,7 @@ func (cs *ClusterSimulator) Reject(req *sim.Request, why Rejection, reason strin
+ 	f, dropReason := rejectionFate(why)
+ 	cs.endRequest(req, f, dropReason, cs.clock)
+ 	cs.recordRejection(req, why, reason)
++	cs.emitGatewayRejection(req, why, reason)
+ 	cs.recordUnserved(req) // measured failed_requests and closed-loop drivers (#1938, #1937)
+ 	if why == RejectedUnservable && cs.sessionCallback != nil {
+ 		for _, next := range cs.sessionCallback(req, cs.clock) {
+@@ -455,6 +456,7 @@ func (cs *ClusterSimulator) parentDone(parent *ParentRequest, at int64, outcome
+ }
+ 
+ func (cs *ClusterSimulator) recordRouting(req *sim.Request, p Placement) {
++	cs.emitRequestRouted(req, p)
+ 	if cs.trace == nil {
+ 		return
+ 	}
+diff --git a/sim/cluster/infra_lifecycle_event.go b/sim/cluster/infra_lifecycle_event.go
+index cf884bce..78412c30 100644
+--- a/sim/cluster/infra_lifecycle_event.go
++++ b/sim/cluster/infra_lifecycle_event.go
+@@ -181,6 +181,9 @@ func NewDrainPolicy(name DrainPolicyName) DrainPolicy {
+ type drainImmediate struct{}
+ 
+ func (d *drainImmediate) Drain(inst *InstanceSimulator, cs *ClusterSimulator) {
++	if inst.drainReason == "" {
++		inst.drainReason = "node_drain"
++	}
+ 	inst.TransitionTo(sim.InstanceStateDraining)
+ 
+ 	// C1/I2: Decrement inFlightRequests for all requests that will never complete —
+@@ -209,6 +212,9 @@ func (d *drainImmediate) Drain(inst *InstanceSimulator, cs *ClusterSimulator) {
+ type drainWait struct{}
+ 
+ func (d *drainWait) Drain(inst *InstanceSimulator, cs *ClusterSimulator) {
++	if inst.drainReason == "" {
++		inst.drainReason = "node_drain"
++	}
+ 	inst.TransitionTo(sim.InstanceStateDraining)
+ 	// The gateway removes the endpoint when it observes the transition.
+ 
+@@ -227,6 +233,9 @@ func (d *drainWait) Drain(inst *InstanceSimulator, cs *ClusterSimulator) {
+ type drainRedirect struct{}
+ 
+ func (d *drainRedirect) Drain(inst *InstanceSimulator, cs *ClusterSimulator) {
++	if inst.drainReason == "" {
++		inst.drainReason = "node_drain"
++	}
+ 	inst.TransitionTo(sim.InstanceStateDraining)
+ 	// The instance remains alive while processing in-flight and late-arriving requests.
+ 	// Cleanup happens via the T042 drain-completion check (QueueDepth==0 && BatchSize==0)
+diff --git a/sim/cluster/instance.go b/sim/cluster/instance.go
+index b18cd8cb..89d162c8 100644
+--- a/sim/cluster/instance.go
++++ b/sim/cluster/instance.go
+@@ -53,6 +53,10 @@ type InstanceSimulator struct {
+ 	// maxNumSeqs stores the instance's configured MaxNumSeqs at construction time.
+ 	// Exposed via MaxBatchSize() for the autoscaler pipeline.
+ 	maxNumSeqs int64
++
++	// Structured event stream tracking (INV-6 read-only observability).
++	readyEmitted bool
++	drainReason  string
+ }
+ 
+ // NewEngineInstance creates an InstanceSimulator whose engine is reached through the
+@@ -521,6 +525,48 @@ func (i *InstanceSimulator) TierBlockHashes(name string) []string {
+ 	return i.drv.TierBlockHashes(name)
+ }
+ 
++// CachedKVBlocksCount returns the number of prefix-cache KV blocks tracked in GPU HBM.
++func (i *InstanceSimulator) CachedKVBlocksCount() int64 {
++	if i.drv == nil {
++		return 0
++	}
++	return int64(i.drv.CachedKVBlocksCount())
++}
++
++// FlushSinkEvents flushes any deferred driver step-end events with timestamps <= upTo.
++func (i *InstanceSimulator) FlushSinkEvents(upTo int64) {
++	if i.drv != nil {
++		i.drv.FlushSinkEvents(upTo)
++	}
++}
++
++// HasCPUOffload reports whether CPU RAM KV offload is configured on this instance.
++func (i *InstanceSimulator) HasCPUOffload() bool {
++	return i.drv != nil && i.drv.HasCPUOffload()
++}
++
++// CPUBlocksTotal returns the configured CPU RAM KV capacity in blocks (0 if disabled).
++func (i *InstanceSimulator) CPUBlocksTotal() int64 {
++	if i.drv == nil {
++		return 0
++	}
++	return i.drv.CPUBlocksTotal()
++}
++
++// SetEventSink installs or replaces the structured NDJSON event sink on this instance's driver.
++func (i *InstanceSimulator) SetEventSink(sink sim.EventSink) {
++	if i.drv != nil {
++		i.drv.SetEventSink(sink)
++	}
++}
++
++// SetPodEventMeta populates pod-level metadata and roofline spec on this instance's driver.
++func (i *InstanceSimulator) SetPodEventMeta(gpusPerPod, tpDegree, kvBlockSize, kvBlocksTotal int, roofline *sim.ModelRooflineSpec, hasCPUOffload bool, cpuBlocksTotal int64) {
++	if i.drv != nil {
++		i.drv.SetPodEventMeta(string(i.id), gpusPerPod, tpDegree, kvBlockSize, kvBlocksTotal, roofline, hasCPUOffload, cpuBlocksTotal)
++	}
++}
++
+ // SetKVEventSink makes the instance's engine publish its KV events (sim.Simulator.SetKVEventSink).
+ func (i *InstanceSimulator) SetKVEventSink(sink func(at int64, events []sim.KVEvent)) {
+ 	if err := i.drv.SetKVEventSink(sink); err != nil {
+diff --git a/sim/cluster/pd_events.go b/sim/cluster/pd_events.go
+index 1c474083..8b2096b0 100644
+--- a/sim/cluster/pd_events.go
++++ b/sim/cluster/pd_events.go
+@@ -195,7 +195,21 @@ func (cs *ClusterSimulator) startPull(req *sim.Request, _, blocks int64, demand
+ // How the handoff ended (outcome) decides when the prefill side frees its held KV: the
+ // connector's rule (NIXLReleaseOnDrop, INV-PD-7); the cluster releases the hold or
+ // schedules its lease expiry accordingly (releasePrefillOnDrop).
++func nixlOutcomeReason(o NIXLOutcome) string {
++	switch o {
++	case NIXLDecodeNeverReceived:
++		return "decode_never_received"
++	case NIXLDecodeRejected:
++		return "decode_rejected"
++	case NIXLDecodeVanished:
++		return "decode_vanished"
++	default:
++		return fmt.Sprintf("decode_kv_drop_%d", int(o))
++	}
++}
++
+ func (e *KVTransferStartedEvent) dropAtStart(cs *ClusterSimulator, outcome NIXLOutcome) {
++	cs.emitDecodeKVRejection(e.parentReq.ID, e.time, nixlOutcomeReason(outcome))
+ 	cs.releasePrefillOnDrop(e.parentReq, outcome, e.time)
+ 	cs.droppedAtDecodeKV++
+ 	cs.endRequest(e.parentReq.OriginalRequest, sim.FateDropped, sim.DropDecodeKV, e.time)
+@@ -227,6 +241,7 @@ func scheduleTransferCompletion(cs *ClusterSimulator, parentReq *ParentRequest,
+ 	numBlocks := parentReq.PulledKVBlocks
+ 	duration := AloneTicks(flow)
+ 	parentReq.TransferAloneTicks = duration
++	cs.emitKVTransferStarted(parentReq, startTime)
+ 	if cs.pdLinks != nil {
+ 		cs.pdLinkFlows[cs.pdLinks.Start(startTime, flow)] = parentReq
+ 		logrus.Debugf("[cluster] KV transfer started for %s at %d: %d blocks, %d μs alone, sharing links with %d others",
+@@ -340,6 +355,7 @@ func (e *KVTransferCompletedEvent) Execute(cs *ClusterSimulator) {
+ 	if decodeInst == nil {
+ 		logrus.Errorf("[cluster] decode instance %q for %s not found in cs.instances at transfer complete — routing invariant violated; KV cannot be released",
+ 			decodeInstID, e.parentReq.ID)
++		cs.emitDecodeKVRejection(e.parentReq.ID, e.time, "decode_instance_not_found")
+ 		cs.droppedAtDecodeKV++
+ 		cs.endRequest(e.parentReq.OriginalRequest, sim.FateDropped, sim.DropDecodeKV, e.time)
+ 		cs.recordUnserved(e.parentReq.OriginalRequest)
+@@ -354,6 +370,7 @@ func (e *KVTransferCompletedEvent) Execute(cs *ClusterSimulator) {
+ 		// terminated). Release reserved blocks and drop.
+ 		logrus.Warnf("[cluster] decode instance %s for %s is no longer routable at transfer complete — releasing reserved KV and dropping",
+ 			decodeInstID, e.parentReq.ID)
++		cs.emitDecodeKVRejection(e.parentReq.ID, e.time, "decode_instance_not_routable")
+ 		decodeInst.ReleaseReservedKV(decodeSubReq, e.time)
+ 		cs.droppedAtDecodeKV++
+ 		cs.endRequest(e.parentReq.OriginalRequest, sim.FateDropped, sim.DropDecodeKV, e.time)
+@@ -385,15 +402,16 @@ func (e *KVTransferCompletedEvent) Execute(cs *ClusterSimulator) {
+ 	// Record KV transfer after successful promotion (BC-PD-17).
+ 	// Placement here ensures no KVTransferRecord is written for a request
+ 	// whose decode pod became non-routable during the transfer window.
++	transferDuration := e.parentReq.TransferCompleteTime - e.parentReq.TransferStartTime
++	if transferDuration < 0 {
++		logrus.Warnf("[cluster] INV-PD-4 violated: TransferCompleteTime (%d) < TransferStartTime (%d) for req %s; recording 0",
++			e.parentReq.TransferCompleteTime, e.parentReq.TransferStartTime, e.parentReq.ID)
++		transferDuration = 0
++	}
++	cs.emitKVTransferCompleted(e.parentReq, e.time, transferDuration)
+ 	if cs.trace != nil {
+ 		// INV-PD-4: transfer_start ≤ transfer_complete by timestamp sequencing.
+ 		// Defensive clamp: warn and record 0 if violated.
+-		transferDuration := e.parentReq.TransferCompleteTime - e.parentReq.TransferStartTime
+-		if transferDuration < 0 {
+-			logrus.Warnf("[cluster] INV-PD-4 violated: TransferCompleteTime (%d) < TransferStartTime (%d) for req %s; recording 0",
+-				e.parentReq.TransferCompleteTime, e.parentReq.TransferStartTime, e.parentReq.ID)
+-			transferDuration = 0
+-		}
+ 		cs.trace.RecordKVTransfer(trace.KVTransferRecord{
+ 			ParentRequestID:   e.parentReq.ID,
+ 			TransferStartTime: e.parentReq.TransferStartTime,
+diff --git a/sim/engine_driver.go b/sim/engine_driver.go
+index 25868486..253da60a 100644
+--- a/sim/engine_driver.go
++++ b/sim/engine_driver.go
+@@ -79,6 +79,24 @@ type EngineDriverConfig struct {
+ 	// engine's steps, sampling, TTFT, end-to-end latency and per-step ITL entries (Request.ITL)
+ 	// are as without it.
+ 	StreamInterval int
++	// EventSink receives structured v1 NDJSON simulation events when non-nil and Enabled().
++	// Must never affect simulation scheduling, routing, RNG, or stdout Result (INV-6).
++	EventSink EventSink
++	// PodID identifies this instance in emitted events (defaults to "pod-0" if empty).
++	PodID string
++	// GPUsPerPod, TPDegree, KVBlockSize, and KVBlocksTotal describe this pod's KV geometry
++	// for emitted KV block events. Defaults are derived from eng.Snapshot() when zero.
++	GPUsPerPod    int
++	TPDegree      int
++	KVBlockSize   int
++	KVBlocksTotal int
++	// RooflineSpec provides model and hardware parameters for analytical batch.step roofline
++	// estimation; nil yields a zero-initialized derived RooflinePoint.
++	RooflineSpec *ModelRooflineSpec
++	// HasCPUOffload indicates whether a CPU RAM offload tier is configured for eviction destination.
++	HasCPUOffload bool
++	// CPUBlocksTotal is the configured CPU RAM KV cache capacity in blocks (0 when disabled).
++	CPUBlocksTotal int64
+ }
+ 
+ // DefaultStallSteps is the progress watchdog's limit when EngineDriverConfig.StallSteps is
+@@ -183,6 +201,11 @@ type EngineDriver struct {
+ 	// leader's other ranks' drivers, in rank order.
+ 	leader  *EngineDriver
+ 	members []*EngineDriver
++
++	// EventSink observability state (zero simulation side-effects, INV-6).
++	kvTracker        *kvBlockTracker
++	pendingEndEvents []pendingSinkEvent
++	tierTransfers    map[engine.TransferID]tierTransferInfo
+ }
+ 
+ type driverReq struct {
+@@ -193,6 +216,7 @@ type driverReq struct {
+ 	scheduledIdx int
+ 	lastEnd      int64 // the end of the last step that emitted a token for the request
+ 	emitted      int
++	lastComputed int     // computed tokens tracked for preemption accounting
+ 	sent         int     // tokens delivered to the client (StreamInterval groups them)
+ 	clientEnd    int64   // the end of the step that delivered the last of them
+ 	acceptCarry  float64 // the fraction of an accepted draft the request is owed
+@@ -202,8 +226,8 @@ type driverReq struct {
+ }
+ 
+ type driverBatch struct {
+-	b   engine.Batch
+-	end int64
++	b          engine.Batch
++	start, end int64
+ }
+ 
+ // stagedBatch is a pipelined runner step's sampling requests, the requests its schedule freed
+@@ -230,6 +254,23 @@ func NewEngineDriver(eng engine.Engine, cfg EngineDriverConfig) *EngineDriver {
+ 			d.stage = stage
+ 		}
+ 	}
++	if d.sinkEnabled() {
++		// Enable KVEvents on the engine solely to populate res.KVEvents for EventSink
++		// without enabling router KV event publishing when d.kvEventSink == nil.
++		if p, ok := eng.(interface{ EnableKVEvents() }); ok {
++			p.EnableKVEvents()
++		}
++		snap := eng.Snapshot()
++		blockSize := cfg.KVBlockSize
++		if blockSize <= 0 {
++			blockSize = snap.KVBlockSize
++		}
++		blocksTotal := cfg.KVBlocksTotal
++		if blocksTotal <= 0 {
++			blocksTotal = int(snap.KVBlocksTotal)
++		}
++		d.kvTracker = newKVBlockTracker(blockSize, blocksTotal)
++	}
+ 	return d
+ }
+ 
+@@ -301,6 +342,7 @@ func (d *EngineDriver) ProcessNextEvent() Event {
+ 	}
+ 	d.preEventClock = d.Clock
+ 	d.Clock = shim.Timestamp()
++	d.flushPendingEndEvents(d.Clock)
+ 	shim.ev.run(d)
+ 	return entry.event
+ }
+@@ -379,6 +421,7 @@ func (d *EngineDriver) Finalize() {
+ 		maps.Copy(d.Metrics.AdapterLoadCounts, loads)
+ 		maps.Copy(d.Metrics.AdapterEvictionCounts, evictions)
+ 	}
++	d.flushPendingEndEvents(d.Horizon)
+ 	d.Metrics.SimEndedTime = min(d.Clock, d.Horizon)
+ 	logrus.Infof("[tick %07d] Simulation ended", d.Clock)
+ }
+@@ -477,6 +520,12 @@ func (e *driverQueuedEvent) run(d *EngineDriver) {
+ 		req.State = StateTimedOut
+ 		d.Metrics.TimedOutRequests++
+ 		d.Metrics.RecordTimeout(req)
++		d.emitEvent(e.at, &RequestTimedOutEvent{
++			ReqID:     req.ID,
++			PodID:     d.podID(),
++			Stage:     "engine",
++			ElapsedUS: max(e.at-req.ArrivalTime, 0),
++		})
+ 		d.done(req, e.at)
+ 		return
+ 	}
+@@ -488,6 +537,11 @@ func (e *driverQueuedEvent) run(d *EngineDriver) {
+ 		d.Metrics.DroppedUnservable++
+ 		d.Metrics.RecordUnserved(req, false)
+ 		delete(d.Metrics.Requests, req.ID)
++		d.emitEvent(e.at, &RequestRejectedEvent{
++			ReqID:  req.ID,
++			Reason: err.Error(),
++			Stage:  "unservable",
++		})
+ 		d.done(req, e.at)
+ 		return
+ 	}
+@@ -495,6 +549,13 @@ func (e *driverQueuedEvent) run(d *EngineDriver) {
+ 	d.Metrics.EngineAccepted++
+ 	req.State = StateQueued
+ 	d.reqs[req.ID] = &driverReq{req: req}
++	if d.sinkEnabled() {
++		d.emitEvent(e.at, &RequestQueuedEvent{
++			ReqID:      req.ID,
++			PodID:      d.podID(),
++			QueueDepth: max(d.eng.Snapshot().Waiting, 0),
++		})
++	}
+ 	if req.Deadline > 0 && req.Deadline <= d.Horizon {
+ 		d.schedule(&driverTimeoutEvent{at: req.Deadline, req: req})
+ 	}
+@@ -552,13 +613,17 @@ func (e *driverArrivalStep) run(d *EngineDriver) {
+ // driverStepEnd completes the oldest in-flight batch at its step's end; for a batch already
+ // applied at its start (ApplyAtStepStart), it only steps the engine again.
+ type driverStepEnd struct {
+-	at      int64
+-	applied bool
++	at         int64
++	applied    bool
++	sinkEvents []EventRecord
+ }
+ 
+ func (e *driverStepEnd) Timestamp() int64 { return e.at }
+ func (e *driverStepEnd) Priority() int    { return PriorityStep }
+ func (e *driverStepEnd) run(d *EngineDriver) {
++	for _, ev := range e.sinkEvents {
++		d.emitEvent(e.at, ev)
++	}
+ 	if e.applied {
+ 		d.kick(e.at)
+ 		return
+@@ -572,7 +637,7 @@ func (e *driverStepEnd) run(d *EngineDriver) {
+ 	if err != nil {
+ 		panic(fmt.Sprintf("engine driver: Complete(%d) at %d: %v", fb.b.ID, e.at, err))
+ 	}
+-	d.apply(fb.b, res, e.at)
++	d.apply(fb.b, fb.start, res, e.at, false)
+ 	d.kick(e.at)
+ }
+ 
+@@ -635,10 +700,19 @@ func (e *driverTimeoutEvent) run(d *EngineDriver) {
+ 		panic(fmt.Sprintf("engine driver: Finish(%s): %v", req.ID, err))
+ 	}
+ 	d.noteFreed(req.ID)
++	if d.kvTracker != nil {
++		d.kvTracker.onFinished(req.ID, false)
++	}
+ 	req.State = StateTimedOut
+ 	d.Metrics.TimedOutRequests++
+ 	d.Metrics.RecordTimeout(req)
+ 	delete(d.reqs, req.ID)
++	d.emitEvent(e.at, &RequestTimedOutEvent{
++		ReqID:     req.ID,
++		PodID:     d.podID(),
++		Stage:     "engine",
++		ElapsedUS: max(e.at-req.ArrivalTime, 0),
++	})
+ 	d.done(req, e.at)
+ 	d.kick(e.at)
+ }
+@@ -669,7 +743,7 @@ func (d *EngineDriver) kick(now int64) {
+ 		if err != nil {
+ 			panic(fmt.Sprintf("engine driver: Schedule at %d: %v", now, err))
+ 		}
+-		d.notePreempted(b)
++		d.notePreempted(b, now)
+ 		d.finishUnrun(b.Finished, now)
+ 		if b.Empty() {
+ 			d.noteEmptyStep(b)
+@@ -688,11 +762,11 @@ func (d *EngineDriver) kick(now int64) {
+ 			if err != nil {
+ 				panic(fmt.Sprintf("engine driver: Complete(%d) at %d: %v", b.ID, now, err))
+ 			}
+-			d.apply(b, res, end)
+-			d.schedule(&driverStepEnd{at: end, applied: true})
++			sinkEvs := d.apply(b, start, res, end, true)
++			d.schedule(&driverStepEnd{at: end, applied: true, sinkEvents: sinkEvs})
+ 			continue
+ 		}
+-		d.inFlight = append(d.inFlight, driverBatch{b: b, end: end})
++		d.inFlight = append(d.inFlight, driverBatch{b: b, start: start, end: end})
+ 		d.schedule(&driverStepEnd{at: end})
+ 	}
+ 	d.rearmWake(now)
+@@ -883,8 +957,26 @@ func (d *EngineDriver) preemptedSince(id string, i int) bool {
+ // admit records a batch scheduled at now whose step starts at start: each request's first
+ // scheduling (its state, scheduling delay and admission prefix lookup), at the current step index.
+ func (d *EngineDriver) admit(b engine.Batch, now, start int64) {
++	sinkOn := d.sinkEnabled()
++	var snap engine.State
++	if sinkOn && d.kvTracker != nil && len(b.Reqs) > 0 {
++		snap = d.eng.Snapshot()
++	}
+ 	for _, s := range b.Reqs {
+-		if r := d.reqs[s.ID]; r != nil && r.req.State != StateRunning {
++		r := d.reqs[s.ID]
++		var offload int
++		var offloadChecked bool
++		readOffload := func() int {
++			if offloadChecked {
++				return offload
++			}
++			offloadChecked = true
++			if o, ok := d.eng.(interface{ OffloadCachedTokens(id string) int }); ok {
++				offload = o.OffloadCachedTokens(s.ID)
++			}
++			return offload
++		}
++		if r != nil && r.req.State != StateRunning {
+ 			if r.remote && r.emitted == 0 {
+ 				// A remote-prefilled request's first token is a decode step's: its gap runs
+ 				// from the step's start.
+@@ -902,23 +994,67 @@ func (d *EngineDriver) admit(b engine.Batch, now, start int64) {
+ 				// request's lookup again is not counted (PrefixCacheStats.record,
+ 				// vllm/v1/metrics/stats.py:138-155@5df63a72).
+ 				r.lookedUp = true
+-				var offload int
+-				if o, ok := d.eng.(interface{ OffloadCachedTokens(id string) int }); ok {
+-					offload = o.OffloadCachedTokens(s.ID)
+-				}
++				off := readOffload()
+ 				d.Metrics.recordPrefixLookup(r.req, PrefixLookup{QueryTokens: r.req.InputLen(),
+-					HitTokens: int64(s.CachedTokens - offload), CPUHitTokens: int64(offload)})
++					HitTokens: int64(s.CachedTokens - off), CPUHitTokens: int64(off)})
++			}
++			if sinkOn {
++				off := readOffload()
++				d.emitEvent(now, &RequestScheduledEvent{
++					ReqID:        s.ID,
++					PodID:        d.podID(),
++					CachedTokens: max(s.CachedTokens, 0),
++					CPUHitTokens: max(off, 0),
++					PrefixLookup: s.PrefixLookup,
++				})
++			}
++		}
++		if r != nil {
++			r.lastComputed = s.Computed + s.Tokens
++		}
++		if sinkOn && d.kvTracker != nil {
++			var reqPtr *Request
++			if r != nil {
++				reqPtr = r.req
++			}
++			if allocIDs, shared := d.kvTracker.onScheduled(s, reqPtr, snap); len(allocIDs) > 0 {
++				d.emitEvent(now, &KVBlockAllocatedEvent{
++					PodID:          d.podID(),
++					GPUIndices:     d.gpuIndices(),
++					BlockIDs:       allocIDs,
++					ReqID:          s.ID,
++					Tier:           "gpu",
++					SharedWithReqs: shared,
++				})
+ 			}
+ 		}
+ 	}
+ }
+ 
+-func (d *EngineDriver) notePreempted(b engine.Batch) {
++func (d *EngineDriver) notePreempted(b engine.Batch, now int64) {
++	sinkOn := d.sinkEnabled()
+ 	for _, id := range b.Preempted {
+ 		d.Metrics.PreemptionCount++
+-		if r := d.reqs[id]; r != nil {
++		r := d.reqs[id]
++		var lost int
++		if r != nil {
++			lost = r.lastComputed
+ 			r.req.State = StateQueued
+ 			r.resumed = r.emitted > 0
++			r.lastComputed = 0
++		}
++		if sinkOn {
++			freed := []int{}
++			if d.kvTracker != nil {
++				freed = d.kvTracker.onPreempted(id)
++			}
++			d.emitEvent(now, &RequestPreemptedEvent{
++				ReqID:              id,
++				PodID:              d.podID(),
++				Reason:             "kv_capacity",
++				ComputedTokensLost: max(lost, 0),
++				FreedBlocks:        freed,
++			})
+ 		}
+ 	}
+ }
+@@ -944,7 +1080,7 @@ func (d *EngineDriver) rearmWake(now int64) {
+ 
+ // apply records what a completed batch made visible: first tokens, inter-token latencies and
+ // finishes, in the host's report terms.
+-func (d *EngineDriver) apply(b engine.Batch, res engine.Result, end int64) {
++func (d *EngineDriver) apply(b engine.Batch, start int64, res engine.Result, end int64, deferEmit bool) []EventRecord {
+ 	d.noteHandoffs(res.Handoffs)
+ 	if d.kvEventSink != nil && len(res.KVEvents) > 0 {
+ 		events := make([]KVEvent, len(res.KVEvents))
+@@ -963,6 +1099,11 @@ func (d *EngineDriver) apply(b engine.Batch, res engine.Result, end int64) {
+ 		ids = append(ids, id)
+ 	}
+ 	sort.Strings(ids)
++	var firstEmitted map[string]bool
++	sinkOn := d.sinkEnabled()
++	if sinkOn {
++		firstEmitted = map[string]bool{}
++	}
+ 	for _, id := range ids {
+ 		r := d.reqs[id]
+ 		if r == nil {
+@@ -988,6 +1129,9 @@ func (d *EngineDriver) apply(b engine.Batch, res engine.Result, end int64) {
+ 			r.lastEnd = end
+ 			n-- // the first token's latency is TTFT, not an ITL entry
+ 			firstStep = true
++			if sinkOn {
++				firstEmitted[id] = true
++			}
+ 		}
+ 		if n > 0 {
+ 			// A step emitting n tokens is one ITL entry, as the compatibility engine's
+@@ -1032,6 +1176,19 @@ func (d *EngineDriver) apply(b engine.Batch, res engine.Result, end int64) {
+ 			}
+ 		}
+ 	}
++	var sinkEvents []EventRecord
++	var sinkOut *[]EventRecord
++	if sinkOn {
++		stepEvs := d.emitStepEvents(b, start, end, res, firstEmitted)
++		if deferEmit {
++			sinkEvents = stepEvs
++			sinkOut = &sinkEvents
++		} else {
++			for _, ev := range stepEvs {
++				d.emitEvent(end, ev)
++			}
++		}
++	}
+ 	for _, f := range res.Finished {
+ 		d.noteProgress()
+ 		d.noteFreed(f.ID)
+@@ -1040,8 +1197,9 @@ func (d *EngineDriver) apply(b engine.Batch, res engine.Result, end int64) {
+ 			continue
+ 		}
+ 		d.flushUndelivered(r, f, end)
+-		d.finish(r, f, end)
++		d.finish(r, f, end, sinkOut)
+ 	}
++	return sinkEvents
+ }
+ 
+ // deliver is the client's view of a request's tokens under StreamInterval (vLLM's output
+@@ -1121,7 +1279,7 @@ func (d *EngineDriver) StallErr() error { return d.stallErr }
+ func (d *EngineDriver) finishUnrun(fs []engine.Finished, now int64) {
+ 	for _, f := range fs {
+ 		if r := d.reqs[f.ID]; r != nil {
+-			d.finish(r, f, now)
++			d.finish(r, f, now, nil)
+ 		}
+ 	}
+ }
+@@ -1130,9 +1288,9 @@ func (d *EngineDriver) finishUnrun(fs []engine.Finished, now int64) {
+ // anything (engine.FinishError: vLLM answers it with an error, no token, vllm/v1/engine/
+ // __init__.py:56-57@5df63a72) is unservable, as a request the engine refuses at Add is: it is
+ // dropped, not completed, so it adds no latency sample. Any other finish is a completion.
+-func (d *EngineDriver) finish(r *driverReq, f engine.Finished, end int64) {
++func (d *EngineDriver) finish(r *driverReq, f engine.Finished, end int64, sinkOut *[]EventRecord) {
+ 	if f.Reason != engine.FinishError || r.emitted > 0 {
+-		d.complete(r, f, end)
++		d.complete(r, f, end, sinkOut)
+ 		return
+ 	}
+ 	req := r.req
+@@ -1140,6 +1298,9 @@ func (d *EngineDriver) finish(r *driverReq, f engine.Finished, end int64) {
+ 	d.Metrics.RecordUnserved(req, false)
+ 	delete(d.Metrics.Requests, req.ID)
+ 	delete(d.reqs, req.ID)
++	if d.kvTracker != nil {
++		d.kvTracker.onFinished(req.ID, false)
++	}
+ 	if d.unserved == nil {
+ 		d.unserved = map[string]bool{}
+ 	}
+@@ -1150,12 +1311,24 @@ func (d *EngineDriver) finish(r *driverReq, f engine.Finished, end int64) {
+ 	// it DoneDropped. A request the engine had admitted is StateRunning here, which both would
+ 	// read as a completion, so a session would go on to its next round.
+ 	req.State = StateQueued
++	if d.sinkEnabled() {
++		ev := &RequestRejectedEvent{
++			ReqID:  req.ID,
++			Reason: "engine_finish_error",
++			Stage:  "unservable",
++		}
++		if sinkOut != nil {
++			*sinkOut = append(*sinkOut, ev)
++		} else {
++			d.emitEvent(end, ev)
++		}
++	}
+ 	d.done(req, end)
+ }
+ 
+ // complete records a finished request as the compatibility engine's recordRequestCompletion
+ // does, with the engine's own output count.
+-func (d *EngineDriver) complete(r *driverReq, f engine.Finished, end int64) {
++func (d *EngineDriver) complete(r *driverReq, f engine.Finished, end int64, sinkOut *[]EventRecord) {
+ 	req := r.req
+ 	req.State = StateCompleted
+ 	req.DepartureTime = end
+@@ -1192,6 +1365,25 @@ func (d *EngineDriver) complete(r *driverReq, f engine.Finished, end int64) {
+ 		Req: req, TTFT: req.FirstTokenTime, OutputTokens: f.OutputTokens, E2E: e2e, ITL: itl,
+ 		Steps: d.stepIdx - r.scheduledIdx, Clock: clock, Overhead: overhead,
+ 	})
++	if d.kvTracker != nil {
++		d.kvTracker.onFinished(req.ID, req.RetainKVOnFinish)
++	}
++	if d.sinkEnabled() {
++		ev := &RequestFinishedEvent{
++			ReqID:        req.ID,
++			PodID:        d.podID(),
++			Reason:       mapFinishReason(f.Reason),
++			OutputTokens: max(f.OutputTokens, 0),
++			TTFTUs:       max(req.FirstTokenTime, 0),
++			E2EUs:        max(e2e, 0),
++			TPOTUs:       max(itl, 0),
++		}
++		if sinkOut != nil {
++			*sinkOut = append(*sinkOut, ev)
++		} else {
++			d.emitEvent(end, ev)
++		}
++	}
+ 	delete(d.reqs, req.ID)
+ 	d.done(req, end)
+ }
+@@ -1217,6 +1409,32 @@ func (d *EngineDriver) Evict(req *Request, now int64) bool {
+ 		panic(fmt.Sprintf("engine driver: Finish(%s, abort): %v", req.ID, err))
+ 	}
+ 	d.noteFreed(req.ID)
++	if d.kvTracker != nil {
++		d.kvTracker.onFinished(req.ID, false)
++	}
++	if d.sinkEnabled() {
++		var itlSum int64
++		for _, v := range req.ITL {
++			itlSum += v
++		}
++		var tpot float64
++		if r.emitted > 1 {
++			tpot = float64(itlSum) / float64(r.emitted-1)
++		}
++		var ttft int64
++		if req.TTFTSet {
++			ttft = max(req.FirstTokenTime, 0)
++		}
++		d.emitEvent(now, &RequestFinishedEvent{
++			ReqID:        req.ID,
++			PodID:        d.podID(),
++			Reason:       "abort",
++			OutputTokens: max(r.emitted, 0),
++			TTFTUs:       ttft,
++			E2EUs:        max(now-req.ArrivalTime, 0),
++			TPOTUs:       max(tpot, 0),
++		})
++	}
+ 	req.State = StateCompleted
+ 	delete(d.reqs, req.ID)
+ 	d.kick(now)
+@@ -1240,6 +1458,9 @@ func (d *EngineDriver) DrainWaiting(now int64) []*Request {
+ 		if r == nil {
+ 			panic(fmt.Sprintf("engine driver: the engine drained %s, which the driver does not hold", id))
+ 		}
++		if d.kvTracker != nil {
++			d.kvTracker.onFinished(id, false)
++		}
+ 		out = append(out, r.req)
+ 		delete(d.reqs, id)
+ 	}
+@@ -1260,6 +1481,62 @@ func (d *EngineDriver) SetKVEventSink(sink func(at int64, events []KVEvent)) err
+ 	return nil
+ }
+ 
++// SetEventSink installs or replaces the structured NDJSON event sink on a built driver.
++// When enabled, it also enables engine KV events and initializes the KV block tracker if needed.
++func (d *EngineDriver) SetEventSink(sink EventSink) {
++	d.cfg.EventSink = sink
++	if d.sinkEnabled() {
++		if p, ok := d.eng.(interface{ EnableKVEvents() }); ok {
++			p.EnableKVEvents()
++		}
++		if d.kvTracker == nil {
++			snap := d.eng.Snapshot()
++			blockSize := d.cfg.KVBlockSize
++			if blockSize <= 0 {
++				blockSize = snap.KVBlockSize
++			}
++			blocksTotal := d.cfg.KVBlocksTotal
++			if blocksTotal <= 0 {
++				blocksTotal = int(snap.KVBlocksTotal)
++			}
++			d.kvTracker = newKVBlockTracker(blockSize, blocksTotal)
++		}
++	}
++}
++
++// SetPodEventMeta populates pod-level metadata and roofline specification on the driver.
++func (d *EngineDriver) SetPodEventMeta(podID string, gpusPerPod, tpDegree, kvBlockSize, kvBlocksTotal int, roofline *ModelRooflineSpec, hasCPUOffload bool, cpuBlocksTotal int64) {
++	d.cfg.PodID = podID
++	if gpusPerPod > 0 {
++		d.cfg.GPUsPerPod = gpusPerPod
++	}
++	if tpDegree > 0 {
++		d.cfg.TPDegree = tpDegree
++	}
++	if kvBlockSize > 0 {
++		d.cfg.KVBlockSize = kvBlockSize
++	}
++	if kvBlocksTotal > 0 {
++		d.cfg.KVBlocksTotal = kvBlocksTotal
++	}
++	if roofline != nil {
++		d.cfg.RooflineSpec = roofline
++	}
++	d.cfg.HasCPUOffload = hasCPUOffload
++	if cpuBlocksTotal > 0 {
++		d.cfg.CPUBlocksTotal = cpuBlocksTotal
++	}
++	if d.sinkEnabled() && d.kvTracker == nil {
++		d.SetEventSink(d.cfg.EventSink)
++	}
++}
++
++// HasCPUOffload reports whether CPU RAM KV offload is configured on this driver.
++func (d *EngineDriver) HasCPUOffload() bool { return d.cfg.HasCPUOffload }
++
++// CPUBlocksTotal returns the configured CPU RAM KV cache capacity in blocks.
++func (d *EngineDriver) CPUBlocksTotal() int64 { return d.cfg.CPUBlocksTotal }
++
+ // KVEventsRefusal is why a router cannot index the engine's KV events, for an engine that says
+ // (a KVEventsRefusal method, blis-vllm's v0.32.0 engine for a full-attention group at a block size
+ // other than its hash block size); nil otherwise.
+diff --git a/sim/engine_driver_events.go b/sim/engine_driver_events.go
+new file mode 100644
+index 00000000..62b4cc5f
+--- /dev/null
++++ b/sim/engine_driver_events.go
+@@ -0,0 +1,270 @@
++package sim
++
++import (
++	"github.com/sirupsen/logrus"
++
++	"github.com/inference-sim/blis-substrate/contracts/engine"
++)
++
++type pendingSinkEvent struct {
++	tUS int64
++	ev  EventRecord
++}
++
++type tierTransferInfo struct {
++	reqID      string
++	fromTier   string
++	toTier     string
++	direction  string
++	blockIDs   []int
++	numBlocks  int
++	tokens     int
++	durationUS int64
++}
++
++func (d *EngineDriver) sinkEnabled() bool {
++	return d.cfg.EventSink != nil && d.cfg.EventSink.Enabled()
++}
++
++func (d *EngineDriver) podID() string {
++	if d.cfg.PodID != "" {
++		return d.cfg.PodID
++	}
++	return "pod-0"
++}
++
++func (d *EngineDriver) gpuIndices() []int {
++	n := d.cfg.TPDegree
++	if n <= 0 {
++		n = d.cfg.GPUsPerPod
++	}
++	if n <= 0 {
++		n = 1
++	}
++	out := make([]int, n)
++	for i := range out {
++		out[i] = i
++	}
++	return out
++}
++
++func (d *EngineDriver) emitEvent(tUS int64, ev EventRecord) {
++	if !d.sinkEnabled() || ev == nil {
++		return
++	}
++	if err := d.cfg.EventSink.Emit(tUS, ev); err != nil {
++		logrus.Warnf("event sink emit failed: %v", err)
++	}
++}
++
++func (d *EngineDriver) flushPendingEndEvents(upTo int64) {
++	if len(d.pendingEndEvents) == 0 {
++		return
++	}
++	remaining := d.pendingEndEvents[:0]
++	for _, pe := range d.pendingEndEvents {
++		if pe.tUS <= upTo {
++			d.emitEvent(pe.tUS, pe.ev)
++		} else {
++			remaining = append(remaining, pe)
++		}
++	}
++	if len(remaining) == 0 {
++		d.pendingEndEvents = nil
++		return
++	}
++	d.pendingEndEvents = remaining
++}
++
++// FlushSinkEvents emits any deferred step-end events with timestamps <= upTo.
++func (d *EngineDriver) FlushSinkEvents(upTo int64) {
++	d.flushPendingEndEvents(upTo)
++}
++
++// CachedKVBlocksCount returns the number of GPU prefix-cache blocks currently resident in
++// the driver's KV block tracker (read-only observability signal).
++func (d *EngineDriver) CachedKVBlocksCount() int {
++	return d.kvTracker.cachedCount()
++}
++
++func (d *EngineDriver) emitStepEvents(b engine.Batch, start, end int64, res engine.Result, firstEmitted map[string]bool) []EventRecord {
++	if !d.sinkEnabled() {
++		return nil
++	}
++	var out []EventRecord
++	podID := d.podID()
++	durationUS := max(end-start, 1)
++
++	if len(b.Reqs) > 0 {
++		members := make([]BatchMember, 0, len(b.Reqs))
++		prefillTokens, decodeTokens := 0, 0
++		for _, s := range b.Reqs {
++			role := "decode"
++			if s.Computed < s.PromptLen {
++				role = "prefill"
++				prefillTokens += s.Tokens
++			} else {
++				decodeTokens += s.Tokens
++			}
++			members = append(members, BatchMember{
++				ReqID:          s.ID,
++				Role:           role,
++				Tokens:         max(s.Tokens, 1),
++				ComputedBefore: max(s.Computed, 0),
++			})
++		}
++		phase := "decode"
++		if prefillTokens > 0 && decodeTokens > 0 {
++			phase = "mixed"
++		} else if prefillTokens > 0 {
++			phase = "prefill"
++		}
++		roofline := RooflinePoint{
++			Bottleneck: "memory_bw",
++			Derived:    true,
++		}
++		if d.cfg.RooflineSpec != nil {
++			roofline = d.cfg.RooflineSpec.EstimateBatch(b, durationUS)
++		}
++		out = append(out, &BatchStepEvent{
++			PodID:         podID,
++			BatchID:       uint64(b.ID),
++			Phase:         phase,
++			Members:       members,
++			PrefillTokens: prefillTokens,
++			DecodeTokens:  decodeTokens,
++			TotalTokens:   prefillTokens + decodeTokens,
++			DurationUS:    durationUS,
++			Roofline:      roofline,
++		})
++
++		for _, s := range b.Reqs {
++			emittedNow := res.Emitted[s.ID]
++			totalEmitted := emittedNow
++			if r := d.reqs[s.ID]; r != nil {
++				totalEmitted = r.emitted
++				r.lastComputed = s.Computed + s.Tokens
++			}
++			isFirst := firstEmitted[s.ID]
++			if s.Computed < s.PromptLen {
++				out = append(out, &RequestPrefillEvent{
++					ReqID:           s.ID,
++					PodID:           podID,
++					BatchID:         uint64(b.ID),
++					TokensProcessed: max(s.Tokens, 0),
++					ComputedAfter:   max(s.Computed+s.Tokens, 0),
++					PromptTokens:    max(s.PromptLen, 0),
++					DurationUS:      durationUS,
++				})
++				if emittedNow > 0 || isFirst {
++					out = append(out, &RequestDecodeStepEvent{
++						ReqID:         s.ID,
++						PodID:         podID,
++						BatchID:       uint64(b.ID),
++						TokensEmitted: max(emittedNow, 0),
++						TotalEmitted:  max(totalEmitted, 0),
++						IsFirstToken:  isFirst,
++						DurationUS:    durationUS,
++					})
++				}
++			} else {
++				out = append(out, &RequestDecodeStepEvent{
++					ReqID:         s.ID,
++					PodID:         podID,
++					BatchID:       uint64(b.ID),
++					TokensEmitted: max(emittedNow, 0),
++					TotalEmitted:  max(totalEmitted, 0),
++					IsFirstToken:  isFirst,
++					DurationUS:    durationUS,
++				})
++			}
++		}
++	}
++
++	if d.kvTracker != nil && len(res.KVEvents) > 0 {
++		out = append(out, d.kvTracker.onKVEvents(res.KVEvents, podID, d.gpuIndices(), d.cfg.HasCPUOffload)...)
++	}
++	return out
++}
++
++func (d *EngineDriver) emitTierTransferStarted(t engine.Transfer, now, durationUS int64) {
++	if !d.sinkEnabled() {
++		return
++	}
++	fromTier, toTier, direction := "gpu", "cpu_dram", "offload"
++	if t.Kind == engine.TransferLoad {
++		fromTier, toTier, direction = "cpu_dram", "gpu", "load"
++	}
++	var blockIDs []int
++	if d.kvTracker != nil {
++		blockIDs = d.kvTracker.blockIDsForReq(t.Request, t.Blocks)
++	} else {
++		blockIDs = []int{}
++	}
++	info := tierTransferInfo{
++		reqID:      t.Request,
++		fromTier:   fromTier,
++		toTier:     toTier,
++		direction:  direction,
++		blockIDs:   blockIDs,
++		numBlocks:  max(t.Blocks, 0),
++		tokens:     max(t.Tokens, 0),
++		durationUS: max(durationUS, 0),
++	}
++	if d.tierTransfers == nil {
++		d.tierTransfers = map[engine.TransferID]tierTransferInfo{}
++	}
++	d.tierTransfers[t.ID] = info
++	d.emitEvent(now, &KVBlockMovedEvent{
++		PodID:      d.podID(),
++		TransferID: uint64(t.ID),
++		ReqID:      info.reqID,
++		FromTier:   info.fromTier,
++		ToTier:     info.toTier,
++		Direction:  info.direction,
++		BlockIDs:   info.blockIDs,
++		NumBlocks:  info.numBlocks,
++		Tokens:     info.tokens,
++		DurationUS: 0,
++		Status:     "started",
++	})
++}
++
++func (d *EngineDriver) emitTierTransferCompleted(id engine.TransferID, at int64) {
++	if !d.sinkEnabled() {
++		return
++	}
++	info, ok := d.tierTransfers[id]
++	if !ok {
++		return
++	}
++	delete(d.tierTransfers, id)
++	d.emitEvent(at, &KVBlockMovedEvent{
++		PodID:      d.podID(),
++		TransferID: uint64(id),
++		ReqID:      info.reqID,
++		FromTier:   info.fromTier,
++		ToTier:     info.toTier,
++		Direction:  info.direction,
++		BlockIDs:   info.blockIDs,
++		NumBlocks:  info.numBlocks,
++		Tokens:     info.tokens,
++		DurationUS: info.durationUS,
++		Status:     "completed",
++	})
++}
++
++func mapFinishReason(r engine.FinishReason) string {
++	switch r {
++	case engine.FinishStop:
++		return "stop"
++	case engine.FinishLength:
++		return "length"
++	case engine.FinishAbort:
++		return "abort"
++	case engine.FinishError:
++		return "error"
++	default:
++		return "stop"
++	}
++}
+diff --git a/sim/engine_driver_group.go b/sim/engine_driver_group.go
+index 66639e7f..c18e7a74 100644
+--- a/sim/engine_driver_group.go
++++ b/sim/engine_driver_group.go
+@@ -227,7 +227,7 @@ func (d *EngineDriver) kickGroup(now int64) {
+ 		if !ran {
+ 			continue
+ 		}
+-		o.notePreempted(ob)
++		o.notePreempted(ob, now)
+ 		o.admit(ob, now, now)
+ 	}
+ 	for _, f := range b.Finished {
+@@ -239,7 +239,10 @@ func (d *EngineDriver) kickGroup(now int64) {
+ 	}
+ 	for _, o := range drivers {
+ 		r := results[o]
+-		o.apply(shares[o], r, end)
++		sinkEvs := o.apply(shares[o], now, r, end, true)
++		for _, ev := range sinkEvs {
++			o.pendingEndEvents = append(o.pendingEndEvents, pendingSinkEvent{tUS: end, ev: ev})
++		}
+ 		for range r.Finished {
+ 			// A finished request leaves its rank's instance when the step ends (the host loop's
+ 			// RequestLeftEvent), which is the instance's last event if nothing follows it.
+diff --git a/sim/engine_driver_handoff.go b/sim/engine_driver_handoff.go
+index 6c8a1cbd..cad4ee76 100644
+--- a/sim/engine_driver_handoff.go
++++ b/sim/engine_driver_handoff.go
+@@ -60,7 +60,7 @@ func (d *EngineDriver) startTransfersAfter(ts []engine.Transfer, now, computeEnd
+ 	for _, t := range ts {
+ 		demand := d.priceTransfer(t)
+ 		if t.Tier != "" {
+-			d.startTierTransfer(t, demand, computeEnd)
++			d.startTierTransfer(t, demand, now, computeEnd)
+ 			continue
+ 		}
+ 		req := d.remote[t.Request]
+@@ -191,6 +191,9 @@ func (d *EngineDriver) ReleaseHandoff(req *Request, now int64) {
+ 		panic(fmt.Sprintf("engine driver: ReleaseHandoff(%s): the engine holds no KV for it", req.ID))
+ 	}
+ 	delete(d.holds, req.ID)
++	if d.kvTracker != nil {
++		d.kvTracker.onFinished(req.ID, false)
++	}
+ 	if err := d.eng.TransferDone(h.Transfer, true, now); err != nil {
+ 		panic(fmt.Sprintf("engine driver: TransferDone(%d) for %s: %v", h.Transfer, req.ID, err))
+ 	}
+@@ -223,12 +226,14 @@ func (d *EngineDriver) noteHandoffs(hs []engine.Handoff) {
+ // its stores in the next step's pre_forward, before that step's forward is queued
+ // (vllm/v1/worker/gpu/kv_connector.py:81, 131-138; offloading/worker.py:218-236). Loads therefore never overlap each other, nor stores each other, but a load and a
+ // store do.
+-func (d *EngineDriver) startTierTransfer(t engine.Transfer, demand kernel.TransferDemand, after int64) {
++func (d *EngineDriver) startTierTransfer(t engine.Transfer, demand kernel.TransferDemand, now, after int64) {
+ 	if d.tierFreeAt == nil {
+ 		d.tierFreeAt = map[engine.TransferKind]int64{}
+ 	}
+ 	start := max(after, d.tierFreeAt[t.Kind])
+-	d.tierFreeAt[t.Kind] = start + TierTicks(demand)
++	dur := TierTicks(demand)
++	d.tierFreeAt[t.Kind] = start + dur
++	d.emitTierTransferStarted(t, now, dur)
+ 	d.schedule(&driverTierTransferDone{at: d.tierFreeAt[t.Kind], id: t.ID})
+ }
+ 
+@@ -245,5 +250,6 @@ func (e *driverTierTransferDone) run(d *EngineDriver) {
+ 	if err := d.eng.TransferDone(e.id, true, e.at); err != nil {
+ 		panic(fmt.Sprintf("engine driver: TransferDone(%d) of a tier transfer: %v", e.id, err))
+ 	}
++	d.emitTierTransferCompleted(e.id, e.at)
+ 	d.kick(e.at)
+ }
+diff --git a/sim/events_schema.go b/sim/events_schema.go
+new file mode 100644
+index 00000000..c9fe99f1
+--- /dev/null
++++ b/sim/events_schema.go
+@@ -0,0 +1,511 @@
++package sim
++
++// SchemaVersionV1 is the NDJSON event stream schema version matching schema/events.schema.json.
++const SchemaVersionV1 = "1.0"
++
++// Event type constants matching schema/events.schema.json.
++const (
++	EventTypeHeader           = "header"
++	EventTypeRequestArrived   = "request.arrived"
++	EventTypeRequestAdmitted  = "request.admitted"
++	EventTypeRequestRejected  = "request.rejected"
++	EventTypeRequestRouted    = "request.routed"
++	EventTypeRequestQueued    = "request.queued"
++	EventTypeRequestScheduled = "request.scheduled"
++	EventTypeRequestPrefill   = "request.prefill"
++	EventTypeRequestDecode    = "request.decode_step"
++	EventTypeRequestPreempted = "request.preempted"
++	EventTypeRequestFinished  = "request.finished"
++	EventTypeRequestTimedOut  = "request.timed_out"
++	EventTypeBatchStep        = "batch.step"
++	EventTypeKVBlockAllocated = "kv.block.allocated"
++	EventTypeKVBlockCached    = "kv.block.cached"
++	EventTypeKVBlockEvicted   = "kv.block.evicted"
++	EventTypeKVBlockMoved     = "kv.block.moved"
++	EventTypeKVTransfer       = "kv.transfer"
++	EventTypePodCreated       = "pod.created"
++	EventTypePodLoading       = "pod.loading"
++	EventTypePodReady         = "pod.ready"
++	EventTypePodDraining      = "pod.draining"
++	EventTypePodTerminated    = "pod.terminated"
++	EventTypeMetricsSnapshot  = "metrics.snapshot"
++)
++
++// EventBase holds the common required fields on every v1 event record.
++type EventBase struct {
++	Seq  uint64 `json:"seq"`
++	TUs  int64  `json:"t_us"`
++	Type string `json:"type"`
++}
++
++// SetHeader stamps the monotonically increasing sequence number, timestamp, and type.
++func (b *EventBase) SetHeader(seq uint64, tUS int64, eventType string) {
++	b.Seq = seq
++	b.TUs = tUS
++	if b.Type == "" {
++		b.Type = eventType
++	}
++}
++
++// EventRecord is implemented by every typed v1 event emitted through EventSink.
++type EventRecord interface {
++	EventType() string
++	SetHeader(seq uint64, tUS int64, eventType string)
++}
++
++// GPUSpecs captures per-GPU hardware capabilities for the header topology.
++type GPUSpecs struct {
++	MemoryGiB  float64 `json:"memory_gib"`
++	TFLOPsPeak float64 `json:"tflops_peak"`
++	TFLOPsFP8  float64 `json:"tflops_fp8"`
++	BWPeakTBs  float64 `json:"bw_peak_tbs"`
++	SMCount    int     `json:"sm_count"`
++}
++
++// MemoryBreakdownBytes captures static per-GPU memory reservations in bytes.
++type MemoryBreakdownBytes struct {
++	Weights        int64 `json:"weights"`
++	ActivationPeak int64 `json:"activation_peak"`
++	CUDAGraph      int64 `json:"cuda_graph"`
++	CommBuffers    int64 `json:"comm_buffers"`
++}
++
++// PoolConfig describes one serving pool in HeaderTopology.
++type PoolConfig struct {
++	Role                 string               `json:"role"`
++	Replicas             int                  `json:"replicas"`
++	TP                   int                  `json:"tp"`
++	PP                   int                  `json:"pp"`
++	DP                   int                  `json:"dp"`
++	GPUsPerPod           int                  `json:"gpus_per_pod"`
++	GPUType              string               `json:"gpu_type"`
++	GPUSpecs             GPUSpecs             `json:"gpu_specs"`
++	MemoryBreakdownBytes MemoryBreakdownBytes `json:"memory_breakdown_bytes"`
++	KVBlocksPerGPU       int64                `json:"kv_blocks_per_gpu"`
++	KVBlockSizeTokens    int                  `json:"kv_block_size_tokens"`
++	MaxNumSeqs           int                  `json:"max_num_seqs"`
++	MaxNumBatchedTokens  int                  `json:"max_num_batched_tokens"`
++	MaxModelLen          int                  `json:"max_model_len"`
++}
++
++// InitialPod describes a pod present at simulation start in HeaderTopology.
++type InitialPod struct {
++	PodID    string   `json:"pod_id"`
++	PoolRole string   `json:"pool_role"`
++	GPUIDs   []string `json:"gpu_ids"`
++	TPDegree int      `json:"tp_degree"`
++	State    string   `json:"state"`
++}
++
++// HeaderBLIS identifies the simulator and stack versions in HeaderRecord.
++type HeaderBLIS struct {
++	Commit        string            `json:"commit"`
++	VLLMVersion   string            `json:"vllm_version"`
++	LLMDVersion   string            `json:"llmd_version"`
++	StackVersions map[string]string `json:"stack_versions"`
++}
++
++// HeaderScenario identifies the run configuration in HeaderRecord.
++type HeaderScenario struct {
++	Name          string         `json:"name"`
++	Model         string         `json:"model"`
++	Hardware      string         `json:"hardware"`
++	Flags         map[string]any `json:"flags"`
++	Seed          int64          `json:"seed"`
++	HorizonUS     int64          `json:"horizon_us"`
++	RoutingPolicy string         `json:"routing_policy,omitempty"`
++}
++
++// HeaderTiers describes KV cache tiers modelled in the simulation.
++type HeaderTiers struct {
++	GPUHBMBlocks        int64             `json:"gpu_hbm_blocks"`
++	CPURAMBlocks        int64             `json:"cpu_ram_blocks"`
++	CPURAMBytes         int64             `json:"cpu_ram_bytes"`
++	LocalSSDModelled    bool              `json:"local_ssd_modelled"`
++	RemoteStoreModelled bool              `json:"remote_store_modelled"`
++	UnmodelledNotes     map[string]string `json:"unmodelled_notes"`
++}
++
++// HeaderTopology describes the cluster topology at simulation start.
++type HeaderTopology struct {
++	GatewayLatencyUS int64        `json:"gateway_latency_us"`
++	Pools            []PoolConfig `json:"pools"`
++	Tiers            HeaderTiers  `json:"tiers"`
++	InitialPods      []InitialPod `json:"initial_pods"`
++}
++
++// HeaderRecord is the first line of a v1 NDJSON event stream.
++type HeaderRecord struct {
++	Type          string         `json:"type"`
++	SchemaVersion string         `json:"schema_version"`
++	BLIS          HeaderBLIS     `json:"blis"`
++	Scenario      HeaderScenario `json:"scenario"`
++	Topology      HeaderTopology `json:"topology"`
++}
++
++// RequestArrivedEvent records a request entering the system.
++type RequestArrivedEvent struct {
++	EventBase
++	ReqID           string   `json:"req_id"`
++	PromptTokens    int      `json:"prompt_tokens"`
++	MaxOutputTokens int      `json:"max_output_tokens"`
++	PrefixGroup     string   `json:"prefix_group,omitempty"`
++	PrefixTokens    int      `json:"prefix_tokens,omitempty"`
++	BlockHashes     []string `json:"block_hashes,omitempty"`
++	SLOClass        string   `json:"slo_class,omitempty"`
++	SessionID       string   `json:"session_id,omitempty"`
++}
++
++// EventType returns the schema event type identifier.
++func (*RequestArrivedEvent) EventType() string { return EventTypeRequestArrived }
++
++// RequestAdmittedEvent records gateway admission of a request.
++type RequestAdmittedEvent struct {
++	EventBase
++	ReqID  string `json:"req_id"`
++	Reason string `json:"reason,omitempty"`
++}
++
++// EventType returns the schema event type identifier.
++func (*RequestAdmittedEvent) EventType() string { return EventTypeRequestAdmitted }
++
++// RequestRejectedEvent records rejection of a request at admission, routing, or engine enqueue.
++type RequestRejectedEvent struct {
++	EventBase
++	ReqID  string `json:"req_id"`
++	Reason string `json:"reason"`
++	Stage  string `json:"stage"`
++}
++
++// EventType returns the schema event type identifier.
++func (*RequestRejectedEvent) EventType() string { return EventTypeRequestRejected }
++
++// CandidateScore captures per-pod scorer state evaluated during routing.
++type CandidateScore struct {
++	PodID            string             `json:"pod_id"`
++	Score            float64            `json:"score"`
++	ScorerBreakdown  map[string]float64 `json:"scorer_breakdown,omitempty"`
++	QueueDepth       int                `json:"queue_depth"`
++	BatchSize        int                `json:"batch_size"`
++	InFlightRequests int                `json:"in_flight_requests,omitempty"`
++	KVUtilization    float64            `json:"kv_utilization"`
++	FreeKVBlocks     int64              `json:"free_kv_blocks"`
++}
++
++// RequestRoutedEvent records the router's pod selection for a request.
++type RequestRoutedEvent struct {
++	EventBase
++	ReqID        string             `json:"req_id"`
++	ChosenPod    string             `json:"chosen_pod"`
++	PrefillPod   string             `json:"prefill_pod,omitempty"`
++	DecodePod    string             `json:"decode_pod,omitempty"`
++	Disaggregate bool               `json:"disaggregate"`
++	Reason       string             `json:"reason,omitempty"`
++	Scores       map[string]float64 `json:"scores,omitempty"`
++	Candidates   []CandidateScore   `json:"candidates,omitempty"`
++	Regret       *float64           `json:"regret,omitempty"`
++}
++
++// EventType returns the schema event type identifier.
++func (*RequestRoutedEvent) EventType() string { return EventTypeRequestRouted }
++
++// RequestQueuedEvent records a request entering an instance's waiting queue.
++type RequestQueuedEvent struct {
++	EventBase
++	ReqID      string `json:"req_id"`
++	PodID      string `json:"pod_id"`
++	QueueDepth int    `json:"queue_depth"`
++}
++
++// EventType returns the schema event type identifier.
++func (*RequestQueuedEvent) EventType() string { return EventTypeRequestQueued }
++
++// RequestScheduledEvent records a request being admitted from waiting into a running batch.
++type RequestScheduledEvent struct {
++	EventBase
++	ReqID        string `json:"req_id"`
++	PodID        string `json:"pod_id"`
++	CachedTokens int    `json:"cached_tokens"`
++	CPUHitTokens int    `json:"cpu_hit_tokens,omitempty"`
++	PrefixLookup bool   `json:"prefix_lookup"`
++}
++
++// EventType returns the schema event type identifier.
++func (*RequestScheduledEvent) EventType() string { return EventTypeRequestScheduled }
++
++// RequestPrefillEvent records prefill progress for one request in a completed batch step.
++type RequestPrefillEvent struct {
++	EventBase
++	ReqID           string `json:"req_id"`
++	PodID           string `json:"pod_id"`
++	BatchID         uint64 `json:"batch_id"`
++	TokensProcessed int    `json:"tokens_processed"`
++	ComputedAfter   int    `json:"computed_after"`
++	PromptTokens    int    `json:"prompt_tokens"`
++	DurationUS      int64  `json:"duration_us"`
++}
++
++// EventType returns the schema event type identifier.
++func (*RequestPrefillEvent) EventType() string { return EventTypeRequestPrefill }
++
++// RequestDecodeStepEvent records token emission for one request in a completed batch step.
++type RequestDecodeStepEvent struct {
++	EventBase
++	ReqID         string `json:"req_id"`
++	PodID         string `json:"pod_id"`
++	BatchID       uint64 `json:"batch_id"`
++	TokensEmitted int    `json:"tokens_emitted"`
++	TotalEmitted  int    `json:"total_emitted"`
++	IsFirstToken  bool   `json:"is_first_token"`
++	DurationUS    int64  `json:"duration_us"`
++}
++
++// EventType returns the schema event type identifier.
++func (*RequestDecodeStepEvent) EventType() string { return EventTypeRequestDecode }
++
++// RequestPreemptedEvent records preemption of a running request on a pod.
++type RequestPreemptedEvent struct {
++	EventBase
++	ReqID              string `json:"req_id"`
++	PodID              string `json:"pod_id"`
++	Reason             string `json:"reason"`
++	ComputedTokensLost int    `json:"computed_tokens_lost,omitempty"`
++	FreedBlocks        []int  `json:"freed_blocks"`
++}
++
++// EventType returns the schema event type identifier.
++func (*RequestPreemptedEvent) EventType() string { return EventTypeRequestPreempted }
++
++// RequestFinishedEvent records completion or abort of a request on a pod.
++type RequestFinishedEvent struct {
++	EventBase
++	ReqID        string  `json:"req_id"`
++	PodID        string  `json:"pod_id"`
++	Reason       string  `json:"reason"`
++	OutputTokens int     `json:"output_tokens"`
++	TTFTUs       int64   `json:"ttft_us"`
++	E2EUs        int64   `json:"e2e_us"`
++	TPOTUs       float64 `json:"tpot_us"`
++}
++
++// EventType returns the schema event type identifier.
++func (*RequestFinishedEvent) EventType() string { return EventTypeRequestFinished }
++
++// RequestTimedOutEvent records a client deadline expiry in the gateway or engine.
++type RequestTimedOutEvent struct {
++	EventBase
++	ReqID     string `json:"req_id"`
++	PodID     string `json:"pod_id,omitempty"`
++	Stage     string `json:"stage"`
++	ElapsedUS int64  `json:"elapsed_us"`
++}
++
++// EventType returns the schema event type identifier.
++func (*RequestTimedOutEvent) EventType() string { return EventTypeRequestTimedOut }
++
++// BatchMember summarizes one request's participation in a BatchStepEvent.
++type BatchMember struct {
++	ReqID          string `json:"req_id"`
++	Role           string `json:"role"`
++	Tokens         int    `json:"tokens"`
++	ComputedBefore int    `json:"computed_before"`
++}
++
++// RooflinePoint captures analytical compute and HBM bandwidth roofline metrics for a batch.
++type RooflinePoint struct {
++	FLOPs               float64            `json:"flops"`
++	BytesMoved          float64            `json:"bytes_moved"`
++	ArithmeticIntensity float64            `json:"arithmetic_intensity"`
++	AchievedTFLOPs      float64            `json:"achieved_tflops"`
++	AchievedBWTBs       float64            `json:"achieved_bw_tbs"`
++	Bottleneck          string             `json:"bottleneck"`
++	PerResourceUS       map[string]float64 `json:"per_resource_us,omitempty"`
++	Derived             bool               `json:"derived"`
++}
++
++// BatchStepEvent records a completed forward-pass batch step on a pod.
++type BatchStepEvent struct {
++	EventBase
++	PodID         string        `json:"pod_id"`
++	BatchID       uint64        `json:"batch_id"`
++	Phase         string        `json:"phase"`
++	Members       []BatchMember `json:"members"`
++	PrefillTokens int           `json:"prefill_tokens"`
++	DecodeTokens  int           `json:"decode_tokens"`
++	TotalTokens   int           `json:"total_tokens"`
++	DurationUS    int64         `json:"duration_us"`
++	Roofline      RooflinePoint `json:"roofline"`
++}
++
++// EventType returns the schema event type identifier.
++func (*BatchStepEvent) EventType() string { return EventTypeBatchStep }
++
++// KVBlockAllocatedEvent records physical KV block allocations for a request.
++type KVBlockAllocatedEvent struct {
++	EventBase
++	PodID          string   `json:"pod_id"`
++	GPUIndices     []int    `json:"gpu_indices"`
++	BlockIDs       []int    `json:"block_ids"`
++	ReqID          string   `json:"req_id"`
++	BlockHashes    []string `json:"block_hashes,omitempty"`
++	Tier           string   `json:"tier"`
++	SharedWithReqs []string `json:"shared_with_reqs,omitempty"`
++}
++
++// EventType returns the schema event type identifier.
++func (*KVBlockAllocatedEvent) EventType() string { return EventTypeKVBlockAllocated }
++
++// KVBlockCachedEvent records blocks inserted into the prefix cache.
++type KVBlockCachedEvent struct {
++	EventBase
++	PodID          string   `json:"pod_id"`
++	GPUIndices     []int    `json:"gpu_indices"`
++	BlockIDs       []int    `json:"block_ids"`
++	BlockHashes    []string `json:"block_hashes"`
++	PrevOwnerReqID string   `json:"prev_owner_req_id,omitempty"`
++	Tier           string   `json:"tier"`
++}
++
++// EventType returns the schema event type identifier.
++func (*KVBlockCachedEvent) EventType() string { return EventTypeKVBlockCached }
++
++// KVBlockEvictedEvent records blocks evicted from GPU HBM or CPU DRAM cache.
++type KVBlockEvictedEvent struct {
++	EventBase
++	PodID            string   `json:"pod_id"`
++	GPUIndices       []int    `json:"gpu_indices"`
++	BlockIDs         []int    `json:"block_ids"`
++	BlockHashes      []string `json:"block_hashes,omitempty"`
++	Tier             string   `json:"tier"`
++	Destination      string   `json:"destination"`
++	Reason           string   `json:"reason"`
++	TriggeredByReqID string   `json:"triggered_by_req_id,omitempty"`
++}
++
++// EventType returns the schema event type identifier.
++func (*KVBlockEvictedEvent) EventType() string { return EventTypeKVBlockEvicted }
++
++// KVBlockMovedEvent records an intra-pod tier offload or reload transfer.
++type KVBlockMovedEvent struct {
++	EventBase
++	PodID      string `json:"pod_id"`
++	TransferID uint64 `json:"transfer_id"`
++	ReqID      string `json:"req_id"`
++	FromTier   string `json:"from_tier"`
++	ToTier     string `json:"to_tier"`
++	Direction  string `json:"direction"`
++	BlockIDs   []int  `json:"block_ids"`
++	NumBlocks  int    `json:"num_blocks"`
++	Tokens     int    `json:"tokens"`
++	DurationUS int64  `json:"duration_us"`
++	Status     string `json:"status"`
++}
++
++// EventType returns the schema event type identifier.
++func (*KVBlockMovedEvent) EventType() string { return EventTypeKVBlockMoved }
++
++// KVTransferEvent records a disaggregated P/D KV transfer between pods.
++type KVTransferEvent struct {
++	EventBase
++	TransferID     *uint64 `json:"transfer_id,omitempty"`
++	ReqID          string  `json:"req_id"`
++	FromPod        string  `json:"from_pod"`
++	ToPod          string  `json:"to_pod"`
++	NumKVBlocks    int     `json:"num_kv_blocks"`
++	PulledKVBlocks int     `json:"pulled_kv_blocks"`
++	DurationUS     int64   `json:"duration_us"`
++	Status         string  `json:"status"`
++}
++
++// EventType returns the schema event type identifier.
++func (*KVTransferEvent) EventType() string { return EventTypeKVTransfer }
++
++// PodCreatedEvent records creation of a serving pod.
++type PodCreatedEvent struct {
++	EventBase
++	PodID    string   `json:"pod_id"`
++	PoolRole string   `json:"pool_role"`
++	GPUIDs   []string `json:"gpu_ids"`
++	TPDegree int      `json:"tp_degree"`
++	NodeID   string   `json:"node_id,omitempty"`
++}
++
++// EventType returns the schema event type identifier.
++func (*PodCreatedEvent) EventType() string { return EventTypePodCreated }
++
++// PodLoadingEvent records transition of a pod into loading state.
++type PodLoadingEvent struct {
++	EventBase
++	PodID    string `json:"pod_id"`
++	PoolRole string `json:"pool_role"`
++}
++
++// EventType returns the schema event type identifier.
++func (*PodLoadingEvent) EventType() string { return EventTypePodLoading }
++
++// PodReadyEvent records transition of a pod into ready state.
++type PodReadyEvent struct {
++	EventBase
++	PodID    string `json:"pod_id"`
++	PoolRole string `json:"pool_role"`
++}
++
++// EventType returns the schema event type identifier.
++func (*PodReadyEvent) EventType() string { return EventTypePodReady }
++
++// PodDrainingEvent records transition of a pod into draining state.
++type PodDrainingEvent struct {
++	EventBase
++	PodID    string `json:"pod_id"`
++	PoolRole string `json:"pool_role"`
++	Reason   string `json:"reason,omitempty"`
++}
++
++// EventType returns the schema event type identifier.
++func (*PodDrainingEvent) EventType() string { return EventTypePodDraining }
++
++// PodTerminatedEvent records termination of a pod.
++type PodTerminatedEvent struct {
++	EventBase
++	PodID    string `json:"pod_id"`
++	PoolRole string `json:"pool_role"`
++}
++
++// EventType returns the schema event type identifier.
++func (*PodTerminatedEvent) EventType() string { return EventTypePodTerminated }
++
++// InstanceMetricsSnapshot captures per-pod metrics inside MetricsSnapshotEvent.
++type InstanceMetricsSnapshot struct {
++	PodID             string `json:"pod_id"`
++	State             string `json:"state"`
++	QueueDepth        int    `json:"queue_depth"`
++	BatchSize         int    `json:"batch_size"`
++	KVUsedBlocks      int64  `json:"kv_used_blocks"`
++	KVCachedBlocks    int64  `json:"kv_cached_blocks"`
++	KVFreeBlocks      int64  `json:"kv_free_blocks"`
++	KVTotalBlocks     int64  `json:"kv_total_blocks"`
++	CPUUsedBlocks     *int64 `json:"cpu_used_blocks,omitempty"`
++	CPUTotalBlocks    *int64 `json:"cpu_total_blocks,omitempty"`
++	Preemptions       int64  `json:"preemptions"`
++	CompletedRequests int    `json:"completed_requests"`
++}
++
++// MetricsSnapshotEvent records periodic or final cluster-wide metrics.
++type MetricsSnapshotEvent struct {
++	EventBase
++	IsFinal            bool                      `json:"is_final"`
++	GatewayQueueDepth  int                       `json:"gateway_queue_depth"`
++	CompletedRequests  int                       `json:"completed_requests"`
++	Preemptions        int64                     `json:"preemptions"`
++	RejectedRequests   int                       `json:"rejected_requests"`
++	TimedOutRequests   int                       `json:"timed_out_requests"`
++	DroppedRequests    int                       `json:"dropped_requests"`
++	TTFTMeanMs         float64                   `json:"ttft_mean_ms"`
++	TPOTMeanMs         float64                   `json:"tpot_mean_ms"`
++	OutputTokS         float64                   `json:"output_tok_s"`
++	PrefixCacheHitRate float64                   `json:"prefix_cache_hit_rate"`
++	Instances          []InstanceMetricsSnapshot `json:"instances"`
++}
++
++// EventType returns the schema event type identifier.
++func (*MetricsSnapshotEvent) EventType() string { return EventTypeMetricsSnapshot }
+diff --git a/sim/events_sink.go b/sim/events_sink.go
+new file mode 100644
+index 00000000..270ff30b
+--- /dev/null
++++ b/sim/events_sink.go
+@@ -0,0 +1,171 @@
++package sim
++
++import (
++	"bufio"
++	"encoding/json"
++	"errors"
++	"io"
++	"sync"
++)
++
++// EventSink writes structured v1 NDJSON simulation events without influencing simulation state (INV-6).
++type EventSink interface {
++	Enabled() bool
++	WriteHeader(h *HeaderRecord) error
++	Emit(tUS int64, ev EventRecord) error
++	Flush() error
++	Close() error
++}
++
++// JSONLEventSink is a buffered, thread-safe EventSink writing compact NDJSON lines.
++type JSONLEventSink struct {
++	mu            sync.Mutex
++	w             io.Writer
++	bw            *bufio.Writer
++	enc           *json.Encoder
++	seq           uint64
++	lastTUs       int64
++	headerWritten bool
++	closed        bool
++}
++
++// NewJSONLEventSink constructs a JSONLEventSink writing NDJSON records to w.
++// If w implements io.Closer, Close flushes the buffer and closes w.
++func NewJSONLEventSink(w io.Writer) *JSONLEventSink {
++	if w == nil {
++		return nil
++	}
++	bw := bufio.NewWriterSize(w, 64*1024)
++	enc := json.NewEncoder(bw)
++	enc.SetEscapeHTML(false)
++	return &JSONLEventSink{
++		w:   w,
++		bw:  bw,
++		enc: enc,
++	}
++}
++
++// Enabled reports whether the sink is active and ready to receive events.
++func (s *JSONLEventSink) Enabled() bool {
++	return s != nil
++}
++
++// WriteHeader writes the v1 HeaderRecord as the first NDJSON line without advancing event seq.
++func (s *JSONLEventSink) WriteHeader(h *HeaderRecord) error {
++	if s == nil {
++		return nil
++	}
++	if h == nil {
++		return errors.New("event sink: nil header record")
++	}
++	s.mu.Lock()
++	defer s.mu.Unlock()
++	if s.closed {
++		return errors.New("event sink: closed")
++	}
++	if s.headerWritten {
++		return errors.New("event sink: header already written")
++	}
++
++	rec := *h
++	rec.Type = EventTypeHeader
++	rec.SchemaVersion = SchemaVersionV1
++	if rec.BLIS.StackVersions == nil {
++		rec.BLIS.StackVersions = map[string]string{}
++	}
++	if rec.Scenario.Flags == nil {
++		rec.Scenario.Flags = map[string]any{}
++	}
++	if rec.Topology.Tiers.UnmodelledNotes == nil {
++		rec.Topology.Tiers.UnmodelledNotes = map[string]string{}
++	}
++	if rec.Topology.InitialPods == nil {
++		rec.Topology.InitialPods = []InitialPod{}
++	}
++	if rec.Topology.Pools == nil {
++		rec.Topology.Pools = []PoolConfig{}
++	}
++
++	if err := s.enc.Encode(&rec); err != nil {
++		return err
++	}
++	s.headerWritten = true
++	return nil
++}
++
++// Emit stamps seq and monotonically non-decreasing t_us on ev and writes it as one JSON line.
++func (s *JSONLEventSink) Emit(tUS int64, ev EventRecord) error {
++	if s == nil || ev == nil {
++		return nil
++	}
++	s.mu.Lock()
++	defer s.mu.Unlock()
++	if s.closed {
++		return errors.New("event sink: closed")
++	}
++	if tUS < 0 {
++		tUS = 0
++	}
++	if tUS < s.lastTUs {
++		tUS = s.lastTUs
++	}
++	s.lastTUs = tUS
++
++	seq := s.seq
++	s.seq++
++	ev.SetHeader(seq, tUS, ev.EventType())
++	return s.enc.Encode(ev)
++}
++
++// Flush flushes any buffered NDJSON lines to the underlying writer.
++func (s *JSONLEventSink) Flush() error {
++	if s == nil {
++		return nil
++	}
++	s.mu.Lock()
++	defer s.mu.Unlock()
++	if s.closed {
++		return nil
++	}
++	return s.bw.Flush()
++}
++
++// Close flushes buffered records and closes the underlying writer if it implements io.Closer.
++func (s *JSONLEventSink) Close() error {
++	if s == nil {
++		return nil
++	}
++	s.mu.Lock()
++	defer s.mu.Unlock()
++	if s.closed {
++		return nil
++	}
++	s.closed = true
++	flushErr := s.bw.Flush()
++	if c, ok := s.w.(io.Closer); ok {
++		if closeErr := c.Close(); closeErr != nil && flushErr == nil {
++			return closeErr
++		}
++	}
++	return flushErr
++}
++
++// Seq returns the next sequence number to be assigned (total emitted events so far).
++func (s *JSONLEventSink) Seq() uint64 {
++	if s == nil {
++		return 0
++	}
++	s.mu.Lock()
++	defer s.mu.Unlock()
++	return s.seq
++}
++
++// LastTUs returns the latest emitted event timestamp in microseconds.
++func (s *JSONLEventSink) LastTUs() int64 {
++	if s == nil {
++		return 0
++	}
++	s.mu.Lock()
++	defer s.mu.Unlock()
++	return s.lastTUs
++}
+diff --git a/sim/events_test.go b/sim/events_test.go
+new file mode 100644
+index 00000000..cd15c1a5
+--- /dev/null
++++ b/sim/events_test.go
+@@ -0,0 +1,680 @@
++package sim
++
++import (
++	"bytes"
++	"encoding/json"
++	"errors"
++	"math"
++	"reflect"
++	"strings"
++	"testing"
++
++	"github.com/inference-sim/blis-substrate/contracts/conformance/enginetest"
++	"github.com/inference-sim/blis-substrate/contracts/engine"
++	"github.com/inference-sim/blis-substrate/contracts/engine/plan"
++)
++
++func parseNDJSONLines(t *testing.T, data []byte) []map[string]any {
++	t.Helper()
++	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
++	out := make([]map[string]any, 0, len(lines))
++	for i, line := range lines {
++		if strings.TrimSpace(line) == "" {
++			continue
++		}
++		var m map[string]any
++		if err := json.Unmarshal([]byte(line), &m); err != nil {
++			t.Fatalf("line %d invalid JSON: %v\nline=%s", i, err, line)
++		}
++		out = append(out, m)
++	}
++	return out
++}
++
++func TestJSONLEventSink_HeaderAndMonotonicSeqAndTUs(t *testing.T) {
++	var nilSink *JSONLEventSink
++	if nilSink.Enabled() {
++		t.Fatal("nil *JSONLEventSink should report Enabled() == false")
++	}
++	if err := nilSink.Emit(10, &RequestQueuedEvent{ReqID: "r0", PodID: "p0", QueueDepth: 1}); err != nil {
++		t.Fatalf("nil sink Emit should be a no-op, got %v", err)
++	}
++
++	var buf bytes.Buffer
++	sink := NewJSONLEventSink(&buf)
++	if !sink.Enabled() {
++		t.Fatal("non-nil sink should report Enabled() == true")
++	}
++
++	hdr := &HeaderRecord{
++		BLIS: HeaderBLIS{
++			Commit:      "abcdef1",
++			VLLMVersion: "0.32.0",
++			LLMDVersion: "1.0.0",
++		},
++		Scenario: HeaderScenario{
++			Name:      "test-run",
++			Model:     "llama-3",
++			Hardware:  "H100",
++			Seed:      42,
++			HorizonUS: 100000,
++		},
++		Topology: HeaderTopology{
++			GatewayLatencyUS: 100,
++			Pools: []PoolConfig{{
++				Role:                "colocated",
++				Replicas:            1,
++				TP:                  1,
++				PP:                  1,
++				DP:                  1,
++				GPUsPerPod:          1,
++				GPUType:             "H100",
++				GPUSpecs:            GPUSpecs{MemoryGiB: 80, TFLOPsPeak: 989, TFLOPsFP8: 1979, BWPeakTBs: 3.35, SMCount: 132},
++				KVBlocksPerGPU:      1024,
++				KVBlockSizeTokens:   16,
++				MaxNumSeqs:          256,
++				MaxNumBatchedTokens: 2048,
++				MaxModelLen:         8192,
++			}},
++		},
++	}
++	if err := sink.WriteHeader(hdr); err != nil {
++		t.Fatalf("WriteHeader failed: %v", err)
++	}
++	if err := sink.WriteHeader(hdr); err == nil {
++		t.Fatal("second WriteHeader should fail")
++	}
++
++	// Emit with negative timestamp (clamped to 0), increasing timestamp, then out-of-order timestamp (clamped to 50).
++	if err := sink.Emit(-10, &RequestArrivedEvent{ReqID: "r0", PromptTokens: 16, MaxOutputTokens: 4}); err != nil {
++		t.Fatal(err)
++	}
++	if err := sink.Emit(50, &RequestQueuedEvent{ReqID: "r0", PodID: "pod-0", QueueDepth: 1}); err != nil {
++		t.Fatal(err)
++	}
++	if err := sink.Emit(30, &RequestScheduledEvent{ReqID: "r0", PodID: "pod-0", CachedTokens: 0, PrefixLookup: true}); err != nil {
++		t.Fatal(err)
++	}
++	if err := sink.Flush(); err != nil {
++		t.Fatal(err)
++	}
++	if err := sink.Close(); err != nil {
++		t.Fatal(err)
++	}
++	if err := sink.Emit(60, &RequestQueuedEvent{ReqID: "r1", PodID: "pod-0", QueueDepth: 1}); err == nil {
++		t.Fatal("Emit after Close should fail")
++	}
++
++	recs := parseNDJSONLines(t, buf.Bytes())
++	if len(recs) != 4 {
++		t.Fatalf("got %d lines, want 4", len(recs))
++	}
++
++	// Header checks: no seq/t_us, non-null maps and initial_pods slice.
++	h := recs[0]
++	if h["type"] != "header" || h["schema_version"] != "1.0" {
++		t.Fatalf("unexpected header type/version: %v", h)
++	}
++	if _, hasSeq := h["seq"]; hasSeq {
++		t.Fatal("header must not contain seq")
++	}
++	if _, hasT := h["t_us"]; hasT {
++		t.Fatal("header must not contain t_us")
++	}
++	topo := h["topology"].(map[string]any)
++	if topo["initial_pods"] == nil {
++		t.Fatal("topology.initial_pods must serialize as [] not null")
++	}
++
++	wantTypes := []string{EventTypeRequestArrived, EventTypeRequestQueued, EventTypeRequestScheduled}
++	wantTUs := []float64{0, 50, 50}
++	for i := 1; i < len(recs); i++ {
++		if recs[i]["seq"] != float64(i-1) {
++			t.Errorf("record %d seq = %v, want %d", i, recs[i]["seq"], i-1)
++		}
++		if recs[i]["t_us"] != wantTUs[i-1] {
++			t.Errorf("record %d t_us = %v, want %v", i, recs[i]["t_us"], wantTUs[i-1])
++		}
++		if recs[i]["type"] != wantTypes[i-1] {
++			t.Errorf("record %d type = %v, want %s", i, recs[i]["type"], wantTypes[i-1])
++		}
++	}
++}
++
++func TestEventSchema_AllRecordsJSONSerialization(t *testing.T) {
++	var buf bytes.Buffer
++	sink := NewJSONLEventSink(&buf)
++
++	regret := 0.25
++	xferID := uint64(7)
++	cpuUsed := int64(0)
++	cpuTotal := int64(64)
++
++	events := []EventRecord{
++		&RequestArrivedEvent{ReqID: "r0", PromptTokens: 32, MaxOutputTokens: 16},
++		&RequestAdmittedEvent{ReqID: "r0"},
++		&RequestRejectedEvent{ReqID: "r0", Reason: "queue full", Stage: "admission"},
++		&RequestRoutedEvent{ReqID: "r0", ChosenPod: "pod-0", Disaggregate: false, Candidates: []CandidateScore{{PodID: "pod-0", Score: 1.0, QueueDepth: 0, BatchSize: 0, KVUtilization: 0.1, FreeKVBlocks: 100}}, Regret: &regret},
++		&RequestQueuedEvent{ReqID: "r0", PodID: "pod-0", QueueDepth: 1},
++		&RequestScheduledEvent{ReqID: "r0", PodID: "pod-0", CachedTokens: 16, CPUHitTokens: 8, PrefixLookup: true},
++		&RequestPrefillEvent{ReqID: "r0", PodID: "pod-0", BatchID: 1, TokensProcessed: 32, ComputedAfter: 32, PromptTokens: 32, DurationUS: 500},
++		&RequestDecodeStepEvent{ReqID: "r0", PodID: "pod-0", BatchID: 2, TokensEmitted: 1, TotalEmitted: 1, IsFirstToken: true, DurationUS: 100},
++		&RequestPreemptedEvent{ReqID: "r0", PodID: "pod-0", Reason: "kv_capacity", ComputedTokensLost: 32, FreedBlocks: []int{}},
++		&RequestFinishedEvent{ReqID: "r0", PodID: "pod-0", Reason: "stop", OutputTokens: 16, TTFTUs: 500, E2EUs: 2000, TPOTUs: 100},
++		&RequestTimedOutEvent{ReqID: "r0", PodID: "pod-0", Stage: "engine", ElapsedUS: 5000},
++		&BatchStepEvent{PodID: "pod-0", BatchID: 1, Phase: "prefill", Members: []BatchMember{}, PrefillTokens: 0, DecodeTokens: 0, TotalTokens: 0, DurationUS: 1, Roofline: RooflinePoint{Bottleneck: "memory_bw", Derived: true}},
++		&KVBlockAllocatedEvent{PodID: "pod-0", GPUIndices: []int{0}, BlockIDs: []int{0, 1}, ReqID: "r0", Tier: "gpu"},
++		&KVBlockCachedEvent{PodID: "pod-0", GPUIndices: []int{0}, BlockIDs: []int{0}, BlockHashes: []string{"h0"}, Tier: "gpu"},
++		&KVBlockEvictedEvent{PodID: "pod-0", GPUIndices: []int{0}, BlockIDs: []int{0}, Tier: "gpu", Destination: "dropped", Reason: "lru_eviction"},
++		&KVBlockMovedEvent{PodID: "pod-0", TransferID: 1, ReqID: "r0", FromTier: "gpu", ToTier: "cpu_dram", Direction: "offload", BlockIDs: []int{}, NumBlocks: 0, Tokens: 0, DurationUS: 50, Status: "completed"},
++		&KVTransferEvent{TransferID: &xferID, ReqID: "r0", FromPod: "p0", ToPod: "d0", NumKVBlocks: 2, PulledKVBlocks: 2, DurationUS: 120, Status: "completed"},
++		&PodCreatedEvent{PodID: "pod-0", PoolRole: "colocated", GPUIDs: []string{"gpu-0"}, TPDegree: 1},
++		&PodLoadingEvent{PodID: "pod-0", PoolRole: "colocated"},
++		&PodReadyEvent{PodID: "pod-0", PoolRole: "colocated"},
++		&PodDrainingEvent{PodID: "pod-0", PoolRole: "colocated", Reason: "scale_down"},
++		&PodTerminatedEvent{PodID: "pod-0", PoolRole: "colocated"},
++		&MetricsSnapshotEvent{
++			IsFinal:            false,
++			GatewayQueueDepth:  0,
++			CompletedRequests:  1,
++			Preemptions:        0,
++			RejectedRequests:   0,
++			TimedOutRequests:   0,
++			DroppedRequests:    0,
++			TTFTMeanMs:         0.5,
++			TPOTMeanMs:         0.1,
++			OutputTokS:         100,
++			PrefixCacheHitRate: 0.5,
++			Instances: []InstanceMetricsSnapshot{{
++				PodID:             "pod-0",
++				State:             "active",
++				QueueDepth:        0,
++				BatchSize:         1,
++				KVUsedBlocks:      2,
++				KVCachedBlocks:    1,
++				KVFreeBlocks:      1022,
++				KVTotalBlocks:     1024,
++				CPUUsedBlocks:     &cpuUsed,
++				CPUTotalBlocks:    &cpuTotal,
++				Preemptions:       0,
++				CompletedRequests: 1,
++			}},
++		},
++	}
++
++	for i, ev := range events {
++		if err := sink.Emit(int64(i*10), ev); err != nil {
++			t.Fatalf("Emit(%T) failed: %v", ev, err)
++		}
++	}
++	if err := sink.Close(); err != nil {
++		t.Fatal(err)
++	}
++
++	recs := parseNDJSONLines(t, buf.Bytes())
++	if len(recs) != len(events) {
++		t.Fatalf("got %d records, want %d", len(recs), len(events))
++	}
++
++	// Verify required array fields never serialize as JSON null.
++	requiredArrays := map[string][]string{
++		EventTypeRequestRouted:    {"candidates"},
++		EventTypeRequestPreempted: {"freed_blocks"},
++		EventTypeBatchStep:        {"members"},
++		EventTypeKVBlockAllocated: {"gpu_indices", "block_ids"},
++		EventTypeKVBlockCached:    {"gpu_indices", "block_ids", "block_hashes"},
++		EventTypeKVBlockEvicted:   {"gpu_indices", "block_ids"},
++		EventTypeKVBlockMoved:     {"block_ids"},
++		EventTypePodCreated:       {"gpu_ids"},
++		EventTypeMetricsSnapshot:  {"instances"},
++	}
++	for i, rec := range recs {
++		typ, _ := rec["type"].(string)
++		if typ == "" {
++			t.Fatalf("record %d missing type", i)
++		}
++		for _, field := range requiredArrays[typ] {
++			val, present := rec[field]
++			if !present || val == nil {
++				t.Errorf("record %d (%s) field %q is missing or null", i, typ, field)
++			}
++		}
++	}
++}
++
++func TestModelRooflineSpec_EstimateBatch(t *testing.T) {
++	spec := &ModelRooflineSpec{
++		ModelName:              "llama-8b",
++		HiddenSize:             4096,
++		IntermediateSize:       14336,
++		NumHiddenLayers:        32,
++		NumAttentionHeads:      32,
++		NumKVHeads:             8,
++		HeadDim:                128,
++		VocabSize:              128256,
++		WeightBytesPerRank:     16_000_000_000,
++		KVBytesPerTokenPerRank: 131072,
++		TP:                     1,
++		PP:                     1,
++		ChipTFLOPsPeak:         989,
++		ChipTFLOPsFP8:          1979,
++		ChipBWTBs:              3.35,
++		IsFP8:                  false,
++	}
++
++	// Large prefill -> compute-bound.
++	prefillBatch := engine.Batch{
++		ID:   1,
++		Reqs: []engine.Scheduled{{ID: "r0", Tokens: 2048, Computed: 0, PromptLen: 2048}},
++	}
++	rp := spec.EstimateBatch(prefillBatch, 20_000)
++	if !rp.Derived {
++		t.Fatal("expected Derived == true")
++	}
++	if rp.Bottleneck != "compute" {
++		t.Errorf("prefill bottleneck = %q, want compute (AI=%.2f)", rp.Bottleneck, rp.ArithmeticIntensity)
++	}
++	if rp.FLOPs <= 0 || rp.BytesMoved <= 0 || rp.AchievedTFLOPs <= 0 || rp.AchievedBWTBs <= 0 {
++		t.Errorf("expected positive roofline metrics, got %+v", rp)
++	}
++
++	// Single-token decode -> memory_bw-bound.
++	decodeBatch := engine.Batch{
++		ID:   2,
++		Reqs: []engine.Scheduled{{ID: "r0", Tokens: 1, Computed: 512, PromptLen: 512}},
++	}
++	rd := spec.EstimateBatch(decodeBatch, 5_000)
++	if rd.Bottleneck != "memory_bw" {
++		t.Errorf("decode bottleneck = %q, want memory_bw (AI=%.2f)", rd.Bottleneck, rd.ArithmeticIntensity)
++	}
++
++	// MoE + FP8 + durationUS <= 0 safeguard -> no NaN/Inf.
++	moeSpec := *spec
++	moeSpec.IsMoE = true
++	moeSpec.NumExperts = 8
++	moeSpec.ExpertsPerTok = 2
++	moeSpec.IsFP8 = true
++	rmoe := moeSpec.EstimateBatch(decodeBatch, 0)
++	for _, v := range []float64{rmoe.FLOPs, rmoe.BytesMoved, rmoe.ArithmeticIntensity, rmoe.AchievedTFLOPs, rmoe.AchievedBWTBs} {
++		if math.IsNaN(v) || math.IsInf(v, 0) {
++			t.Fatalf("unexpected NaN/Inf in roofline: %+v", rmoe)
++		}
++	}
++
++	// Empty batch -> zero metrics, memory_bw, Derived: true.
++	rempty := spec.EstimateBatch(engine.Batch{ID: 3}, 0)
++	if rempty.FLOPs != 0 || rempty.BytesMoved != 0 || rempty.Bottleneck != "memory_bw" || !rempty.Derived {
++		t.Errorf("unexpected empty batch roofline: %+v", rempty)
++	}
++}
++
++func TestEngineDriver_EventSink_LifecycleAndINV6(t *testing.T) {
++	for _, applyAtStart := range []bool{false, true} {
++		name := "applyAtEnd"
++		if applyAtStart {
++			name = "applyAtStart"
++		}
++		t.Run(name, func(t *testing.T) {
++			runDriver := func(sink EventSink) (*EngineDriver, []*Request) {
++				eng, err := enginetest.NewFIFO(enginetest.FIFOConfig{
++					MaxRunning:     4,
++					TokenBudget:    8, // Forces chunked prefill on 16-token prompt
++					StepBaseUs:     100,
++					StepPerTokenUs: 10,
++				})
++				if err != nil {
++					t.Fatal(err)
++				}
++				cfg := EngineDriverConfig{
++					Horizon:          1 << 40,
++					ApplyAtStepStart: applyAtStart,
++					EventSink:        sink,
++					PodID:            "pod-test",
++					TPDegree:         2,
++					KVBlockSize:      8,
++					KVBlocksTotal:    64,
++					RooflineSpec: &ModelRooflineSpec{
++						HiddenSize:             512,
++						IntermediateSize:       1024,
++						NumHiddenLayers:        4,
++						NumAttentionHeads:      8,
++						NumKVHeads:             4,
++						HeadDim:                64,
++						VocabSize:              1000,
++						WeightBytesPerRank:     1_000_000,
++						KVBytesPerTokenPerRank: 1024,
++						TP:                     2,
++						PP:                     1,
++						ChipTFLOPsPeak:         100,
++						ChipBWTBs:              1.0,
++					},
++				}
++				d := NewEngineDriver(eng, cfg)
++				r0 := &Request{ID: "r0", InputTokens: tokens(16), OutputTokens: tokens(3), ArrivalTime: 0}
++				// r1 arrives mid-first-step to exercise ApplyAtStepStart timestamp ordering!
++				r1 := &Request{ID: "r1", InputTokens: tokens(8), OutputTokens: tokens(2), ArrivalTime: 50}
++				d.InjectArrival(r0)
++				d.InjectArrival(r1)
++				d.Run()
++				return d, []*Request{r0, r1}
++			}
++
++			baseDriver, baseReqs := runDriver(nil)
++			var buf bytes.Buffer
++			sink := NewJSONLEventSink(&buf)
++			obsDriver, obsReqs := runDriver(sink)
++			if err := sink.Close(); err != nil {
++				t.Fatal(err)
++			}
++
++			// INV-6: Metrics and per-request outcomes must be identical.
++			if baseDriver.Metrics.CompletedRequests != obsDriver.Metrics.CompletedRequests ||
++				baseDriver.Metrics.TotalInputTokens != obsDriver.Metrics.TotalInputTokens ||
++				baseDriver.Metrics.TotalOutputTokens != obsDriver.Metrics.TotalOutputTokens ||
++				baseDriver.Metrics.SimEndedTime != obsDriver.Metrics.SimEndedTime ||
++				!reflect.DeepEqual(baseDriver.Metrics.RequestTTFTs, obsDriver.Metrics.RequestTTFTs) ||
++				!reflect.DeepEqual(baseDriver.Metrics.RequestE2Es, obsDriver.Metrics.RequestE2Es) ||
++				!reflect.DeepEqual(baseDriver.Metrics.RequestITLs, obsDriver.Metrics.RequestITLs) ||
++				!reflect.DeepEqual(baseDriver.Metrics.RequestSchedulingDelays, obsDriver.Metrics.RequestSchedulingDelays) ||
++				!reflect.DeepEqual(baseDriver.Metrics.AllITLs, obsDriver.Metrics.AllITLs) {
++				t.Fatalf("INV-6 violated when EventSink enabled:\nbase=%+v\nobs=%+v", baseDriver.Metrics, obsDriver.Metrics)
++			}
++			for i := range baseReqs {
++				if baseReqs[i].FirstTokenTime != obsReqs[i].FirstTokenTime ||
++					!reflect.DeepEqual(baseReqs[i].ITL, obsReqs[i].ITL) {
++					t.Fatalf("request %d mismatch under EventSink", i)
++				}
++			}
++
++			recs := parseNDJSONLines(t, buf.Bytes())
++			if len(recs) == 0 {
++				t.Fatal("expected emitted events")
++			}
++
++			seenTypes := map[string]int{}
++			var prevT float64
++			for i, rec := range recs {
++				if rec["seq"] != float64(i) {
++					t.Errorf("seq[%d] = %v, want %d", i, rec["seq"], i)
++				}
++				tUS := rec["t_us"].(float64)
++				if i > 0 && tUS < prevT {
++					t.Errorf("non-monotonic t_us at seq %d: %v < %v", i, tUS, prevT)
++				}
++				prevT = tUS
++				typ := rec["type"].(string)
++				seenTypes[typ]++
++
++				if typ == EventTypeKVBlockAllocated {
++					gpuIdx := rec["gpu_indices"].([]any)
++					if len(gpuIdx) != 2 {
++						t.Errorf("gpu_indices len = %d, want 2", len(gpuIdx))
++					}
++					bids := rec["block_ids"].([]any)
++					if len(bids) == 0 {
++						t.Errorf("kv.block.allocated block_ids empty")
++					}
++				}
++			}
++
++			for _, reqType := range []string{
++				EventTypeRequestQueued,
++				EventTypeRequestScheduled,
++				EventTypeRequestPrefill,
++				EventTypeRequestDecode,
++				EventTypeRequestFinished,
++				EventTypeBatchStep,
++				EventTypeKVBlockAllocated,
++			} {
++				if seenTypes[reqType] == 0 {
++					t.Errorf("expected at least one %s event, got 0 (seen=%v)", reqType, seenTypes)
++				}
++			}
++		})
++	}
++}
++
++// mockRichEngine wraps enginetest.FIFO to exercise KVEvents, OffloadCachedTokens, prefix hits,
++// preemptions, Add rejections, FinishError, and tier transfers.
++type mockRichEngine struct {
++	*enginetest.FIFO
++	kvEventsEnabled bool
++	rejectID        string
++	finishErrID     string
++	preemptOnStep   int
++	stepCount       int
++	cachedHitByID   map[string]int
++	offloadByID     map[string]int
++	emitKVByStep    map[int][]engine.KVEvent
++	tierStartOnStep int
++	tierDone        map[engine.TransferID]int64
++}
++
++func (m *mockRichEngine) EnableKVEvents() { m.kvEventsEnabled = true }
++
++func (m *mockRichEngine) OffloadCachedTokens(id string) int {
++	return m.offloadByID[id]
++}
++
++func (m *mockRichEngine) Add(r engine.Request, now engine.Time) error {
++	if r.ID == m.rejectID {
++		return errors.New("prompt exceeds max_model_len")
++	}
++	return m.FIFO.Add(r, now)
++}
++
++func (m *mockRichEngine) Schedule(now engine.Time) (engine.Batch, error) {
++	b, err := m.FIFO.Schedule(now)
++	if err != nil {
++		return b, err
++	}
++	if !b.Empty() {
++		m.stepCount++
++		for i := range b.Reqs {
++			if hit := m.cachedHitByID[b.Reqs[i].ID]; hit > 0 && b.Reqs[i].Computed == 0 {
++				b.Reqs[i].PrefixLookup = true
++				b.Reqs[i].CachedTokens = hit
++			}
++		}
++		if m.stepCount == m.preemptOnStep && len(b.Reqs) > 0 {
++			b.Preempted = append(b.Preempted, b.Reqs[0].ID)
++		}
++		if m.stepCount == m.tierStartOnStep && len(b.Reqs) > 0 {
++			b.TransfersStarted = append(b.TransfersStarted, tierTransfer(2001, b.Reqs[0].ID, engine.TransferStore))
++		}
++	}
++	return b, nil
++}
++
++func (m *mockRichEngine) Complete(id engine.BatchID, out engine.Outcome, end engine.Time) (engine.Result, error) {
++	res, err := m.FIFO.Complete(id, out, end)
++	if err != nil {
++		return res, err
++	}
++	if m.kvEventsEnabled {
++		if evs := m.emitKVByStep[m.stepCount]; len(evs) > 0 {
++			res.KVEvents = evs
++		}
++	}
++	if m.finishErrID != "" {
++		for i, f := range res.Finished {
++			if f.ID == m.finishErrID {
++				res.Finished[i].Reason = engine.FinishError
++				res.Finished[i].OutputTokens = 0
++				delete(res.Emitted, m.finishErrID)
++			}
++		}
++	}
++	return res, nil
++}
++
++func (m *mockRichEngine) TransferDone(id engine.TransferID, ok bool, now engine.Time) error {
++	if id >= 2000 {
++		m.tierDone[id] = now
++		return nil
++	}
++	return m.FIFO.TransferDone(id, ok, now)
++}
++
++type plannedMockEngine struct {
++	*mockRichEngine
++}
++
++func (p *plannedMockEngine) Plan() plan.PoolPlan { return tierPlan() }
++
++func TestEngineDriver_EventSink_RejectTimeoutPreemptEvictKVAndTier(t *testing.T) {
++	fifo, err := enginetest.NewFIFO(enginetest.FIFOConfig{
++		MaxRunning:     4,
++		TokenBudget:    64,
++		StepBaseUs:     100,
++		StepPerTokenUs: 0,
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	eng := &mockRichEngine{
++		FIFO:          fifo,
++		rejectID:      "r-reject",
++		finishErrID:   "r-finerr",
++		preemptOnStep: 2,
++		cachedHitByID: map[string]int{"r-hit": 16},
++		offloadByID:   map[string]int{"r-hit": 8},
++		emitKVByStep: map[int][]engine.KVEvent{
++			1: {
++				{Removed: false, Hash: "h0", Tokens: []int32{1, 2, 3, 4, 5, 6, 7, 8}},
++				{Removed: false, Hash: "h1", Parent: "h0", Tokens: []int32{9, 10, 11, 12, 13, 14, 15, 16}},
++			},
++			3: {
++				{Removed: true, Hash: "h1"},
++			},
++		},
++		tierStartOnStep: 1,
++		tierDone:        map[engine.TransferID]int64{},
++	}
++
++	var buf bytes.Buffer
++	sink := NewJSONLEventSink(&buf)
++	plannedEng := &plannedMockEngine{mockRichEngine: eng}
++
++	d := NewEngineDriver(plannedEng, EngineDriverConfig{
++		Horizon:       1 << 40,
++		Environment:   tierEnv(50),
++		EventSink:     sink,
++		PodID:         "pod-rich",
++		TPDegree:      1,
++		KVBlockSize:   8,
++		KVBlocksTotal: 32,
++		HasCPUOffload: true,
++	})
++	if !eng.kvEventsEnabled {
++		t.Fatal("expected EnableKVEvents() to be called when EventSink is enabled")
++	}
++	if d.kvEventSink != nil {
++		t.Fatal("expected d.kvEventSink to remain nil when SetKVEventSink was not called")
++	}
++
++	// 1. r0 completes normally (2 blocks, 16 tokens).
++	r0 := &Request{ID: "r0", InputTokens: tokens(16), OutputTokens: tokens(2), ArrivalTime: 0}
++	// 2. r-reject refused by Add -> request.rejected (unservable).
++	rReject := &Request{ID: "r-reject", InputTokens: tokens(8), OutputTokens: tokens(1), ArrivalTime: 5}
++	// 3. r-qtimeout expires before queued event runs -> request.timed_out (engine).
++	rQTimeout := &Request{ID: "r-qtimeout", InputTokens: tokens(8), OutputTokens: tokens(1), ArrivalTime: 10, Deadline: 10}
++	// 4. r-rtimeout times out while running -> request.timed_out (engine).
++	rRTimeout := &Request{ID: "r-rtimeout", InputTokens: tokens(8), OutputTokens: tokens(10), ArrivalTime: 20, Deadline: 150}
++	// 5. r-hit arrives later with matching prefix tokens -> shared_with_reqs + cpu_hit_tokens.
++	rHit := &Request{ID: "r-hit", InputTokens: tokens(16), OutputTokens: tokens(1), ArrivalTime: 300}
++	// 6. r-evict evicted in flight -> request.finished (abort).
++	rEvict := &Request{ID: "r-evict", InputTokens: tokens(8), OutputTokens: tokens(5), ArrivalTime: 300}
++	// 7. r-finerr fails with FinishError before emitting -> request.rejected (unservable).
++	rFinErr := &Request{ID: "r-finerr", InputTokens: tokens(8), OutputTokens: tokens(1), ArrivalTime: 300}
++
++	for _, r := range []*Request{r0, rReject, rQTimeout, rRTimeout, rHit, rEvict, rFinErr} {
++		d.InjectArrival(r)
++	}
++
++	for d.HasPendingEvents() {
++		if d.PeekNextEventTime() > 350 && rEvict.State == StateRunning {
++			if !d.Evict(rEvict, 350) {
++				t.Fatal("expected Evict(r-evict) to return true")
++			}
++			continue
++		}
++		d.ProcessNextEvent()
++	}
++	d.Finalize()
++	if err := sink.Close(); err != nil {
++		t.Fatal(err)
++	}
++
++	// After h0 and h1 were cached and h1 was evicted, 1 cached block (h0) remains.
++	if got := d.CachedKVBlocksCount(); got != 1 {
++		t.Errorf("CachedKVBlocksCount() = %d, want 1", got)
++	}
++
++	recs := parseNDJSONLines(t, buf.Bytes())
++	seen := map[string]int{}
++	var foundSharedHit, foundCPUOffloadEvict, foundAbortedFinish, foundPreemptFreed bool
++	var movedStatuses []string
++	for _, rec := range recs {
++		typ := rec["type"].(string)
++		seen[typ]++
++		switch typ {
++		case EventTypeKVBlockAllocated:
++			if rec["req_id"] == "r-hit" {
++				if sw, ok := rec["shared_with_reqs"].([]any); ok && len(sw) > 0 {
++					foundSharedHit = true
++				}
++			}
++		case EventTypeRequestScheduled:
++			if rec["req_id"] == "r-hit" && rec["cpu_hit_tokens"] != float64(8) {
++				t.Errorf("r-hit cpu_hit_tokens = %v, want 8", rec["cpu_hit_tokens"])
++			}
++		case EventTypeKVBlockEvicted:
++			if rec["destination"] == "cpu_dram" && rec["reason"] == "lru_eviction" {
++				foundCPUOffloadEvict = true
++			}
++		case EventTypeRequestFinished:
++			if rec["req_id"] == "r-evict" && rec["reason"] == "abort" {
++				foundAbortedFinish = true
++			}
++		case EventTypeRequestPreempted:
++			if fb, ok := rec["freed_blocks"].([]any); ok && len(fb) > 0 {
++				foundPreemptFreed = true
++			}
++		case EventTypeKVBlockMoved:
++			movedStatuses = append(movedStatuses, rec["status"].(string))
++		}
++	}
++
++	if seen[EventTypeRequestRejected] != 2 {
++		t.Errorf("request.rejected count = %d, want 2 (Add failure + FinishError)", seen[EventTypeRequestRejected])
++	}
++	for _, want := range []string{
++		EventTypeRequestRejected,
++		EventTypeRequestTimedOut,
++		EventTypeRequestPreempted,
++		EventTypeRequestFinished,
++		EventTypeKVBlockCached,
++		EventTypeKVBlockEvicted,
++		EventTypeKVBlockMoved,
++	} {
++		if seen[want] == 0 {
++			t.Errorf("missing expected event type %s (seen=%v)", want, seen)
++		}
++	}
++	if !foundSharedHit {
++		t.Error("expected shared_with_reqs on prefix hit r-hit")
++	}
++	if !foundCPUOffloadEvict {
++		t.Error("expected kv.block.evicted with destination=cpu_dram when HasCPUOffload=true")
++	}
++	if !foundAbortedFinish {
++		t.Error("expected request.finished with reason=abort for evicted request")
++	}
++	if !foundPreemptFreed {
++		t.Error("expected non-empty freed_blocks on request.preempted")
++	}
++	if len(movedStatuses) != 2 || movedStatuses[0] != "started" || movedStatuses[1] != "completed" {
++		t.Errorf("kv.block.moved statuses = %v, want [started completed]", movedStatuses)
++	}
++}
+diff --git a/sim/kv_block_tracker.go b/sim/kv_block_tracker.go
+new file mode 100644
+index 00000000..f0ad743a
+--- /dev/null
++++ b/sim/kv_block_tracker.go
+@@ -0,0 +1,493 @@
++package sim
++
++import (
++	"container/heap"
++	"slices"
++	"sort"
++	"strconv"
++	"strings"
++
++	"github.com/inference-sim/blis-substrate/contracts/engine"
++)
++
++// intMinHeap maintains freed physical KV block IDs in deterministic lowest-index-first order.
++type intMinHeap []int
++
++func (h intMinHeap) Len() int           { return len(h) }
++func (h intMinHeap) Less(i, j int) bool { return h[i] < h[j] }
++func (h intMinHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
++func (h *intMinHeap) Push(x any)        { *h = append(*h, x.(int)) }
++func (h *intMinHeap) Pop() any {
++	old := *h
++	n := len(old)
++	v := old[n-1]
++	*h = old[:n-1]
++	return v
++}
++
++// kvBlockTracker deterministically mirrors physical KV block slot indices [0..KVBlocksTotal-1]
++// for an EngineDriver so emitted kv.block.* and request.preempted events carry consistent,
++// non-negative block IDs without affecting simulation behavior (INV-6).
++type kvBlockTracker struct {
++	blockSize   int
++	totalBlocks int
++
++	nextSlot  int
++	freedHeap intMinHeap
++
++	reqBlocks        map[string][]int
++	reqTokenBlocks   map[string][]string // per-request token-chunk keys by block index
++	blockRefCount    map[int]int
++	blockOwners      map[int][]string
++	lastOwnerByBlock map[int]string
++
++	cachedBlocks     map[int]string    // gpu blockID -> hash
++	cachedOrder      []int             // FIFO insertion order of gpu cached blockIDs
++	cachedByHash     map[string]int    // gpu hash -> blockID
++	cachedByTokenKey map[string]int    // token chunk key -> gpu blockID
++	tokenKeyByBlock  map[int]string    // gpu blockID -> token chunk key
++	cpuCachedByHash  map[string]int    // cpu_dram hash -> blockID
++	nextCPUSlot      int
++}
++
++func newKVBlockTracker(blockSize, totalBlocks int) *kvBlockTracker {
++	if blockSize <= 0 {
++		blockSize = 16
++	}
++	return &kvBlockTracker{
++		blockSize:        blockSize,
++		totalBlocks:      max(totalBlocks, 0),
++		reqBlocks:        map[string][]int{},
++		reqTokenBlocks:   map[string][]string{},
++		blockRefCount:    map[int]int{},
++		blockOwners:      map[int][]string{},
++		lastOwnerByBlock: map[int]string{},
++		cachedBlocks:     map[int]string{},
++		cachedByHash:     map[string]int{},
++		cachedByTokenKey: map[string]int{},
++		tokenKeyByBlock:  map[int]string{},
++		cpuCachedByHash:  map[string]int{},
++	}
++}
++
++func (t *kvBlockTracker) syncGeometry(snap engine.State) {
++	if snap.KVBlockSize > 0 && t.blockSize <= 0 {
++		t.blockSize = snap.KVBlockSize
++	}
++	if snap.KVBlocksTotal > 0 && t.totalBlocks == 0 {
++		t.totalBlocks = int(snap.KVBlocksTotal)
++	}
++}
++
++func (t *kvBlockTracker) allocSlot() int {
++	if len(t.freedHeap) > 0 {
++		return heap.Pop(&t.freedHeap).(int)
++	}
++	if t.totalBlocks == 0 || t.nextSlot < t.totalBlocks {
++		bid := t.nextSlot
++		t.nextSlot++
++		return bid
++	}
++	// Reclaim the oldest unreferenced prefix-cached block if the pool is at capacity.
++	for i, bid := range t.cachedOrder {
++		if t.blockRefCount[bid] == 0 {
++			t.evictCachedBlockMeta(bid)
++			t.cachedOrder = append(t.cachedOrder[:i], t.cachedOrder[i+1:]...)
++			return bid
++		}
++	}
++	// Fallback if totalBlocks was underestimated by config.
++	bid := t.nextSlot
++	t.nextSlot++
++	return bid
++}
++
++func (t *kvBlockTracker) freeSlot(bid int) {
++	if bid < 0 {
++		return
++	}
++	heap.Push(&t.freedHeap, bid)
++}
++
++func (t *kvBlockTracker) addOwner(bid int, reqID string) {
++	t.blockRefCount[bid]++
++	owners := t.blockOwners[bid]
++	if !slices.Contains(owners, reqID) {
++		t.blockOwners[bid] = append(owners, reqID)
++	}
++	t.lastOwnerByBlock[bid] = reqID
++}
++
++func (t *kvBlockTracker) removeOwner(bid int, reqID string) {
++	if t.blockRefCount[bid] > 0 {
++		t.blockRefCount[bid]--
++	}
++	owners := t.blockOwners[bid]
++	for i, o := range owners {
++		if o == reqID {
++			t.blockOwners[bid] = append(owners[:i], owners[i+1:]...)
++			break
++		}
++	}
++	if len(t.blockOwners[bid]) == 0 {
++		delete(t.blockOwners, bid)
++	}
++}
++
++// onScheduled allocates or pins physical blocks needed for s in the current batch.
++// It returns newly allocated/pinned block IDs (empty if no new blocks were needed) and any
++// shared request IDs for prefix hits.
++func (t *kvBlockTracker) onScheduled(s engine.Scheduled, req *Request, snap engine.State) (allocatedIDs []int, sharedWith []string) {
++	t.syncGeometry(snap)
++
++	held := t.reqBlocks[s.ID]
++	totalAfter := max(s.Computed+s.Tokens, 0)
++	blocksNeeded := (totalAfter + t.blockSize - 1) / t.blockSize
++	if blocksNeeded <= len(held) {
++		return nil, nil
++	}
++
++	sharedSet := map[string]bool{}
++	tokKeys := t.reqTokenBlocks[s.ID]
++
++	// Record token chunk keys for the request's prompt blocks if available.
++	if req != nil && len(tokKeys) == 0 && len(req.InputTokens) >= t.blockSize {
++		numPromptBlocks := len(req.InputTokens) / t.blockSize
++		tokKeys = make([]string, numPromptBlocks)
++		for bi := 0; bi < numPromptBlocks; bi++ {
++			tokKeys[bi] = tokensKey(req.InputTokens[bi*t.blockSize : (bi+1)*t.blockSize])
++		}
++		t.reqTokenBlocks[s.ID] = tokKeys
++	}
++
++	// First admission with prefix-cache hit: reuse matching cached blocks when available.
++	if len(held) == 0 && s.CachedTokens > 0 {
++		hitBlocks := min(s.CachedTokens/t.blockSize, blocksNeeded)
++		for bi := 0; bi < hitBlocks; bi++ {
++			var bid int
++			var matched bool
++			if bi < len(tokKeys) && tokKeys[bi] != "" {
++				if existing, ok := t.cachedByTokenKey[tokKeys[bi]]; ok {
++					bid = existing
++					matched = true
++				}
++			}
++			if !matched {
++				bid = t.allocSlot()
++			}
++			for _, owner := range t.blockOwners[bid] {
++				if owner != s.ID {
++					sharedSet[owner] = true
++				}
++			}
++			if prev, ok := t.lastOwnerByBlock[bid]; ok && prev != "" && prev != s.ID {
++				sharedSet[prev] = true
++			}
++			t.addOwner(bid, s.ID)
++			held = append(held, bid)
++			allocatedIDs = append(allocatedIDs, bid)
++		}
++	}
++
++	for len(held) < blocksNeeded {
++		bid := t.allocSlot()
++		t.addOwner(bid, s.ID)
++		held = append(held, bid)
++		allocatedIDs = append(allocatedIDs, bid)
++	}
++
++	t.reqBlocks[s.ID] = held
++	if len(sharedSet) > 0 {
++		sharedWith = make([]string, 0, len(sharedSet))
++		for id := range sharedSet {
++			sharedWith = append(sharedWith, id)
++		}
++		sort.Strings(sharedWith)
++	}
++	return allocatedIDs, sharedWith
++}
++
++// onPreempted releases all blocks held by a preempted request and returns the freed block IDs.
++func (t *kvBlockTracker) onPreempted(reqID string) []int {
++	blocks := t.reqBlocks[reqID]
++	delete(t.reqBlocks, reqID)
++	delete(t.reqTokenBlocks, reqID)
++	freed := make([]int, 0, len(blocks))
++	for _, bid := range blocks {
++		t.removeOwner(bid, reqID)
++		if t.blockRefCount[bid] == 0 {
++			freed = append(freed, bid)
++			if _, isCached := t.cachedBlocks[bid]; !isCached {
++				t.freeSlot(bid)
++			}
++		}
++	}
++	return freed
++}
++
++// onFinished releases blocks held by reqID unless retainKV is true (disaggregated prefill hold).
++func (t *kvBlockTracker) onFinished(reqID string, retainKV bool) {
++	if retainKV {
++		return
++	}
++	blocks := t.reqBlocks[reqID]
++	delete(t.reqBlocks, reqID)
++	delete(t.reqTokenBlocks, reqID)
++	for _, bid := range blocks {
++		t.removeOwner(bid, reqID)
++		if t.blockRefCount[bid] == 0 {
++			if _, isCached := t.cachedBlocks[bid]; !isCached {
++				t.freeSlot(bid)
++			}
++		}
++	}
++}
++
++// blockIDsForReq returns up to limit block IDs currently held by reqID (or deterministic fallback).
++func (t *kvBlockTracker) blockIDsForReq(reqID string, limit int) []int {
++	if limit <= 0 {
++		return []int{}
++	}
++	held := t.reqBlocks[reqID]
++	if len(held) >= limit {
++		out := make([]int, limit)
++		copy(out, held[:limit])
++		return out
++	}
++	out := make([]int, 0, limit)
++	out = append(out, held...)
++	for i := len(out); i < limit; i++ {
++		out = append(out, i)
++	}
++	return out
++}
++
++// onKVEvents translates engine KVEvent entries into KVBlockCachedEvent / KVBlockEvictedEvent records.
++func (t *kvBlockTracker) onKVEvents(events []engine.KVEvent, podID string, gpuIndices []int, hasCPUOffload bool) []EventRecord {
++	if len(events) == 0 {
++		return nil
++	}
++	var out []EventRecord
++	var curCached *KVBlockCachedEvent
++	var curEvicted *KVBlockEvictedEvent
++
++	flushCached := func() {
++		if curCached != nil {
++			out = append(out, curCached)
++			curCached = nil
++		}
++	}
++	flushEvicted := func() {
++		if curEvicted != nil {
++			out = append(out, curEvicted)
++			curEvicted = nil
++		}
++	}
++
++	for _, ev := range events {
++		tier := "gpu"
++		if ev.Tier == "cpu" {
++			tier = "cpu_dram"
++		}
++
++		if !ev.Removed {
++			flushEvicted()
++			var bid int
++			var prevOwner string
++			if tier == "cpu_dram" {
++				if existing, ok := t.cpuCachedByHash[ev.Hash]; ok {
++					bid = existing
++				} else if gpuBid, ok := t.cachedByHash[ev.Hash]; ok {
++					bid = gpuBid
++					t.cpuCachedByHash[ev.Hash] = bid
++				} else {
++					bid = t.nextCPUSlot
++					t.nextCPUSlot++
++					t.cpuCachedByHash[ev.Hash] = bid
++				}
++			} else {
++				bid, prevOwner = t.recordGPUCachedBlock(ev)
++			}
++
++			if curCached != nil && curCached.Tier == tier && curCached.PrevOwnerReqID == prevOwner {
++				curCached.BlockIDs = append(curCached.BlockIDs, bid)
++				curCached.BlockHashes = append(curCached.BlockHashes, ev.Hash)
++				continue
++			}
++			flushCached()
++			curCached = &KVBlockCachedEvent{
++				PodID:          podID,
++				GPUIndices:     slices.Clone(gpuIndices),
++				BlockIDs:       []int{bid},
++				BlockHashes:    []string{ev.Hash},
++				PrevOwnerReqID: prevOwner,
++				Tier:           tier,
++			}
++			continue
++		}
++
++		// ev.Removed == true -> kv.block.evicted
++		flushCached()
++		var bid int
++		if tier == "cpu_dram" {
++			if existing, ok := t.cpuCachedByHash[ev.Hash]; ok {
++				bid = existing
++				delete(t.cpuCachedByHash, ev.Hash)
++			}
++		} else {
++			if existing, ok := t.cachedByHash[ev.Hash]; ok {
++				bid = existing
++				delete(t.cachedByHash, ev.Hash)
++				if curHash, ok := t.cachedBlocks[bid]; ok && curHash == ev.Hash {
++					t.evictCachedBlockMeta(bid)
++					t.removeFromCachedOrder(bid)
++					if t.blockRefCount[bid] == 0 {
++						t.freeSlot(bid)
++					}
++				}
++			}
++		}
++
++		dest := "dropped"
++		if tier == "gpu" && hasCPUOffload {
++			dest = "cpu_dram"
++		}
++		if curEvicted != nil && curEvicted.Tier == tier && curEvicted.Destination == dest {
++			curEvicted.BlockIDs = append(curEvicted.BlockIDs, bid)
++			curEvicted.BlockHashes = append(curEvicted.BlockHashes, ev.Hash)
++			continue
++		}
++		flushEvicted()
++		curEvicted = &KVBlockEvictedEvent{
++			PodID:       podID,
++			GPUIndices:  slices.Clone(gpuIndices),
++			BlockIDs:    []int{bid},
++			BlockHashes: []string{ev.Hash},
++			Tier:        tier,
++			Destination: dest,
++			Reason:      "lru_eviction",
++		}
++	}
++
++	flushCached()
++	flushEvicted()
++	return out
++}
++
++func (t *kvBlockTracker) recordGPUCachedBlock(ev engine.KVEvent) (bid int, prevOwner string) {
++	if existing, ok := t.cachedByHash[ev.Hash]; ok {
++		return existing, t.lastOwnerByBlock[existing]
++	}
++
++	tokKey := tokensKey32(ev.Tokens)
++	if tokKey != "" {
++		if existing, ok := t.cachedByTokenKey[tokKey]; ok {
++			bid = existing
++			prevOwner = t.lastOwnerByBlock[bid]
++		} else {
++			// Deterministically match an active request's block at this token chunk.
++			reqIDs := make([]string, 0, len(t.reqTokenBlocks))
++			for id := range t.reqTokenBlocks {
++				reqIDs = append(reqIDs, id)
++			}
++			sort.Strings(reqIDs)
++			found := false
++			for _, id := range reqIDs {
++				keys := t.reqTokenBlocks[id]
++				blocks := t.reqBlocks[id]
++				for bi, k := range keys {
++					if k == tokKey && bi < len(blocks) {
++						bid = blocks[bi]
++						prevOwner = id
++						found = true
++						break
++					}
++				}
++				if found {
++					break
++				}
++			}
++			if !found {
++				bid = t.allocSlot()
++			}
++			t.cachedByTokenKey[tokKey] = bid
++			t.tokenKeyByBlock[bid] = tokKey
++		}
++	} else {
++		bid = t.allocSlot()
++	}
++
++	if _, already := t.cachedBlocks[bid]; !already {
++		t.cachedOrder = append(t.cachedOrder, bid)
++	}
++	t.cachedBlocks[bid] = ev.Hash
++	t.cachedByHash[ev.Hash] = bid
++	if prevOwner != "" {
++		t.lastOwnerByBlock[bid] = prevOwner
++	} else {
++		prevOwner = t.lastOwnerByBlock[bid]
++	}
++	return bid, prevOwner
++}
++
++func (t *kvBlockTracker) evictCachedBlockMeta(bid int) {
++	if h, ok := t.cachedBlocks[bid]; ok {
++		delete(t.cachedBlocks, bid)
++		if t.cachedByHash[h] == bid {
++			delete(t.cachedByHash, h)
++		}
++	}
++	if tk, ok := t.tokenKeyByBlock[bid]; ok {
++		delete(t.tokenKeyByBlock, bid)
++		if t.cachedByTokenKey[tk] == bid {
++			delete(t.cachedByTokenKey, tk)
++		}
++	}
++}
++
++func (t *kvBlockTracker) removeFromCachedOrder(bid int) {
++	for i, id := range t.cachedOrder {
++		if id == bid {
++			t.cachedOrder = append(t.cachedOrder[:i], t.cachedOrder[i+1:]...)
++			return
++		}
++	}
++}
++
++// cachedCount returns the number of GPU prefix-cache blocks currently resident in the tracker.
++func (t *kvBlockTracker) cachedCount() int {
++	if t == nil {
++		return 0
++	}
++	return len(t.cachedBlocks)
++}
++
++func tokensKey(ts []TokenID) string {
++	if len(ts) == 0 {
++		return ""
++	}
++	var sb strings.Builder
++	sb.Grow(len(ts) * 4)
++	for i, v := range ts {
++		if i > 0 {
++			sb.WriteByte(',')
++		}
++		sb.WriteString(strconv.FormatInt(int64(v), 10))
++	}
++	return sb.String()
++}
++
++func tokensKey32(ts []int32) string {
++	if len(ts) == 0 {
++		return ""
++	}
++	var sb strings.Builder
++	sb.Grow(len(ts) * 4)
++	for i, v := range ts {
++		if i > 0 {
++			sb.WriteByte(',')
++		}
++		sb.WriteString(strconv.FormatInt(int64(v), 10))
++	}
++	return sb.String()
++}
+diff --git a/sim/roofline.go b/sim/roofline.go
+new file mode 100644
+index 00000000..d2ccefb7
+--- /dev/null
++++ b/sim/roofline.go
+@@ -0,0 +1,158 @@
++package sim
++
++import (
++	"math"
++
++	"github.com/inference-sim/blis-substrate/contracts/engine"
++)
++
++// ModelRooflineSpec holds pure-primitive model architecture, parallelism, and GPU roofline
++// parameters used to derive analytical RooflinePoint values for each executed batch.
++type ModelRooflineSpec struct {
++	ModelName string
++
++	HiddenSize        int64
++	IntermediateSize  int64
++	NumHiddenLayers   int64
++	NumAttentionHeads int64
++	NumKVHeads        int64
++	HeadDim           int64
++	VocabSize         int64
++
++	IsMoE         bool
++	NumExperts    int64
++	ExpertsPerTok int64
++
++	WeightBytesPerRank   int64
++	ActivationPeakBytes  int64
++	KVBytesPerTokenPerRank int64
++
++	TP int
++	PP int
++
++	ChipTFLOPsPeak    float64
++	ChipTFLOPsFP8     float64
++	ChipBWTBs         float64
++	IsFP8             bool
++	ComputePeakTFLOPs float64
++}
++
++// EstimateBatch computes analytical per-rank FLOPs, HBM bytes moved, arithmetic intensity,
++// achieved TFLOP/s and TB/s, and the roofline bottleneck ("compute" vs "memory_bw") for b.
++func (s *ModelRooflineSpec) EstimateBatch(b engine.Batch, durationUS int64) RooflinePoint {
++	if durationUS < 1 {
++		durationUS = 1
++	}
++	if s == nil {
++		return RooflinePoint{
++			Bottleneck: "memory_bw",
++			Derived:    true,
++		}
++	}
++
++	var totalTokens int64
++	var kvReadTokens int64
++	var kvWriteTokens int64
++	var attnPairs float64
++
++	for _, req := range b.Reqs {
++		toks := int64(max(req.Tokens, 0))
++		if toks == 0 {
++			continue
++		}
++		ctx := int64(max(req.Computed+req.Tokens, 0))
++		totalTokens += toks
++		kvReadTokens += ctx
++		kvWriteTokens += toks
++		attnPairs += float64(toks) * float64(ctx)
++	}
++
++	if totalTokens == 0 {
++		return RooflinePoint{
++			Bottleneck: "memory_bw",
++			Derived:    true,
++		}
++	}
++
++	layers := float64(max(s.NumHiddenLayers, 0))
++	h := float64(max(s.HiddenSize, 0))
++	inter := float64(max(s.IntermediateSize, 0))
++	nQ := float64(max(s.NumAttentionHeads, 0))
++	nKV := float64(max(s.NumKVHeads, 0))
++	if nKV == 0 {
++		nKV = nQ
++	}
++	headDim := float64(max(s.HeadDim, 0))
++	if headDim == 0 && nQ > 0 {
++		headDim = h / nQ
++	}
++	vocab := float64(max(s.VocabSize, 0))
++
++	activeExperts := 1.0
++	if s.IsMoE {
++		activeExperts = float64(max(s.ExpertsPerTok, 1))
++	}
++
++	// Linear projections per token:
++	// - Attention Q, K, V, O projections: 2*H*(nQ*d) + 2*H*(nKV*d) + 2*(nQ*d)*H = 4*H*d*(nQ + nKV)
++	// - SwiGLU / gated MLP projections (gate, up, down): 6*H*I * activeExperts
++	// - LM head: 2*H*V
++	attnLinearPerToken := 4.0 * h * headDim * (nQ + nKV)
++	mlpLinearPerToken := 6.0 * h * inter * activeExperts
++	lmHeadPerToken := 2.0 * h * vocab
++	linearFlops := float64(totalTokens)*(layers*(attnLinearPerToken+mlpLinearPerToken)+lmHeadPerToken)
++
++	// Attention QK^T and AV FLOPs across all layers and query heads: 4 * L * nQ * d * sum(tokens * ctx).
++	attnFlops := 4.0 * layers * nQ * headDim * attnPairs
++
++	ranks := float64(max(s.TP, 1) * max(s.PP, 1))
++	flopsPerRank := (linearFlops + attnFlops) / ranks
++
++	// Analytical HBM bytes moved per rank:
++	// weights read once per batch + KV cache read for active contexts + KV written for scheduled tokens.
++	weightsRead := float64(max(s.WeightBytesPerRank, 0))
++	kvPerTok := float64(max(s.KVBytesPerTokenPerRank, 0))
++	bytesMoved := weightsRead + float64(kvReadTokens+kvWriteTokens)*kvPerTok
++
++	durS := float64(durationUS) / 1e6
++	var ai float64
++	if bytesMoved > 0 {
++		ai = flopsPerRank / bytesMoved
++	}
++	achievedTFLOPs := flopsPerRank / durS / 1e12
++	achievedBWTBs := bytesMoved / durS / 1e12
++
++	computePeak := s.ComputePeakTFLOPs
++	if computePeak <= 0 {
++		if s.IsFP8 && s.ChipTFLOPsFP8 > 0 {
++			computePeak = s.ChipTFLOPsFP8
++		} else {
++			computePeak = s.ChipTFLOPsPeak
++		}
++	}
++
++	bottleneck := "memory_bw"
++	if computePeak > 0 && s.ChipBWTBs > 0 {
++		ridge := (computePeak * 1e12) / (s.ChipBWTBs * 1e12)
++		if ai >= ridge {
++			bottleneck = "compute"
++		}
++	}
++
++	return RooflinePoint{
++		FLOPs:               sanitizeNonNeg(flopsPerRank),
++		BytesMoved:          sanitizeNonNeg(bytesMoved),
++		ArithmeticIntensity: sanitizeNonNeg(ai),
++		AchievedTFLOPs:      sanitizeNonNeg(achievedTFLOPs),
++		AchievedBWTBs:       sanitizeNonNeg(achievedBWTBs),
++		Bottleneck:          bottleneck,
++		Derived:             true,
++	}
++}
++
++func sanitizeNonNeg(v float64) float64 {
++	if math.IsNaN(v) || math.IsInf(v, 0) || v < 0 {
++		return 0
++	}
++	return v
++}

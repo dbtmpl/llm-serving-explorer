@@ -1,0 +1,18 @@
+version: "2"
+seed: 42
+category: language
+aggregate_rate: 120.0
+num_requests: 60
+clients:
+  - id: "hot-prefix"
+    rate_fraction: 0.85
+    prefix_group: "hot-system-prompt"
+    prefix_length: 1024
+    arrival: { process: poisson }
+    input_distribution: { type: constant, params: { value: 256 } }
+    output_distribution: { type: constant, params: { value: 128 } }
+  - id: "unique-bg"
+    rate_fraction: 0.15
+    arrival: { process: poisson }
+    input_distribution: { type: constant, params: { value: 256 } }
+    output_distribution: { type: constant, params: { value: 128 } }

@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: engine/go.mod
+          cache-dependency-path: engine/go.sum
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply engine patch
+        run: pnpm engine:patch
+
+      - name: Build browser WASM
+        run: pnpm build:wasm
+
+      - name: Run Go engine tests
+        working-directory: engine
+        run: go test ./sim/...
+
+      - name: Typecheck web app
+        run: pnpm --filter @llm-viz/web typecheck
+
+      - name: Run unit and integration tests
+        run: pnpm test
+
+      - name: Build static site
+        run: pnpm build

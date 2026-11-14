@@ -1,0 +1,41 @@
+# BLIS defaults.yaml — shipped LoRA control-plane defaults.
+#
+# There is no per-model `defaults:` block any more (#1768). The deployment is the
+# blis-schemas scenario named by --scenario on `blis run` and `blis replay`, never inferred
+# per-model, and the model config is read from the catalog located by --catalog /
+# BLIS_CATALOG (#1731). A `defaults:` key left in a hand-maintained copy of this file is
+# rejected by strict parsing (R10) — delete the block and name a scenario.
+#
+# There is no `workloads:` block any more (#1769). The named workload presets (chatbot,
+# summarization, contentgen, multidoc) live in the catalog, at
+# <catalog>/workloads/<name>.yaml — one copy, read by `blis run --workload` and
+# `blis convert preset --name` alike. They used to be
+# duplicated here as well, with nothing keeping the two copies in sync. A `workloads:` key
+# left in a hand-maintained copy of this file is now rejected by strict parsing (R10) —
+# delete the block and point --catalog / BLIS_CATALOG at a catalog that defines the preset.
+
+# There is no `trained_physics_coefficients:` block any more (#1851). BLIS takes every
+# latency, memory and transfer price from blis-latency-kernel, whose fitted coefficients
+# live in blis-registry (--registry). A stale block in a hand-maintained copy of this file
+# is rejected by strict parsing (R10) — delete it.
+
+# LoRA control-plane defaults (#1464). INERT: these seed the --lora-* flag defaults
+# but are only applied to a run when adapters are configured. With no adapters
+# declared, the subsystem is a no-op and output is byte-identical to a pre-feature
+# build (INV-6). adapter_capacity is intentionally absent (nil => inert); the adapter
+# registry is declared per-run via a config file, not here.
+lora:
+  load_base_latency_us: 1500.0
+  load_bandwidth_bytes_us: 2.0e6
+  footprint_bytes_per_rank: 2.0e6
+  step_overhead_tiers:
+    8: {k6: 0.02, k7: 1.0}
+    16: {k6: 0.035, k7: 1.0}
+    32: {k6: 0.06, k7: 1.0}
+# KV-cache offload storage-device physics (H5, #1587) used to live here as a
+# `kv_offload_devices:` block. #1770 removed it: the table was duplicated with the
+# catalog's devices/storage.yaml and nothing kept the copies in sync, so the CATALOG is
+# now the single source of truth. --kv-offload-config's per-tier `device_class` resolves
+# against <catalog>/devices/storage.yaml (--catalog / BLIS_CATALOG names the catalog clone
+# root). Re-adding the block here does not work: strict parsing (R10) refuses it.
+version: 0.0.1

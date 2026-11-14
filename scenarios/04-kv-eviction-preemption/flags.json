@@ -1,0 +1,17 @@
+{
+  "title": "04 · KV Cache Eviction & Preemption",
+  "subtitle": "Saturate a tight GPU KV budget to trigger LRU cache eviction and running-request preemption",
+  "recommended_views": ["kv-cache", "timeline", "scheduler-queue"],
+  "scenario": "scenario.yaml",
+  "num_requests": 24,
+  "rate": 40,
+  "prompt_tokens": 768,
+  "prompt_tokens_stdev": 0,
+  "prompt_tokens_min": 768,
+  "prompt_tokens_max": 768,
+  "output_tokens": 128,
+  "output_tokens_stdev": 0,
+  "output_tokens_min": 128,
+  "output_tokens_max": 128,
+  "seed": 42
+}

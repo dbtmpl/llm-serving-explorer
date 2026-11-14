@@ -1,0 +1,23 @@
+{
+  "name": "llm-serving-explorer",
+  "version": "0.1.0",
+  "description": "Interactive visual explainer for LLM inference serving: routing, continuous batching, KV cache, memory tiers, P/D disaggregation and autoscaling.",
+  "private": true,
+  "license": "Apache-2.0",
+  "scripts": {
+    "test": "vitest run",
+    "test:all": "pnpm -r test",
+    "test:schema": "pnpm --filter @llm-viz/schema test",
+    "gen:types": "pnpm --filter @llm-viz/schema gen:types",
+    "engine:patch": "node tools/engine-patch.mjs apply",
+    "engine:export-patch": "node tools/engine-patch.mjs export",
+    "gen:scenarios": "tsx tools/gen-scenarios/src/index.ts",
+    "build:wasm": "node tools/build-wasm.mjs",
+    "build": "pnpm --filter @llm-viz/web build"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.9"
+  }
+}

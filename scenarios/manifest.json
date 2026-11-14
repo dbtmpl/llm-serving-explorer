@@ -1,0 +1,156 @@
+{
+  "schema_version": "1.0",
+  "scenarios": [
+    {
+      "id": "01-single-request",
+      "title": "01 · Single Request Lifecycle",
+      "subtitle": "Watch one request flow from arrival through prefill, paged KV allocation, and token-by-token decode",
+      "events_file": "01-single-request/events.ndjson.gz",
+      "recommended_views": [
+        "timeline",
+        "kv-cache",
+        "batch-roofline"
+      ],
+      "event_count": 149,
+      "duration_us": 2031075,
+      "completed_requests": 1,
+      "events_bytes": 7683
+    },
+    {
+      "id": "02-continuous-batching",
+      "title": "02 · Continuous Batching vs Static Batching",
+      "subtitle": "See how iteration-level scheduling and mixed prefill+decode steps multiply decode throughput",
+      "events_file": "02-continuous-batching/events.ndjson.gz",
+      "recommended_views": [
+        "batch-roofline",
+        "timeline",
+        "compare"
+      ],
+      "event_count": 1962,
+      "duration_us": 2461896,
+      "completed_requests": 12,
+      "events_bytes": 44548,
+      "baseline_events_file": "02-continuous-batching/baseline.events.ndjson.gz",
+      "compare_label": "Static Serialized (max_num_seqs=1)",
+      "baseline_event_count": 3386,
+      "baseline_events_bytes": 130553
+    },
+    {
+      "id": "03-prefix-caching",
+      "title": "03 · Automatic Prefix Caching",
+      "subtitle": "Reuse KV blocks of a shared 1,024-token system prompt across requests to slash TTFT",
+      "events_file": "03-prefix-caching/events.ndjson.gz",
+      "recommended_views": [
+        "kv-cache",
+        "timeline",
+        "compare"
+      ],
+      "event_count": 614,
+      "duration_us": 4536432,
+      "completed_requests": 8,
+      "events_bytes": 18168,
+      "baseline_events_file": "03-prefix-caching/baseline.events.ndjson.gz",
+      "compare_label": "Prefix Caching Disabled",
+      "baseline_event_count": 580,
+      "baseline_events_bytes": 17488
+    },
+    {
+      "id": "04-kv-eviction-preemption",
+      "title": "04 · KV Cache Eviction & Preemption",
+      "subtitle": "Saturate a tight GPU KV budget to trigger LRU cache eviction and running-request preemption",
+      "events_file": "04-kv-eviction-preemption/events.ndjson.gz",
+      "recommended_views": [
+        "kv-cache",
+        "timeline",
+        "scheduler-queue"
+      ],
+      "event_count": 4092,
+      "duration_us": 5410356,
+      "completed_requests": 24,
+      "events_bytes": 135919
+    },
+    {
+      "id": "05-memory-tiers",
+      "title": "05 · Memory Tiers (GPU HBM ↔ CPU DRAM)",
+      "subtitle": "Offload evicted KV blocks to host CPU DRAM and reload them on later prefix hits",
+      "events_file": "05-memory-tiers/events.ndjson.gz",
+      "recommended_views": [
+        "memory-tiers",
+        "kv-cache",
+        "timeline"
+      ],
+      "event_count": 7580,
+      "duration_us": 7718971,
+      "completed_requests": 45,
+      "events_bytes": 306666
+    },
+    {
+      "id": "06-llmd-routing",
+      "title": "06 · llm-d Gateway Routing",
+      "subtitle": "Score 4 replicas with prefix-cache affinity + queue + KV utilization vs load-only routing",
+      "events_file": "06-llmd-routing/events.ndjson.gz",
+      "recommended_views": [
+        "routing-gateway",
+        "cluster-topology",
+        "compare"
+      ],
+      "event_count": 4373,
+      "duration_us": 2490624,
+      "completed_requests": 48,
+      "events_bytes": 137422,
+      "baseline_events_file": "06-llmd-routing/baseline.events.ndjson.gz",
+      "compare_label": "Load-Only Routing (No Prefix Scorer)",
+      "baseline_event_count": 4357,
+      "baseline_events_bytes": 132838
+    },
+    {
+      "id": "07-pd-disaggregation",
+      "title": "07 · Prefill / Decode Disaggregation (3P1D)",
+      "subtitle": "Separate compute-bound prefill and bandwidth-bound decode onto dedicated H100 TP=2 pools over 400G IB",
+      "events_file": "07-pd-disaggregation/events.ndjson.gz",
+      "recommended_views": [
+        "pd-disaggregation",
+        "cluster-topology",
+        "timeline"
+      ],
+      "event_count": 1665,
+      "duration_us": 2493373,
+      "completed_requests": 18,
+      "events_bytes": 87910
+    },
+    {
+      "id": "08-cache-aware-overload",
+      "title": "08 · Cache-Affinity Overload & Queue Skew",
+      "subtitle": "See how aggressive prefix affinity creates hot-spot queues on 2 pods while peer pods sit nearly idle",
+      "events_file": "08-cache-aware-overload/events.ndjson.gz",
+      "recommended_views": [
+        "routing-gateway",
+        "scheduler-queue",
+        "compare"
+      ],
+      "event_count": 9437,
+      "duration_us": 3301416,
+      "completed_requests": 60,
+      "events_bytes": 207613,
+      "baseline_events_file": "08-cache-aware-overload/baseline.events.ndjson.gz",
+      "compare_label": "In-Flight Load Balanced (active-request-scorer)",
+      "baseline_event_count": 9602,
+      "baseline_events_bytes": 217829
+    },
+    {
+      "id": "09-autoscaling",
+      "title": "09 · Pod Autoscaling & Lifecycle",
+      "subtitle": "Watch a traffic wave trigger scale-up (created → loading → ready) and scale-down (draining → terminated)",
+      "events_file": "09-autoscaling/events.ndjson.gz",
+      "recommended_views": [
+        "autoscaling-lifecycle",
+        "cluster-topology",
+        "metrics"
+      ],
+      "event_count": 4981,
+      "duration_us": 25000000,
+      "completed_requests": 67,
+      "events_bytes": 329181
+    }
+  ]
+}

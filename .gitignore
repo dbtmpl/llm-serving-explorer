@@ -1,0 +1,26 @@
+# Dependencies and build output
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Generated WASM build of the engine (built by `pnpm build:wasm`, too large to commit)
+/web/public/wasm/*.gz
+/web/public/wasm/blis.wasm*
+
+# Test output
+test-results/
+playwright-report/
+coverage/
+
+# Local development notes and agent tooling (not part of the project)
+.dev/
+.claude/
+CLAUDE.local.md
+
+# OS and editor files
+.DS_Store
+.idea/
+.vscode/
+*.log
+.env
+.env.*

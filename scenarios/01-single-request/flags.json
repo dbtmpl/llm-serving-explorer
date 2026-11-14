@@ -1,0 +1,17 @@
+{
+  "title": "01 · Single Request Lifecycle",
+  "subtitle": "Watch one request flow from arrival through prefill, paged KV allocation, and token-by-token decode",
+  "recommended_views": ["timeline", "kv-cache", "batch-roofline"],
+  "scenario": "scenario.yaml",
+  "num_requests": 1,
+  "rate": 1,
+  "prompt_tokens": 256,
+  "prompt_tokens_stdev": 0,
+  "prompt_tokens_min": 256,
+  "prompt_tokens_max": 256,
+  "output_tokens": 64,
+  "output_tokens_stdev": 0,
+  "output_tokens_min": 64,
+  "output_tokens_max": 64,
+  "seed": 42
+}

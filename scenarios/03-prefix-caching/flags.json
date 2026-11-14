@@ -1,0 +1,22 @@
+{
+  "title": "03 · Automatic Prefix Caching",
+  "subtitle": "Reuse KV blocks of a shared 1,024-token system prompt across requests to slash TTFT",
+  "recommended_views": ["kv-cache", "timeline", "compare"],
+  "scenario": "scenario.yaml",
+  "num_requests": 8,
+  "rate": 2,
+  "prefix_tokens": 1024,
+  "prompt_tokens": 64,
+  "prompt_tokens_stdev": 0,
+  "prompt_tokens_min": 64,
+  "prompt_tokens_max": 64,
+  "output_tokens": 32,
+  "output_tokens_stdev": 0,
+  "output_tokens_min": 32,
+  "output_tokens_max": 32,
+  "seed": 42,
+  "compare_variant": {
+    "label": "Prefix Caching Disabled",
+    "scenario": "baseline.scenario.yaml"
+  }
+}

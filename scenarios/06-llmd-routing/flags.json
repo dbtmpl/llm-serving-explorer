@@ -1,0 +1,13 @@
+{
+  "title": "06 · llm-d Gateway Routing",
+  "subtitle": "Score 4 replicas with prefix-cache affinity + queue + KV utilization vs load-only routing",
+  "recommended_views": ["routing-gateway", "cluster-topology", "compare"],
+  "scenario": "scenario.yaml",
+  "workload_spec": "workload.yaml",
+  "num_instances": 4,
+  "seed": 42,
+  "compare_variant": {
+    "label": "Load-Only Routing (No Prefix Scorer)",
+    "scenario": "baseline.scenario.yaml"
+  }
+}

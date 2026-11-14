@@ -1,0 +1,21 @@
+{
+  "title": "02 · Continuous Batching vs Static Batching",
+  "subtitle": "See how iteration-level scheduling and mixed prefill+decode steps multiply decode throughput",
+  "recommended_views": ["batch-roofline", "timeline", "compare"],
+  "scenario": "scenario.yaml",
+  "num_requests": 12,
+  "rate": 40,
+  "prompt_tokens": 256,
+  "prompt_tokens_stdev": 0,
+  "prompt_tokens_min": 256,
+  "prompt_tokens_max": 256,
+  "output_tokens": 128,
+  "output_tokens_stdev": 0,
+  "output_tokens_min": 128,
+  "output_tokens_max": 128,
+  "seed": 42,
+  "compare_variant": {
+    "label": "Static Serialized (max_num_seqs=1)",
+    "scenario": "baseline.scenario.yaml"
+  }
+}
