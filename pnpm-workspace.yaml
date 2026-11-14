@@ -1,7 +1,2 @@
-packages:
-  - "schema"
-  - "tools/*"
-  - "web"
-
 allowBuilds:
   esbuild: true

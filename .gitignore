@@ -3,10 +3,6 @@ node_modules/
 dist/
 *.tsbuildinfo
 
-# Generated WASM build of the engine (built by `pnpm build:wasm`, too large to commit)
-/web/public/wasm/*.gz
-/web/public/wasm/blis.wasm*
-
 # Test output
 test-results/
 playwright-report/

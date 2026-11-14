@@ -17,53 +17,31 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
+      - uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v4
         with:
           version: 12
 
-      - name: Setup Node.js 22
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: pnpm
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: engine/go.mod
-          cache-dependency-path: engine/go.sum
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Apply engine patch
-        run: pnpm engine:patch
+      - name: Typecheck
+        run: pnpm typecheck
 
-      - name: Build browser WASM
-        run: pnpm build:wasm
-
-      # Only the packages the patch touches. Upstream's sim/workload tests need about
-      # 15 GB of memory, which is more than a hosted runner has.
-      - name: Run Go engine tests
-        working-directory: engine
-        run: go test ./sim ./sim/cluster
-
-      # The local-runner tests use this binary; building it here keeps their setup hook fast.
-      - name: Build native BLIS binary
-        working-directory: engine
-        run: go build -o /tmp/blis-local-runner .
-
-      - name: Typecheck web app
-        run: pnpm --filter @llm-viz/web typecheck
-
-      - name: Run unit and integration tests
+      - name: Unit tests
         run: pnpm test
 
-      - name: Build static site
+      - name: Build
         run: pnpm build
+
+      - name: Install Playwright browser
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: End-to-end tests
+        run: pnpm test:e2e

@@ -1,4 +1,0 @@
-[submodule "engine"]
-	path = engine
-	url = https://github.com/inference-sim/inference-sim.git
-	ignore = dirty
