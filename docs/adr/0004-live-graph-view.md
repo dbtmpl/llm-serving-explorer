@@ -32,7 +32,7 @@ The BLIS replay app is unchanged and reachable at `classic.html` ("BLIS replay" 
 
 ## Addendum (2026-11-14): hops, conversation store and a shared KV pool
 
-The first cut showed HBM → DRAM → SSD → dropped. The model now goes further: DRAM, SSD, remote pool", the reference notes, and the sheet "Where conversation state lives" say more, and the model now follows them:
+The first cut showed HBM → DRAM → SSD → dropped. The model now goes further:
 
 - **Hops.** The graph is ordered as the canonical turn: gateway and prompt assembly (hops 1 and 2), router (hop 3), admission and execution on the pod (hops 4 and 5), streaming back (hop 6). The earlier "tokenizer before gateway" order was wrong.
 - **Conversation store.** The text of every turn is the system of record; every KV tier is a derived copy. History is read from it on each turn and the finished turn is appended. A session whose KV is gone from every tier is prefilled again from text.
