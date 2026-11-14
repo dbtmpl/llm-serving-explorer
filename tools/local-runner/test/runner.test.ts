@@ -83,10 +83,10 @@ describe("local-runner HTTP server (live native BLIS)", () => {
   beforeAll(async () => {
     await resolveBlisBinary();
     serverHandle = await createLocalRunnerServer({ port: 0, timeoutMs: 60_000 });
-  }, 120_000);
+  }, 300_000);
 
   afterAll(async () => {
-    await serverHandle.close();
+    await serverHandle?.close();
   });
 
   it("GET /health reports native-blis and binary path", async () => {

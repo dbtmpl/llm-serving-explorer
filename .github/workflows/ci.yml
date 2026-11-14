@@ -54,6 +54,11 @@ jobs:
         working-directory: engine
         run: go test ./sim ./sim/cluster
 
+      # The local-runner tests use this binary; building it here keeps their setup hook fast.
+      - name: Build native BLIS binary
+        working-directory: engine
+        run: go build -o /tmp/blis-local-runner .
+
       - name: Typecheck web app
         run: pnpm --filter @llm-viz/web typecheck
 
