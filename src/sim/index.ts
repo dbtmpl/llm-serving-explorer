@@ -1,0 +1,27 @@
+/**
+ * Public interface of the simulation. The user interface imports from here and nowhere deeper.
+ */
+export { CITATIONS, citeMarkdown, type Citation, type CitationKey } from "./citations.js";
+export { CONCEPTS } from "./catalog.js";
+export type { ApproachMeta, Concept, Fidelity } from "./approach.js";
+
+export { DEFAULT_PARAMS, RESTART_KEYS, type Params, type Routing } from "./core/params.js";
+export type { KvEntry, Metrics, Pod, PodState, Req, Role, RouteDecision, Sample, Session, SimEvent, Stage, StepInfo, Tier, World } from "./core/types.js";
+export { createWorld, livePods, podLoad, replicaSpec } from "./core/world.js";
+
+export { GPUS, MODELS, type GpuSpec, type ModelSpec, type Precision, type ReplicaSpec } from "./hardware/catalog.js";
+export { attnFlops, flopsPerToken, recomputeRatio, seqLoad } from "./cost/flops.js";
+export { kvBytesPerToken, maxBatch, memoryBudget, weightBytes, type MemoryBudget } from "./cost/memory.js";
+export { ridge, stepCost, type StepCost, type StepLoad } from "./cost/roofline.js";
+export { decodeCurve } from "./cost/throughput.js";
+
+export { BLOCK_TOKENS, blocksFor } from "./kvcache/blocks.js";
+export { DISPLAY_CELLS, activeBlocks } from "./kvcache/hbm.js";
+export { tierBw, tierCapBlocks } from "./kvcache/tiers.js";
+
+export { spawnBurst } from "./workload/index.js";
+export { advance, setParam } from "./engine/tick.js";
+export { restartFleet } from "./engine/fleet.js";
+export { costPerMTok, kvFill, median, tokensPerSecond } from "./engine/selectors.js";
+
+export { ARCHITECTURES, DEFAULT_ARCH, type Architecture } from "./presets/architectures.js";

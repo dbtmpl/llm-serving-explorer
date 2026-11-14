@@ -1,0 +1,221 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`simulation behaviour snapshots > 70B on 4 GPUs, scale up and down 1`] = `
+{
+  "counters": {
+    "cachedTokens": 0,
+    "completed": 30,
+    "drops": 0,
+    "evictions": 0,
+    "failed": 0,
+    "gpuSeconds": 141.064,
+    "preemptions": 0,
+    "promptTokens": 92518,
+    "reloads": 0,
+    "tokensOut": 4962,
+  },
+  "events": 1017,
+  "hash": "3df82f25",
+  "meanTpot": 0.025526697,
+  "meanTtft": 3.703744739,
+  "pods": 0,
+}
+`;
+
+exports[`simulation behaviour snapshots > default stack, 30 sessions with follow-ups 1`] = `
+{
+  "counters": {
+    "cachedTokens": 212272,
+    "completed": 88,
+    "drops": 0,
+    "evictions": 0,
+    "failed": 0,
+    "gpuSeconds": 117.5,
+    "preemptions": 0,
+    "promptTokens": 312619,
+    "reloads": 0,
+    "tokensOut": 13588,
+  },
+  "events": 6437,
+  "hash": "4b21eb26",
+  "meanTpot": 0.011673341,
+  "meanTtft": 0.990429953,
+  "pods": 3,
+}
+`;
+
+exports[`simulation behaviour snapshots > disaggregated prefill/decode 1`] = `
+{
+  "counters": {
+    "cachedTokens": 62144,
+    "completed": 40,
+    "drops": 0,
+    "evictions": 0,
+    "failed": 0,
+    "gpuSeconds": 38.804,
+    "preemptions": 0,
+    "promptTokens": 123848,
+    "reloads": 0,
+    "tokensOut": 6390,
+  },
+  "events": 1174,
+  "hash": "173730b4",
+  "meanTpot": 0.012191579,
+  "meanTtft": 1.95548876,
+  "pods": 0,
+}
+`;
+
+exports[`simulation behaviour snapshots > least-loaded routing, no prefix cache 1`] = `
+{
+  "counters": {
+    "cachedTokens": 0,
+    "completed": 117,
+    "drops": 0,
+    "evictions": 0,
+    "failed": 0,
+    "gpuSeconds": 152.582,
+    "preemptions": 0,
+    "promptTokens": 438928,
+    "reloads": 0,
+    "tokensOut": 17798,
+  },
+  "events": 9878,
+  "hash": "f0ed309a",
+  "meanTpot": 0.012698116,
+  "meanTtft": 0.982097478,
+  "pods": 4,
+}
+`;
+
+exports[`simulation behaviour snapshots > load shedding with steady arrivals 1`] = `
+{
+  "counters": {
+    "cachedTokens": 14640,
+    "completed": 46,
+    "drops": 0,
+    "evictions": 0,
+    "failed": 120,
+    "gpuSeconds": 40,
+    "preemptions": 0,
+    "promptTokens": 175044,
+    "reloads": 0,
+    "tokensOut": 31189,
+  },
+  "events": 3869,
+  "hash": "65d6bc8e",
+  "meanTpot": 0.014206839,
+  "meanTtft": 5.305930524,
+  "pods": 1,
+}
+`;
+
+exports[`simulation behaviour snapshots > on-demand admission overload (preemption) 1`] = `
+{
+  "counters": {
+    "cachedTokens": 0,
+    "completed": 16,
+    "drops": 0,
+    "evictions": 5,
+    "failed": 0,
+    "gpuSeconds": 259.008,
+    "preemptions": 99,
+    "promptTokens": 552473,
+    "reloads": 0,
+    "tokensOut": 17691,
+  },
+  "events": 3217,
+  "hash": "d6531a7",
+  "meanTpot": 0.14713567,
+  "meanTtft": 50.073381019,
+  "pods": 0,
+}
+`;
+
+exports[`simulation behaviour snapshots > speculative decoding with overlap 1`] = `
+{
+  "counters": {
+    "cachedTokens": 92608,
+    "completed": 39,
+    "drops": 0,
+    "evictions": 0,
+    "failed": 0,
+    "gpuSeconds": 39.99,
+    "preemptions": 0,
+    "promptTokens": 130913,
+    "reloads": 0,
+    "tokensOut": 11070,
+  },
+  "events": 3283,
+  "hash": "784ffef7",
+  "meanTpot": 0.00444792,
+  "meanTtft": 0.884089583,
+  "pods": 1,
+}
+`;
+
+exports[`simulation behaviour snapshots > static batching, reserve to completion, round-robin 1`] = `
+{
+  "counters": {
+    "cachedTokens": 0,
+    "completed": 55,
+    "drops": 0,
+    "evictions": 0,
+    "failed": 0,
+    "gpuSeconds": 99.55,
+    "preemptions": 0,
+    "promptTokens": 190892,
+    "reloads": 0,
+    "tokensOut": 8340,
+  },
+  "events": 5303,
+  "hash": "83b14944",
+  "meanTpot": 0.010473685,
+  "meanTtft": 1.548186805,
+  "pods": 0,
+}
+`;
+
+exports[`simulation behaviour snapshots > tiers under pressure 1`] = `
+{
+  "counters": {
+    "cachedTokens": 605728,
+    "completed": 90,
+    "drops": 47,
+    "evictions": 67,
+    "failed": 0,
+    "gpuSeconds": 120,
+    "preemptions": 0,
+    "promptTokens": 2449534,
+    "reloads": 12,
+    "tokensOut": 3721,
+  },
+  "events": 2379,
+  "hash": "ec124dec",
+  "meanTpot": 0.237869155,
+  "meanTtft": 15.878568033,
+  "pods": 1,
+}
+`;
+
+exports[`simulation behaviour snapshots > whole-prompt admission 1`] = `
+{
+  "counters": {
+    "cachedTokens": 0,
+    "completed": 20,
+    "drops": 0,
+    "evictions": 0,
+    "failed": 0,
+    "gpuSeconds": 38.23,
+    "preemptions": 0,
+    "promptTokens": 393435,
+    "reloads": 0,
+    "tokensOut": 3269,
+  },
+  "events": 639,
+  "hash": "3d11bd2e",
+  "meanTpot": 0.061341173,
+  "meanTtft": 11.700461486,
+  "pods": 0,
+}
+`;

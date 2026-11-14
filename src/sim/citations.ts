@@ -1,0 +1,281 @@
+/**
+ * Every source this simulation is built on, in one place.
+ *
+ * Rule: no approach enters the simulation without an entry here. Modules refer to sources by key,
+ * so a citation is written once and the tables in the READMEs are generated from this file
+ * (`pnpm docs:sync`).
+ */
+
+export type CitationKind = "paper" | "docs" | "source" | "datasheet";
+
+export interface Citation {
+  /** Short reference used in prose and tables, e.g. "Kwon et al., SOSP 2023". */
+  short: string;
+  title: string;
+  kind: CitationKind;
+  /** Stable link: arXiv abstract, DOI, proceedings page, or project documentation. */
+  url: string;
+}
+
+export const CITATIONS = {
+  vaswani2017: {
+    short: "Vaswani et al., NeurIPS 2017",
+    title: "Attention Is All You Need",
+    kind: "paper",
+    url: "https://arxiv.org/abs/1706.03762"
+  },
+  kaplan2020: {
+    short: "Kaplan et al., 2020",
+    title: "Scaling Laws for Neural Language Models",
+    kind: "paper",
+    url: "https://arxiv.org/abs/2001.08361"
+  },
+  williams2009: {
+    short: "Williams et al., CACM 2009",
+    title: "Roofline: An Insightful Visual Performance Model for Multicore Architectures",
+    kind: "paper",
+    url: "https://doi.org/10.1145/1498765.1498785"
+  },
+  shoeybi2019: {
+    short: "Shoeybi et al., 2019",
+    title: "Megatron-LM: Training Multi-Billion Parameter Language Models Using Model Parallelism",
+    kind: "paper",
+    url: "https://arxiv.org/abs/1909.08053"
+  },
+  crankshaw2017: {
+    short: "Crankshaw et al., NSDI 2017",
+    title: "Clipper: A Low-Latency Online Prediction Serving System",
+    kind: "paper",
+    url: "https://arxiv.org/abs/1612.03079"
+  },
+  tritonBatcher: {
+    short: "NVIDIA Triton docs",
+    title: "Triton Inference Server: Batchers",
+    kind: "docs",
+    url: "https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/user_guide/batcher.html"
+  },
+  yu2022: {
+    short: "Yu et al., OSDI 2022",
+    title: "Orca: A Distributed Serving System for Transformer-Based Generative Models",
+    kind: "paper",
+    url: "https://www.usenix.org/conference/osdi22/presentation/yu"
+  },
+  kwon2023: {
+    short: "Kwon et al., SOSP 2023",
+    title: "Efficient Memory Management for Large Language Model Serving with PagedAttention",
+    kind: "paper",
+    url: "https://arxiv.org/abs/2309.06180"
+  },
+  agrawal2023: {
+    short: "Agrawal et al., 2023",
+    title: "SARATHI: Efficient LLM Inference by Piggybacking Decodes with Chunked Prefills",
+    kind: "paper",
+    url: "https://arxiv.org/abs/2308.16369"
+  },
+  agrawal2024: {
+    short: "Agrawal et al., OSDI 2024",
+    title: "Taming Throughput-Latency Tradeoff in LLM Inference with Sarathi-Serve",
+    kind: "paper",
+    url: "https://arxiv.org/abs/2403.02310"
+  },
+  zheng2023: {
+    short: "Zheng et al., 2023",
+    title: "SGLang: Efficient Execution of Structured Language Model Programs",
+    kind: "paper",
+    url: "https://arxiv.org/abs/2312.07104"
+  },
+  leviathan2023: {
+    short: "Leviathan et al., ICML 2023",
+    title: "Fast Inference from Transformers via Speculative Decoding",
+    kind: "paper",
+    url: "https://arxiv.org/abs/2211.17192"
+  },
+  gao2024: {
+    short: "Gao et al., USENIX ATC 2024",
+    title: "Cost-Efficient Large Language Model Serving for Multi-turn Conversations with CachedAttention",
+    kind: "paper",
+    url: "https://arxiv.org/abs/2403.19708"
+  },
+  qin2024: {
+    short: "Qin et al., FAST 2025",
+    title: "Mooncake: A KVCache-centric Disaggregated Architecture for LLM Serving",
+    kind: "paper",
+    url: "https://arxiv.org/abs/2407.00079"
+  },
+  lmcache2025: {
+    short: "Liu et al., 2025 (LMCache)",
+    title: "LMCache: An Efficient KV Cache Layer for Enterprise-Scale LLM Inference",
+    kind: "paper",
+    url: "https://arxiv.org/abs/2510.09665"
+  },
+  liu2023: {
+    short: "Liu et al., SIGCOMM 2024",
+    title: "CacheGen: KV Cache Compression and Streaming for Fast Large Language Model Serving",
+    kind: "paper",
+    url: "https://arxiv.org/abs/2310.07240"
+  },
+  yu2023: {
+    short: "Yu et al., 2023",
+    title: "Stateful Large Language Model Serving with Pensieve",
+    kind: "paper",
+    url: "https://arxiv.org/abs/2312.05516"
+  },
+  zhong2024: {
+    short: "Zhong et al., OSDI 2024",
+    title: "DistServe: Disaggregating Prefill and Decoding for Goodput-optimized Large Language Model Serving",
+    kind: "paper",
+    url: "https://arxiv.org/abs/2401.09670"
+  },
+  patel2023: {
+    short: "Patel et al., ISCA 2024",
+    title: "Splitwise: Efficient Generative LLM Inference Using Phase Splitting",
+    kind: "paper",
+    url: "https://arxiv.org/abs/2311.18677"
+  },
+  sun2024: {
+    short: "Sun et al., OSDI 2024",
+    title: "Llumnix: Dynamic Scheduling for Large Language Model Serving",
+    kind: "paper",
+    url: "https://arxiv.org/abs/2406.03243"
+  },
+  schroeder2006: {
+    short: "Schroeder et al., NSDI 2006",
+    title: "Open Versus Closed: A Cautionary Tale",
+    kind: "paper",
+    url: "https://www.usenix.org/conference/nsdi-06/presentation/open-versus-closed-cautionary-tale"
+  },
+  vllmScheduler: {
+    short: "vLLM source, scheduler.py",
+    title: "vLLM V1 scheduler (decode-first scheduling, preemption, no admission in a preempting step)",
+    kind: "source",
+    url: "https://github.com/vllm-project/vllm/blob/main/vllm/v1/core/sched/scheduler.py"
+  },
+  vllmSchedulerConfig: {
+    short: "vLLM source, config/scheduler.py",
+    title: "vLLM SchedulerConfig (max_num_seqs, max_num_batched_tokens)",
+    kind: "source",
+    url: "https://github.com/vllm-project/vllm/blob/main/vllm/config/scheduler.py"
+  },
+  vllmPrefixCaching: {
+    short: "vLLM docs, prefix caching",
+    title: "vLLM design: Automatic Prefix Caching",
+    kind: "docs",
+    url: "https://docs.vllm.ai/en/latest/design/prefix_caching.html"
+  },
+  vllmOptimization: {
+    short: "vLLM docs, optimization",
+    title: "vLLM: Optimization and Tuning (preemption, chunked prefill)",
+    kind: "docs",
+    url: "https://docs.vllm.ai/en/latest/configuration/optimization.html"
+  },
+  vllmEngineArgs: {
+    short: "vLLM docs, engine arguments",
+    title: "vLLM: Engine Arguments (gpu_memory_utilization, block_size)",
+    kind: "docs",
+    url: "https://docs.vllm.ai/en/latest/configuration/engine_args.html"
+  },
+  tensorrtLlm: {
+    short: "TensorRT-LLM docs",
+    title: "TensorRT-LLM: scheduler policies (GuaranteedNoEvict)",
+    kind: "docs",
+    url: "https://nvidia.github.io/TensorRT-LLM/"
+  },
+  llmdScheduling: {
+    short: "llm-d docs, router scheduling",
+    title: "llm-d architecture: router scheduling (filters, weighted scorers, picker)",
+    kind: "docs",
+    url: "https://github.com/llm-d/llm-d/blob/main/docs/architecture/router/scheduling.md"
+  },
+  llmdFlowControl: {
+    short: "llm-d docs, flow control",
+    title: "llm-d architecture: flow control (queueing, request TTL, eviction)",
+    kind: "docs",
+    url: "https://github.com/llm-d/llm-d/blob/main/docs/architecture/router/flow-control.md"
+  },
+  llmdDisaggregation: {
+    short: "llm-d docs, P/D disaggregation",
+    title: "llm-d architecture: prefill/decode disaggregation (decode-first decider)",
+    kind: "docs",
+    url: "https://github.com/llm-d/llm-d/blob/main/docs/architecture/disaggregation/pd-disaggregation.md"
+  },
+  llmdAutoscaling: {
+    short: "llm-d docs, autoscaling",
+    title: "llm-d architecture: autoscaling with KEDA on endpoint-picker metrics",
+    kind: "docs",
+    url: "https://github.com/llm-d/llm-d/blob/main/docs/architecture/autoscaling/keda-epp.md"
+  },
+  llmdKvOffloader: {
+    short: "llm-d docs, KV offloader",
+    title: "llm-d architecture: KV offloading to CPU memory and storage",
+    kind: "docs",
+    url: "https://github.com/llm-d/llm-d/blob/main/docs/architecture/kv-management/kv-offloader.md"
+  },
+  gatewayInferenceExtension: {
+    short: "Gateway API Inference Extension",
+    title: "Kubernetes Gateway API Inference Extension (endpoint picker)",
+    kind: "source",
+    url: "https://github.com/kubernetes-sigs/gateway-api-inference-extension"
+  },
+  envoyLoadBalancing: {
+    short: "Envoy docs, load balancers",
+    title: "Envoy: supported load balancers (round robin, least request)",
+    kind: "docs",
+    url: "https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/load_balancers"
+  },
+  knativeAutoscaling: {
+    short: "Knative docs, autoscaling",
+    title: "Knative Serving: autoscaling concepts (target concurrency)",
+    kind: "docs",
+    url: "https://knative.dev/docs/serving/autoscaling/autoscaling-concepts/"
+  },
+  dynamoKvbm: {
+    short: "NVIDIA Dynamo docs",
+    title: "NVIDIA Dynamo: KV block manager and tiered KV storage",
+    kind: "docs",
+    url: "https://docs.nvidia.com/dynamo/latest/"
+  },
+  llama31Card: {
+    short: "Meta, Llama 3.1 8B model card",
+    title: "meta-llama/Llama-3.1-8B-Instruct (architecture in config.json)",
+    kind: "datasheet",
+    url: "https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct"
+  },
+  llama370Card: {
+    short: "Meta, Llama 3 70B model card",
+    title: "meta-llama/Meta-Llama-3-70B-Instruct (architecture in config.json)",
+    kind: "datasheet",
+    url: "https://huggingface.co/meta-llama/Meta-Llama-3-70B-Instruct"
+  },
+  nvidiaH100: {
+    short: "NVIDIA H100 datasheet",
+    title: "NVIDIA H100 Tensor Core GPU",
+    kind: "datasheet",
+    url: "https://www.nvidia.com/en-us/data-center/h100/"
+  },
+  nvidiaH200: {
+    short: "NVIDIA H200 datasheet",
+    title: "NVIDIA H200 Tensor Core GPU",
+    kind: "datasheet",
+    url: "https://www.nvidia.com/en-us/data-center/h200/"
+  },
+  nvidiaB200: {
+    short: "NVIDIA DGX B200 datasheet",
+    title: "NVIDIA DGX B200 (Blackwell B200)",
+    kind: "datasheet",
+    url: "https://www.nvidia.com/en-us/data-center/dgx-b200/"
+  },
+  amdMi300x: {
+    short: "AMD Instinct MI300X datasheet",
+    title: "AMD Instinct MI300X Accelerator",
+    kind: "datasheet",
+    url: "https://www.amd.com/en/products/accelerators/instinct/mi300/mi300x.html"
+  }
+} as const satisfies Record<string, Citation>;
+
+export type CitationKey = keyof typeof CITATIONS;
+
+/** Markdown link for one source: `[Kwon et al., SOSP 2023](https://arxiv.org/abs/2309.06180)`. */
+export function citeMarkdown(key: CitationKey): string {
+  const c = CITATIONS[key];
+  return `[${c.short}](${c.url})`;
+}

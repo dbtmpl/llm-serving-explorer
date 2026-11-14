@@ -1,6 +1,6 @@
 # Design choices, and where sources disagree
 
-The simulation (`src/live/`) is a teaching model. This page records, per topic, what the sources say, where they differ, and which reading the model takes. Checked on 2026-11-14 against reference notes, the vLLM docs, the llm-d dev docs, NVIDIA Dynamo's KVBM docs and the papers named below. Version-dependent facts are marked.
+The simulation (`src/sim/`) is a teaching model. This page records, per topic, what the sources say, where they differ, and which reading the model takes. Checked on 2026-11-14 against reference notes, the vLLM docs, the llm-d dev docs, NVIDIA Dynamo's KVBM docs and the papers named below. Version-dependent facts are marked.
 
 ## Engine
 

@@ -1,0 +1,120 @@
+/**
+ * Workload: who sends requests, how long they are, and what happens between turns.
+ *
+ * Sessions are closed-loop: a user sends a turn, waits for the whole answer, thinks, and only
+ * then sends the next one, so load depends on how fast the system answers (Schroeder et al.,
+ * NSDI 2006, on closed versus open workload models). New sessions can also arrive open-loop at a
+ * fixed rate. Each follow-up turn re-sends the whole conversation, which is what makes prefix
+ * caching and KV tiering matter (Gao et al., USENIX ATC 2024).
+ *
+ * Lengths are drawn uniformly around the configured means. Real length distributions are
+ * heavy-tailed; uniform keeps a small scene readable. Illustrative, not fitted to a trace.
+ */
+import type { ApproachMeta, Concept } from "../approach.js";
+import { emit, rand } from "../core/world.js";
+import type { Req, Session, World } from "../core/types.js";
+import { FRONTEND_HOPS } from "./frontend.js";
+
+/** Uniform ranges, as multiples of the configured mean. */
+export const LENGTH_JITTER = {
+  firstPrompt: [0.6, 1.4],
+  followUp: [0.4, 1.6],
+  output: [0.5, 1.5]
+} as const satisfies Record<string, readonly [number, number]>;
+
+/** Think time is uniform in [0.5, 1.5) times the configured mean. */
+export const THINK_TIME_JITTER = { min: 0.5, span: 1 } as const;
+
+/** A request produces at least a first token and one more, so that time per output token is defined. */
+export const MIN_OUTPUT_TOKENS = 2;
+
+/** Sessions of one burst are spread by up to this many seconds so they do not arrive in one tick. */
+export const BURST_ARRIVAL_JITTER_S = 0.02;
+
+/** Sessions kept in memory. Beyond this, idle ones are forgotten in batches. */
+export const MAX_SESSIONS = 12000;
+export const SESSION_PRUNE_BATCH = 200;
+
+/** Successive session colours are a golden angle apart, so neighbours never look alike. */
+export const HUE_STEP_DEGREES = 137.508;
+
+/** Number of sample prompts the interface can show for a request. */
+export const SAMPLE_PROMPTS = 1000;
+
+export const closedLoopSessions: ApproachMeta = {
+  id: "closed-loop-sessions",
+  name: "Closed-loop multi-turn sessions",
+  summary: "Users wait for an answer, think, then re-send the whole conversation plus a new message.",
+  citations: ["schroeder2006", "gao2024"],
+  fidelity: "simplified"
+};
+
+export const WORKLOAD: Concept = {
+  module: "workload",
+  title: "Workload",
+  question: "Who sends requests, how long are they, and what happens between turns?",
+  approaches: [closedLoopSessions]
+};
+
+const uniform = (w: World, [lo, hi]: readonly [number, number]): number => lo + rand(w) * (hi - lo);
+
+/** Schedule `n` new sessions, each sending one request, spread over `over` simulated seconds. */
+export function spawnBurst(w: World, n: number, over = 0): void {
+  for (let i = 0; i < n; i++) w.pending.push(w.t + (n > 1 ? (over * i) / (n - 1) : 0) + rand(w) * BURST_ARRIVAL_JITTER_S);
+  w.pending.sort((a, b) => a - b);
+}
+
+export function newSession(w: World): void {
+  const id = w.nextId++;
+  const s: Session = { id, hue: (id * HUE_STEP_DEGREES) % 360, turn: 0, ctxTokens: 0, reqId: null, state: "active", nextTurnAt: 0, born: w.t, lastPod: -1, lastTtft: 0, lastTpot: 0 };
+  w.sessions.set(id, s);
+  emit(w, "session.new", { sid: id });
+  newRequest(w, s);
+  if (w.sessions.size > MAX_SESSIONS) {
+    for (const old of w.sessions.values()) {
+      if (old.state === "idle") {
+        w.sessions.delete(old.id);
+        if (w.sessions.size <= MAX_SESSIONS - SESSION_PRUNE_BATCH) break;
+      }
+    }
+  }
+}
+
+/** The session's next turn: its whole history plus a new message. */
+export function newRequest(w: World, s: Session): void {
+  const p = w.params;
+  const fresh = s.turn === 0 ? Math.round(p.promptTokens * uniform(w, LENGTH_JITTER.firstPrompt)) : Math.max(1, Math.round(p.followTokens * uniform(w, LENGTH_JITTER.followUp)));
+  const r: Req = {
+    id: w.nextId++,
+    sid: s.id,
+    lIn: Math.max(1, s.ctxTokens + fresh),
+    newTokens: fresh,
+    lOut: Math.max(MIN_OUTPUT_TOKENS, Math.round(p.outputTokens * uniform(w, LENGTH_JITTER.output))),
+    stage: "send",
+    stageStart: w.t,
+    stageEnd: w.t + FRONTEND_HOPS.send,
+    podId: -1,
+    prefillDone: 0,
+    prefillTarget: 0,
+    cached: 0,
+    out: 0,
+    tCreate: w.t,
+    tFirst: 0,
+    admitT: 0,
+    preemptions: 0,
+    promptIdx: Math.floor(rand(w) * SAMPLE_PROMPTS),
+    kvReady: 0,
+    counted: false,
+    fromPod: -1
+  };
+  w.reqs.set(r.id, r);
+  s.reqId = r.id;
+  s.state = "active";
+  emit(w, "req.new", { sid: s.id, reqId: r.id, lIn: r.lIn, turn: s.turn });
+  if (s.turn > 0) emit(w, "req.followup", { sid: s.id, reqId: r.id, turn: s.turn + 1, history: s.ctxTokens, fresh });
+}
+
+/** Seconds until a session that will return sends its next turn. */
+export function thinkSeconds(w: World): number {
+  return w.params.thinkTimeS * (THINK_TIME_JITTER.min + THINK_TIME_JITTER.span * rand(w));
+}

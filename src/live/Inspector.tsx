@@ -1,8 +1,8 @@
 /** "Dive in" panel: the selected component explained with its live numbers. */
 import type { ReactNode } from "react";
-import { BLOCK_TOKENS, attnFlops, decodeCurve, flopsPerToken, fmtGB, fmtInt, fmtMs, kvBytesPerToken, maxBatch, recomputeRatio, ridge, seqLoad, weightBytes } from "./model.js";
+import { BLOCK_TOKENS, attnFlops, decodeCurve, flopsPerToken, kvBytesPerToken, livePods, maxBatch, recomputeRatio, replicaSpec, ridge, seqLoad, tierBw, tierCapBlocks, weightBytes, type Pod, type World } from "../sim/index.js";
+import { fmtGB, fmtInt, fmtMs } from "./format.js";
 import { C, PROMPTS, pieces, sessionColor, sessionStatus, type Target } from "./render.js";
-import { livePods, tierBw, replicaSpec, tierCapBlocks, type Pod, type World } from "./sim.js";
 
 const Row = ({ k, v }: { k: ReactNode; v: ReactNode }) => (
   <div className="lv-row">

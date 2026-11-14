@@ -2,8 +2,8 @@
  * Canvas scene for the live view: one graph (sessions -> tokenizer -> router -> pods) that grows as
  * requests reach each stage. It only reads the World; it never changes simulation state.
  */
-import { GPUS, ridge, fmtInt, weightBytes } from "./model.js";
-import { CELLS, tierCapBlocks, type Pod, type Req, type Session, type SimEvent, type World } from "./sim.js";
+import { fmtInt } from "./format.js";
+import { DISPLAY_CELLS as CELLS, GPUS, ridge, tierCapBlocks, weightBytes, type Pod, type Req, type Session, type SimEvent, type World } from "../sim/index.js";
 
 export const C = {
   ink: "#0f172a",
