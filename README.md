@@ -13,14 +13,16 @@
   <img alt="Static site" src="https://img.shields.io/badge/Backend-none-1BC070">
 </p>
 
-LLM Serving Explorer is an interactive, animated explanation of how a modern inference stack such as [vLLM](https://github.com/vllm-project/vllm) behind [llm-d](https://github.com/llm-d/llm-d) serves requests. A single graph starts empty and grows as requests arrive: text becomes tokens, the router picks a pod, the engine batches work step by step, and KV-cache blocks fill, move and get evicted on the GPU. It runs in slow motion in your browser, explains each event where it happens, and lets you change the model, hardware and policies while requests are in flight.
+LLM Serving Explorer is an interactive, animated explanation of how a modern inference stack serves requests. A single graph starts empty and grows as requests arrive: text becomes tokens, the router picks a pod, the engine batches work step by step, and KV-cache blocks fill, move and get evicted on the GPU. It runs in slow motion in your browser, explains each event where it happens, and lets you change the model, hardware and policies while requests are in flight.
+
+The simulation is an independent TypeScript model that runs entirely in the browser. It re-implements the scheduling and memory behaviour of [vLLM](https://github.com/vllm-project/vllm) (continuous batching, chunked prefill, paged KV blocks, block-level prefix caching, preemption by recompute) and the routing and prefill/decode design of [llm-d](https://github.com/llm-d/llm-d), as described in their documentation and, for key rules, checked against the vLLM source. Step times come from closed-form roofline formulas. It does not run vLLM or llm-d code and is not calibrated against a real deployment or a simulator, so the mechanisms follow the real systems while absolute numbers are indicative. See [How accurate is it?](#how-accurate-is-it)
 
 <p align="center">
-  <img alt="Demo: one request, then ten, then a hundred, with pods scaling up" src="docs/assets/demo.webp" width="100%">
+  <img alt="Demo: ten requests on one pod, then a thousand at once with pods scaling up" src="docs/assets/demo.webp" width="100%">
 </p>
 
 <p align="center">
-  <a href="docs/assets/demo.mp4">Watch the demo as a video</a>
+  <a href="docs/assets/demo.mp4">Watch the demo in full HD (1080p, 60 fps)</a>
 </p>
 
 ## About
