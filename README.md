@@ -5,6 +5,10 @@
 </p>
 
 <p align="center">
+  <a href="https://dbtmpl.github.io/llm-serving-explorer/"><b>Open the live site</b></a>
+</p>
+
+<p align="center">
   <a href="https://github.com/dbtmpl/llm-serving-explorer/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/dbtmpl/llm-serving-explorer/actions/workflows/ci.yml/badge.svg"></a>
   <a href="./LICENSE"><img alt="License" src="https://img.shields.io/badge/License-Apache_2.0-blue.svg"></a>
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white">
