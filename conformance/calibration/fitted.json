@@ -1,0 +1,237 @@
+{
+  "method": "Coordinate search in log space from the site's defaults. Loss: mean over calibration scenarios of (mean over requests of ln(ttft_ts/ttft_blis)^2 + ln(tpot_ts/tpot_blis)^2) / 2. Step ratios 2, 1.5, 1.25, 1.1, 1.05, 1.02; at each ratio, per parameter in the order mbu, mfu, hostMsBase, hostMsPerSeq, try value * ratio^j for j = -3..3 within bounds, keep the best, repeat until a sweep gains less than 1e-6. Bounds: mbu, mfu in [0.05, 1]; hostMsBase in [0.01, 50]; hostMsPerSeq in [0.001, 5]. specCost and linkGbps are then fitted alone by the same search (bounds [0, 1] and [1, 2000]), with the four parameters held.",
+  "blisCommit": "c79c745619b16a8019339e3bbc79ee5e2923b258",
+  "pairs": {
+    "llama-3.1-8b/b200/tp1": {
+      "model": "llama-3.1-8b",
+      "gpu": "b200",
+      "tp": 1,
+      "timing": {
+        "mbu": 0.6,
+        "mfu": 0.681818,
+        "hostMsBase": 1.16219,
+        "hostMsPerSeq": 0.00713199
+      },
+      "defaults": {
+        "mbu": 0.6,
+        "mfu": 0.5,
+        "hostMsBase": 1.5,
+        "hostMsPerSeq": 0.05
+      },
+      "lossAtDefaults": 0.0438953,
+      "lossAtFit": 0.0229969,
+      "residuals": [
+        {
+          "scenario": "calib-8b-b200-batch16",
+          "ttftMean": -0.215098,
+          "tpotMean": -0.0256742
+        },
+        {
+          "scenario": "calib-8b-b200-batch16-long",
+          "ttftMean": 0.153737,
+          "tpotMean": 0.0870304
+        },
+        {
+          "scenario": "calib-8b-b200-batch4",
+          "ttftMean": -0.223732,
+          "tpotMean": -0.0394001
+        },
+        {
+          "scenario": "calib-8b-b200-batch48",
+          "ttftMean": -0.170765,
+          "tpotMean": 0.0000805834
+        },
+        {
+          "scenario": "calib-8b-b200-isolated",
+          "ttftMean": 0.0921439,
+          "tpotMean": -0.0400311
+        }
+      ],
+      "residualsAtDefaults": [
+        {
+          "scenario": "calib-8b-b200-batch16",
+          "ttftMean": -0.144313,
+          "tpotMean": 0.159261
+        },
+        {
+          "scenario": "calib-8b-b200-batch16-long",
+          "ttftMean": 0.385227,
+          "tpotMean": 0.281061
+        },
+        {
+          "scenario": "calib-8b-b200-batch4",
+          "ttftMean": -0.172284,
+          "tpotMean": 0.0643597
+        },
+        {
+          "scenario": "calib-8b-b200-batch48",
+          "ttftMean": -0.0749174,
+          "tpotMean": 0.346053
+        },
+        {
+          "scenario": "calib-8b-b200-isolated",
+          "ttftMean": 0.261879,
+          "tpotMean": 0.0372235
+        }
+      ]
+    },
+    "llama-3.1-8b/h100/tp1": {
+      "model": "llama-3.1-8b",
+      "gpu": "h100",
+      "tp": 1,
+      "timing": {
+        "mbu": 0.6,
+        "mfu": 0.666667,
+        "hostMsBase": 1.44,
+        "hostMsPerSeq": 0.00569372
+      },
+      "defaults": {
+        "mbu": 0.6,
+        "mfu": 0.5,
+        "hostMsBase": 1.5,
+        "hostMsPerSeq": 0.05
+      },
+      "lossAtDefaults": 0.0793852,
+      "lossAtFit": 0.0228158,
+      "residuals": [
+        {
+          "scenario": "calib-8b-h100-batch16",
+          "ttftMean": -0.191384,
+          "tpotMean": -0.00564993
+        },
+        {
+          "scenario": "calib-8b-h100-batch16-long",
+          "ttftMean": 0.226102,
+          "tpotMean": 0.0867166
+        },
+        {
+          "scenario": "calib-8b-h100-batch4",
+          "ttftMean": -0.195497,
+          "tpotMean": -0.00829372
+        },
+        {
+          "scenario": "calib-8b-h100-batch48",
+          "ttftMean": -0.158259,
+          "tpotMean": -0.000520809
+        },
+        {
+          "scenario": "calib-8b-h100-isolated",
+          "ttftMean": 0.188296,
+          "tpotMean": -0.00696281
+        }
+      ],
+      "residualsAtDefaults": [
+        {
+          "scenario": "calib-8b-h100-batch16",
+          "ttftMean": -0.105688,
+          "tpotMean": 0.0754871
+        },
+        {
+          "scenario": "calib-8b-h100-batch16-long",
+          "ttftMean": 1.13125,
+          "tpotMean": 0.185569
+        },
+        {
+          "scenario": "calib-8b-h100-batch4",
+          "ttftMean": -0.0980178,
+          "tpotMean": 0.0195628
+        },
+        {
+          "scenario": "calib-8b-h100-batch48",
+          "ttftMean": -0.0473615,
+          "tpotMean": 0.174381
+        },
+        {
+          "scenario": "calib-8b-h100-isolated",
+          "ttftMean": 0.43339,
+          "tpotMean": 0.00379287
+        }
+      ],
+      "specCost": {
+        "value": 0.0001,
+        "defaultValue": 0.04,
+        "scenario": "calib-8b-h100-spec",
+        "residualTpot": 0.0170449
+      },
+      "linkGbps": {
+        "value": 323.81,
+        "defaultValue": 100,
+        "scenario": "calib-8b-h100-pd",
+        "residualKvTransfer": 0.00125206
+      }
+    },
+    "llama-70b/h200/tp4": {
+      "model": "llama-70b",
+      "gpu": "h200",
+      "tp": 4,
+      "timing": {
+        "mbu": 0.980392,
+        "mfu": 0.463636,
+        "hostMsBase": 9.91736,
+        "hostMsPerSeq": 0.0589457
+      },
+      "defaults": {
+        "mbu": 0.6,
+        "mfu": 0.5,
+        "hostMsBase": 1.5,
+        "hostMsPerSeq": 0.05
+      },
+      "lossAtDefaults": 0.149187,
+      "lossAtFit": 0.0254718,
+      "residuals": [
+        {
+          "scenario": "calib-70b-h200-batch16",
+          "ttftMean": -0.138453,
+          "tpotMean": 0.00325498
+        },
+        {
+          "scenario": "calib-70b-h200-batch16-long",
+          "ttftMean": 0.343883,
+          "tpotMean": -0.00956102
+        },
+        {
+          "scenario": "calib-70b-h200-batch4",
+          "ttftMean": -0.152643,
+          "tpotMean": 0.0140883
+        },
+        {
+          "scenario": "calib-70b-h200-batch48",
+          "ttftMean": 0.0590938,
+          "tpotMean": -0.0149565
+        },
+        {
+          "scenario": "calib-70b-h200-isolated",
+          "ttftMean": 0.152348,
+          "tpotMean": 0.0154831
+        }
+      ],
+      "residualsAtDefaults": [
+        {
+          "scenario": "calib-70b-h200-batch16",
+          "ttftMean": -0.472348,
+          "tpotMean": -0.187718
+        },
+        {
+          "scenario": "calib-70b-h200-batch16-long",
+          "ttftMean": 0.176286,
+          "tpotMean": -0.13147
+        },
+        {
+          "scenario": "calib-70b-h200-batch4",
+          "ttftMean": -0.288338,
+          "tpotMean": -0.193618
+        },
+        {
+          "scenario": "calib-70b-h200-batch48",
+          "ttftMean": -0.558163,
+          "tpotMean": -0.176917
+        },
+        {
+          "scenario": "calib-70b-h200-isolated",
+          "ttftMean": 0.0538525,
+          "tpotMean": -0.195501
+        }
+      ]
+    }
+  }
+}

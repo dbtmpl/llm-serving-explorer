@@ -1,0 +1,23 @@
+id: calib-8b-h100-spec
+title: Calibration data, speculative decoding, Llama 3.1 8B on one H100
+role: calibration
+# Four requests 15 s apart, each alone on the engine and each prompt in one prefill step, with 4 draft tokens per step and 3.0 tokens accepted per
+# step on average. The fit sets the draft cost (`specCost`) so that the time per token matches BLIS's, which prices its n-gram drafter at nothing.
+model: llama-3.1-8b
+gpu: h100
+engine:
+  tp: 1
+  gpu_memory_utilisation: 0.9
+  max_num_seqs: 64
+  max_num_batched_tokens: 8192
+  block_size: 16
+  prefix_caching: true
+replicas: 1
+routing: round-robin
+speculative: { k: 4, acceptance_length: 3.0 }
+requests:
+  - { session: 1, at: 1.0, turns: [[128, 200]] }
+  - { session: 2, at: 16.0, turns: [[512, 200]] }
+  - { session: 3, at: 31.0, turns: [[2048, 200]] }
+  - { session: 4, at: 46.0, turns: [[4096, 200]] }
+checks: []

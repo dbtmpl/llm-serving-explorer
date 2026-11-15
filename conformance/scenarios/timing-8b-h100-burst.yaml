@@ -1,0 +1,92 @@
+id: timing-8b-h100-burst
+title: Held-out timing, Llama 3.1 8B on one H100, thirty-two requests at the same instant
+# Held out from the calibration set, which staggers its arrivals: 32 requests with 1,500-token prompts and 200-token answers all arrive at the same instant, so the engine takes a burst of prefills and then decodes 32 sequences together.
+model: llama-3.1-8b
+gpu: h100
+engine:
+  tp: 1
+  gpu_memory_utilisation: 0.9
+  max_num_seqs: 64
+  max_num_batched_tokens: 8192
+  block_size: 16
+  prefix_caching: true
+replicas: 1
+routing: round-robin
+requests:
+  - { session: 1, at: 1.00, turns: [[1500, 200]] }
+  - { session: 2, at: 1.00, turns: [[1500, 200]] }
+  - { session: 3, at: 1.00, turns: [[1500, 200]] }
+  - { session: 4, at: 1.00, turns: [[1500, 200]] }
+  - { session: 5, at: 1.00, turns: [[1500, 200]] }
+  - { session: 6, at: 1.00, turns: [[1500, 200]] }
+  - { session: 7, at: 1.00, turns: [[1500, 200]] }
+  - { session: 8, at: 1.00, turns: [[1500, 200]] }
+  - { session: 9, at: 1.00, turns: [[1500, 200]] }
+  - { session: 10, at: 1.00, turns: [[1500, 200]] }
+  - { session: 11, at: 1.00, turns: [[1500, 200]] }
+  - { session: 12, at: 1.00, turns: [[1500, 200]] }
+  - { session: 13, at: 1.00, turns: [[1500, 200]] }
+  - { session: 14, at: 1.00, turns: [[1500, 200]] }
+  - { session: 15, at: 1.00, turns: [[1500, 200]] }
+  - { session: 16, at: 1.00, turns: [[1500, 200]] }
+  - { session: 17, at: 1.00, turns: [[1500, 200]] }
+  - { session: 18, at: 1.00, turns: [[1500, 200]] }
+  - { session: 19, at: 1.00, turns: [[1500, 200]] }
+  - { session: 20, at: 1.00, turns: [[1500, 200]] }
+  - { session: 21, at: 1.00, turns: [[1500, 200]] }
+  - { session: 22, at: 1.00, turns: [[1500, 200]] }
+  - { session: 23, at: 1.00, turns: [[1500, 200]] }
+  - { session: 24, at: 1.00, turns: [[1500, 200]] }
+  - { session: 25, at: 1.00, turns: [[1500, 200]] }
+  - { session: 26, at: 1.00, turns: [[1500, 200]] }
+  - { session: 27, at: 1.00, turns: [[1500, 200]] }
+  - { session: 28, at: 1.00, turns: [[1500, 200]] }
+  - { session: 29, at: 1.00, turns: [[1500, 200]] }
+  - { session: 30, at: 1.00, turns: [[1500, 200]] }
+  - { session: 31, at: 1.00, turns: [[1500, 200]] }
+  - { session: 32, at: 1.00, turns: [[1500, 200]] }
+checks:
+  - id: ttft-mean
+    claim: Mean time to first token agrees with BLIS after calibration.
+    kind: calibrated
+    metric: ttft_mean_s
+    rel_tol: 0.30
+    tolerance: "30 percent: the fit leaves up to 34 percent in time to first token on its own calibration scenarios (BLIS's per-request front-end overhead and its prefill efficiency are not a roofline), so a held-out value within 30 percent shows the fit generalises as well as it fits."
+    known_difference:
+      reason: >-
+        Two things differ and both are visible in the per-request times (run `pnpm conformance:report timing-8b-h100-burst`; BLIS rows are in the reference).
+        First, BLIS passes each request through an admission queue (a tokeniser pool with a per-token service time and a fixed delay,
+        docs/guide/latency-models.md in inference-sim), so requests that arrive together reach its engine one after another: its first request is prefilled
+        alone and sees its first token after 75 ms, where the TypeScript model's front end tokenises all 32 at once and its first step already carries
+        5 prompts (8,192 tokens) and ends after 242 ms. Second, a full 8,192-token prefill step takes about 139 ms in BLIS (steps between the groups of
+        prompts it batches: 362 ms less 223 ms) and about 206 ms in the TypeScript model (448 ms less 242 ms): the fitted MFU of 0.667 is a compromise
+        between BLIS's short prompts (the TypeScript model is faster than BLIS on 128 tokens: 41 against 52 ms) and its long ones (slower on 8,000: 284 against 214 ms, calibration
+        scenario calib-8b-h100-isolated), because a single efficiency factor cannot bend like BLIS's size-dependent prefill cost. A burst is a queue of full prefill
+        steps, so it sits on the steep end. The result is 39 percent more mean time to first token. Decoding agrees (time per token +6.3 percent, end to end +11.6 percent, both inside tolerance).
+      differences:
+        value: { typescript: 0.7586, blis: 0.5452 }
+  - id: tpot-mean
+    claim: Mean time per output token agrees with BLIS after calibration.
+    kind: calibrated
+    metric: tpot_mean_s
+    rel_tol: 0.12
+    tolerance: "12 percent: the fit leaves up to 9 percent in time per token on its calibration scenarios (long contexts are the worst), so 12 percent allows for a different batch size and context length without admitting a wrong functional form."
+  - id: e2e-mean
+    claim: Mean end-to-end time agrees with BLIS after calibration.
+    kind: calibrated
+    metric: e2e_mean_s
+    rel_tol: 0.15
+    tolerance: "15 percent: end-to-end time is dominated by decoding (about 95 percent of it), so it should follow the time per token with a small addition from time to first token."
+  - id: throughput
+    claim: Output tokens per second over the run agree with BLIS after calibration.
+    kind: calibrated
+    metric: throughput_tokens_per_s
+    rel_tol: 0.10
+    tolerance: "10 percent: the load is open loop, so throughput over the run is the offered token rate plus the tail of the last answers; it differs only through the tail."
+    known_difference:
+      reason: >-
+        The same cause as in ttft-mean, seen from the other side: the burst's 32 prompts take longer to prefill in the TypeScript model (full 8,192-token prefill
+        steps of 206 ms against BLIS's 139 ms), so the 6,400 generated tokens are spread over a longer span (the run ends later), and throughput is 10.3 percent lower,
+        just outside the 10 percent tolerance. Decoding itself is within tolerance (time per token +6.3 percent).
+      differences:
+        value: { typescript: 1678, blis: 1870 }

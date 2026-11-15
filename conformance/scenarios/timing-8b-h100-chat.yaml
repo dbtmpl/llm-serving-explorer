@@ -1,0 +1,80 @@
+id: timing-8b-h100-chat
+title: Held-out timing, Llama 3.1 8B on one H100, chat-like load
+# Held out from the calibration set: 40 requests 0.4 s apart with prompts of 300 to 3,500 tokens and answers of 60 to 400, so the batch varies between 1 and about 10 and prompts overlap with decodes.
+model: llama-3.1-8b
+gpu: h100
+engine:
+  tp: 1
+  gpu_memory_utilisation: 0.9
+  max_num_seqs: 64
+  max_num_batched_tokens: 8192
+  block_size: 16
+  prefix_caching: true
+replicas: 1
+routing: round-robin
+requests:
+  - { session: 1, at: 1.00, turns: [[300, 120]] }
+  - { session: 2, at: 1.40, turns: [[1500, 250]] }
+  - { session: 3, at: 1.80, turns: [[700, 60]] }
+  - { session: 4, at: 2.20, turns: [[3500, 400]] }
+  - { session: 5, at: 2.60, turns: [[900, 180]] }
+  - { session: 6, at: 3.00, turns: [[2200, 90]] }
+  - { session: 7, at: 3.40, turns: [[300, 120]] }
+  - { session: 8, at: 3.80, turns: [[1500, 250]] }
+  - { session: 9, at: 4.20, turns: [[700, 60]] }
+  - { session: 10, at: 4.60, turns: [[3500, 400]] }
+  - { session: 11, at: 5.00, turns: [[900, 180]] }
+  - { session: 12, at: 5.40, turns: [[2200, 90]] }
+  - { session: 13, at: 5.80, turns: [[300, 120]] }
+  - { session: 14, at: 6.20, turns: [[1500, 250]] }
+  - { session: 15, at: 6.60, turns: [[700, 60]] }
+  - { session: 16, at: 7.00, turns: [[3500, 400]] }
+  - { session: 17, at: 7.40, turns: [[900, 180]] }
+  - { session: 18, at: 7.80, turns: [[2200, 90]] }
+  - { session: 19, at: 8.20, turns: [[300, 120]] }
+  - { session: 20, at: 8.60, turns: [[1500, 250]] }
+  - { session: 21, at: 9.00, turns: [[700, 60]] }
+  - { session: 22, at: 9.40, turns: [[3500, 400]] }
+  - { session: 23, at: 9.80, turns: [[900, 180]] }
+  - { session: 24, at: 10.20, turns: [[2200, 90]] }
+  - { session: 25, at: 10.60, turns: [[300, 120]] }
+  - { session: 26, at: 11.00, turns: [[1500, 250]] }
+  - { session: 27, at: 11.40, turns: [[700, 60]] }
+  - { session: 28, at: 11.80, turns: [[3500, 400]] }
+  - { session: 29, at: 12.20, turns: [[900, 180]] }
+  - { session: 30, at: 12.60, turns: [[2200, 90]] }
+  - { session: 31, at: 13.00, turns: [[300, 120]] }
+  - { session: 32, at: 13.40, turns: [[1500, 250]] }
+  - { session: 33, at: 13.80, turns: [[700, 60]] }
+  - { session: 34, at: 14.20, turns: [[3500, 400]] }
+  - { session: 35, at: 14.60, turns: [[900, 180]] }
+  - { session: 36, at: 15.00, turns: [[2200, 90]] }
+  - { session: 37, at: 15.40, turns: [[300, 120]] }
+  - { session: 38, at: 15.80, turns: [[1500, 250]] }
+  - { session: 39, at: 16.20, turns: [[700, 60]] }
+  - { session: 40, at: 16.60, turns: [[3500, 400]] }
+checks:
+  - id: ttft-mean
+    claim: Mean time to first token agrees with BLIS after calibration.
+    kind: calibrated
+    metric: ttft_mean_s
+    rel_tol: 0.30
+    tolerance: "30 percent: the fit leaves up to 34 percent in time to first token on its own calibration scenarios (BLIS's per-request front-end overhead and its prefill efficiency are not a roofline), so a held-out value within 30 percent shows the fit generalises as well as it fits."
+  - id: tpot-mean
+    claim: Mean time per output token agrees with BLIS after calibration.
+    kind: calibrated
+    metric: tpot_mean_s
+    rel_tol: 0.12
+    tolerance: "12 percent: the fit leaves up to 9 percent in time per token on its calibration scenarios (long contexts are the worst), so 12 percent allows for a different batch size and context length without admitting a wrong functional form."
+  - id: e2e-mean
+    claim: Mean end-to-end time agrees with BLIS after calibration.
+    kind: calibrated
+    metric: e2e_mean_s
+    rel_tol: 0.15
+    tolerance: "15 percent: end-to-end time is dominated by decoding (about 95 percent of it), so it should follow the time per token with a small addition from time to first token."
+  - id: throughput
+    claim: Output tokens per second over the run agree with BLIS after calibration.
+    kind: calibrated
+    metric: throughput_tokens_per_s
+    rel_tol: 0.10
+    tolerance: "10 percent: the load is open loop, so throughput over the run is the offered token rate plus the tail of the last answers; it differs only through the tail."

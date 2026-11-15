@@ -1,0 +1,160 @@
+id: timing-8b-h100-heavy
+title: Held-out timing, Llama 3.1 8B on one H100, many sequences at once
+# Held out from the calibration set: 120 requests 0.1 s apart with prompts of 800 to 2,500 tokens and answers of 200 to 500, so about 30 sequences decode together and new prompts keep arriving.
+model: llama-3.1-8b
+gpu: h100
+engine:
+  tp: 1
+  gpu_memory_utilisation: 0.9
+  max_num_seqs: 64
+  max_num_batched_tokens: 8192
+  block_size: 16
+  prefix_caching: true
+replicas: 1
+routing: round-robin
+requests:
+  - { session: 1, at: 1.00, turns: [[800, 200]] }
+  - { session: 2, at: 1.10, turns: [[2500, 500]] }
+  - { session: 3, at: 1.20, turns: [[1400, 350]] }
+  - { session: 4, at: 1.30, turns: [[1900, 280]] }
+  - { session: 5, at: 1.40, turns: [[800, 200]] }
+  - { session: 6, at: 1.50, turns: [[2500, 500]] }
+  - { session: 7, at: 1.60, turns: [[1400, 350]] }
+  - { session: 8, at: 1.70, turns: [[1900, 280]] }
+  - { session: 9, at: 1.80, turns: [[800, 200]] }
+  - { session: 10, at: 1.90, turns: [[2500, 500]] }
+  - { session: 11, at: 2.00, turns: [[1400, 350]] }
+  - { session: 12, at: 2.10, turns: [[1900, 280]] }
+  - { session: 13, at: 2.20, turns: [[800, 200]] }
+  - { session: 14, at: 2.30, turns: [[2500, 500]] }
+  - { session: 15, at: 2.40, turns: [[1400, 350]] }
+  - { session: 16, at: 2.50, turns: [[1900, 280]] }
+  - { session: 17, at: 2.60, turns: [[800, 200]] }
+  - { session: 18, at: 2.70, turns: [[2500, 500]] }
+  - { session: 19, at: 2.80, turns: [[1400, 350]] }
+  - { session: 20, at: 2.90, turns: [[1900, 280]] }
+  - { session: 21, at: 3.00, turns: [[800, 200]] }
+  - { session: 22, at: 3.10, turns: [[2500, 500]] }
+  - { session: 23, at: 3.20, turns: [[1400, 350]] }
+  - { session: 24, at: 3.30, turns: [[1900, 280]] }
+  - { session: 25, at: 3.40, turns: [[800, 200]] }
+  - { session: 26, at: 3.50, turns: [[2500, 500]] }
+  - { session: 27, at: 3.60, turns: [[1400, 350]] }
+  - { session: 28, at: 3.70, turns: [[1900, 280]] }
+  - { session: 29, at: 3.80, turns: [[800, 200]] }
+  - { session: 30, at: 3.90, turns: [[2500, 500]] }
+  - { session: 31, at: 4.00, turns: [[1400, 350]] }
+  - { session: 32, at: 4.10, turns: [[1900, 280]] }
+  - { session: 33, at: 4.20, turns: [[800, 200]] }
+  - { session: 34, at: 4.30, turns: [[2500, 500]] }
+  - { session: 35, at: 4.40, turns: [[1400, 350]] }
+  - { session: 36, at: 4.50, turns: [[1900, 280]] }
+  - { session: 37, at: 4.60, turns: [[800, 200]] }
+  - { session: 38, at: 4.70, turns: [[2500, 500]] }
+  - { session: 39, at: 4.80, turns: [[1400, 350]] }
+  - { session: 40, at: 4.90, turns: [[1900, 280]] }
+  - { session: 41, at: 5.00, turns: [[800, 200]] }
+  - { session: 42, at: 5.10, turns: [[2500, 500]] }
+  - { session: 43, at: 5.20, turns: [[1400, 350]] }
+  - { session: 44, at: 5.30, turns: [[1900, 280]] }
+  - { session: 45, at: 5.40, turns: [[800, 200]] }
+  - { session: 46, at: 5.50, turns: [[2500, 500]] }
+  - { session: 47, at: 5.60, turns: [[1400, 350]] }
+  - { session: 48, at: 5.70, turns: [[1900, 280]] }
+  - { session: 49, at: 5.80, turns: [[800, 200]] }
+  - { session: 50, at: 5.90, turns: [[2500, 500]] }
+  - { session: 51, at: 6.00, turns: [[1400, 350]] }
+  - { session: 52, at: 6.10, turns: [[1900, 280]] }
+  - { session: 53, at: 6.20, turns: [[800, 200]] }
+  - { session: 54, at: 6.30, turns: [[2500, 500]] }
+  - { session: 55, at: 6.40, turns: [[1400, 350]] }
+  - { session: 56, at: 6.50, turns: [[1900, 280]] }
+  - { session: 57, at: 6.60, turns: [[800, 200]] }
+  - { session: 58, at: 6.70, turns: [[2500, 500]] }
+  - { session: 59, at: 6.80, turns: [[1400, 350]] }
+  - { session: 60, at: 6.90, turns: [[1900, 280]] }
+  - { session: 61, at: 7.00, turns: [[800, 200]] }
+  - { session: 62, at: 7.10, turns: [[2500, 500]] }
+  - { session: 63, at: 7.20, turns: [[1400, 350]] }
+  - { session: 64, at: 7.30, turns: [[1900, 280]] }
+  - { session: 65, at: 7.40, turns: [[800, 200]] }
+  - { session: 66, at: 7.50, turns: [[2500, 500]] }
+  - { session: 67, at: 7.60, turns: [[1400, 350]] }
+  - { session: 68, at: 7.70, turns: [[1900, 280]] }
+  - { session: 69, at: 7.80, turns: [[800, 200]] }
+  - { session: 70, at: 7.90, turns: [[2500, 500]] }
+  - { session: 71, at: 8.00, turns: [[1400, 350]] }
+  - { session: 72, at: 8.10, turns: [[1900, 280]] }
+  - { session: 73, at: 8.20, turns: [[800, 200]] }
+  - { session: 74, at: 8.30, turns: [[2500, 500]] }
+  - { session: 75, at: 8.40, turns: [[1400, 350]] }
+  - { session: 76, at: 8.50, turns: [[1900, 280]] }
+  - { session: 77, at: 8.60, turns: [[800, 200]] }
+  - { session: 78, at: 8.70, turns: [[2500, 500]] }
+  - { session: 79, at: 8.80, turns: [[1400, 350]] }
+  - { session: 80, at: 8.90, turns: [[1900, 280]] }
+  - { session: 81, at: 9.00, turns: [[800, 200]] }
+  - { session: 82, at: 9.10, turns: [[2500, 500]] }
+  - { session: 83, at: 9.20, turns: [[1400, 350]] }
+  - { session: 84, at: 9.30, turns: [[1900, 280]] }
+  - { session: 85, at: 9.40, turns: [[800, 200]] }
+  - { session: 86, at: 9.50, turns: [[2500, 500]] }
+  - { session: 87, at: 9.60, turns: [[1400, 350]] }
+  - { session: 88, at: 9.70, turns: [[1900, 280]] }
+  - { session: 89, at: 9.80, turns: [[800, 200]] }
+  - { session: 90, at: 9.90, turns: [[2500, 500]] }
+  - { session: 91, at: 10.00, turns: [[1400, 350]] }
+  - { session: 92, at: 10.10, turns: [[1900, 280]] }
+  - { session: 93, at: 10.20, turns: [[800, 200]] }
+  - { session: 94, at: 10.30, turns: [[2500, 500]] }
+  - { session: 95, at: 10.40, turns: [[1400, 350]] }
+  - { session: 96, at: 10.50, turns: [[1900, 280]] }
+  - { session: 97, at: 10.60, turns: [[800, 200]] }
+  - { session: 98, at: 10.70, turns: [[2500, 500]] }
+  - { session: 99, at: 10.80, turns: [[1400, 350]] }
+  - { session: 100, at: 10.90, turns: [[1900, 280]] }
+  - { session: 101, at: 11.00, turns: [[800, 200]] }
+  - { session: 102, at: 11.10, turns: [[2500, 500]] }
+  - { session: 103, at: 11.20, turns: [[1400, 350]] }
+  - { session: 104, at: 11.30, turns: [[1900, 280]] }
+  - { session: 105, at: 11.40, turns: [[800, 200]] }
+  - { session: 106, at: 11.50, turns: [[2500, 500]] }
+  - { session: 107, at: 11.60, turns: [[1400, 350]] }
+  - { session: 108, at: 11.70, turns: [[1900, 280]] }
+  - { session: 109, at: 11.80, turns: [[800, 200]] }
+  - { session: 110, at: 11.90, turns: [[2500, 500]] }
+  - { session: 111, at: 12.00, turns: [[1400, 350]] }
+  - { session: 112, at: 12.10, turns: [[1900, 280]] }
+  - { session: 113, at: 12.20, turns: [[800, 200]] }
+  - { session: 114, at: 12.30, turns: [[2500, 500]] }
+  - { session: 115, at: 12.40, turns: [[1400, 350]] }
+  - { session: 116, at: 12.50, turns: [[1900, 280]] }
+  - { session: 117, at: 12.60, turns: [[800, 200]] }
+  - { session: 118, at: 12.70, turns: [[2500, 500]] }
+  - { session: 119, at: 12.80, turns: [[1400, 350]] }
+  - { session: 120, at: 12.90, turns: [[1900, 280]] }
+checks:
+  - id: ttft-mean
+    claim: Mean time to first token agrees with BLIS after calibration.
+    kind: calibrated
+    metric: ttft_mean_s
+    rel_tol: 0.30
+    tolerance: "30 percent: the fit leaves up to 34 percent in time to first token on its own calibration scenarios (BLIS's per-request front-end overhead and its prefill efficiency are not a roofline), so a held-out value within 30 percent shows the fit generalises as well as it fits."
+  - id: tpot-mean
+    claim: Mean time per output token agrees with BLIS after calibration.
+    kind: calibrated
+    metric: tpot_mean_s
+    rel_tol: 0.12
+    tolerance: "12 percent: the fit leaves up to 9 percent in time per token on its calibration scenarios (long contexts are the worst), so 12 percent allows for a different batch size and context length without admitting a wrong functional form."
+  - id: e2e-mean
+    claim: Mean end-to-end time agrees with BLIS after calibration.
+    kind: calibrated
+    metric: e2e_mean_s
+    rel_tol: 0.15
+    tolerance: "15 percent: end-to-end time is dominated by decoding (about 95 percent of it), so it should follow the time per token with a small addition from time to first token."
+  - id: throughput
+    claim: Output tokens per second over the run agree with BLIS after calibration.
+    kind: calibrated
+    metric: throughput_tokens_per_s
+    rel_tol: 0.10
+    tolerance: "10 percent: the load is open loop, so throughput over the run is the offered token rate plus the tail of the last answers; it differs only through the tail."
