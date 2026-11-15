@@ -64,4 +64,4 @@ export function replicaSpec(p: Params): ReplicaSpec {
 export const podLoad = (pod: Pod): number => pod.running.length + pod.waiting.length + pod.inbound;
 
 /** Pods that exist or are coming up; excludes draining, terminated and failed ones. */
-export const livePods = (w: World): Pod[] => w.pods.filter((p) => p.state === "creating" || p.state === "loading" || p.state === "ready");
+export const livePods = (w: Pick<World, "pods">): Pod[] => w.pods.filter((p) => p.state === "creating" || p.state === "loading" || p.state === "ready");
