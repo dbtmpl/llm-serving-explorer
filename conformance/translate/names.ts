@@ -24,6 +24,12 @@ export const GPU_NAMES: Record<string, NameMap> = {
   b200: { typescript: "b200", blis: "b200" }
 };
 
+/**
+ * What BLIS's catalogue says each GPU's memory is, in GiB (`MemoryGiB` of `catalog/hardware/<gpu>.yaml`). A node pool must state it exactly
+ * (BLIS refuses another number), and only a run with an autoscaler has a node pool.
+ */
+export const GPU_MEMORY_GIB: Record<string, number> = { h100: 79.1895752, h200: 139.80072021, b200: 178.35107422 };
+
 export function modelNames(neutral: string): NameMap {
   const n = MODEL_NAMES[neutral];
   if (!n) throw new Error(`unknown model "${neutral}"; known: ${Object.keys(MODEL_NAMES).join(", ")}`);

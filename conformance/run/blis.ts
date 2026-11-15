@@ -67,6 +67,14 @@ export function reduceBlis(s: Scenario, arm: string, result: Result): Reduced {
   const seen = new Set<string>();
   const rows: RequestRow[] = [];
   const requestsPerPod = new Array<number>(d.replicas).fill(0);
+  // the replicas of the scenario are `instance_<n>`; an autoscaler names the ones it adds by its own pattern, numbered here in order of first use
+  const added: string[] = [];
+  const podIndex = (name: string): number => {
+    const m = /^instance_(\d+)$/.exec(name);
+    if (m) return Number(m[1]);
+    if (!added.includes(name)) added.push(name);
+    return d.replicas + added.indexOf(name);
+  };
   let completedOutputs = 0;
   for (const r of result.request_rows) {
     // a replay carries the session in every row; a generated stream numbers its requests in arrival order
@@ -77,7 +85,7 @@ export function reduceBlis(s: Scenario, arm: string, result: Result): Reduced {
     const asked = wanted.get(key);
     if (!asked) throw new Error(`${s.id}: BLIS returned a row for ${key}, which the scenario did not send`);
     seen.add(key);
-    const pod = r.instance === undefined ? null : Number(r.instance.replace("instance_", ""));
+    const pod = r.instance === undefined ? null : podIndex(r.instance);
     if (pod !== null) requestsPerPod[pod] = (requestsPerPod[pod] ?? 0) + 1;
     if (r.fate === "completed") completedOutputs += (r.output_tokens ?? asked.outputTokens) - 1;
     rows.push({
@@ -108,7 +116,8 @@ export function reduceBlis(s: Scenario, arm: string, result: Result): Reduced {
     cpuTierHitRate: cluster.cpu_tier_hit_rate ?? null,
     kvTransferMeanS: pd?.kv_transfer_mean_ms === undefined ? null : pd.kv_transfer_mean_ms / 1e3,
     specTokensPerStep: d.speculative && decodeSteps > 0 ? completedOutputs / decodeSteps : null,
-    prefillPoolRequests: d.disagg ? (pd?.disaggregated_requests ?? 0) : null
+    prefillPoolRequests: d.disagg ? (pd?.disaggregated_requests ?? 0) : null,
+    peakReplicas: requestsPerPod.filter((n) => n > 0).length
   };
   return {
     simulator: "blis",

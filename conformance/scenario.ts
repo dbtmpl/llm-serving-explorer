@@ -31,6 +31,9 @@ export const REFERENCE_DIR = path.join(CONFORMANCE_DIR, "reference");
 /** KV block size in tokens. Both simulators use vLLM's default; the scenario states it so a mismatch fails loudly. */
 export const BLOCK_TOKENS = 16;
 
+/** How long a replica added by an autoscaler takes to load, seconds. The same number is given to both simulators. */
+export const AUTOSCALE_LOAD_S = 5;
+
 /** The name of the only arm of a scenario that declares none. */
 export const MAIN_ARM = "main";
 
@@ -82,7 +85,6 @@ export const METRICS = [
   "cpu_tier_hit_rate",
   "preemptions",
   "peak_replicas",
-  "final_replicas",
   "completed"
 ] as const;
 export type Metric = (typeof METRICS)[number];

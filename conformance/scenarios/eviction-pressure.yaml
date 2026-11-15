@@ -1,0 +1,71 @@
+id: eviction-pressure
+title: A small GPU pool evicts conversations that a large one keeps
+# The same 30 conversations as tiers-offload, no host tier. With 90 percent memory utilisation (about 446,000 tokens) every conversation stays in GPU memory and every follow-up
+# hits the prefix cache; with 30 percent (about 57,000 tokens) the pool holds about 18, and the follow-ups, in the order the conversations started, each find theirs evicted.
+model: llama-3.1-8b
+gpu: h100
+engine:
+  tp: 1
+  gpu_memory_utilisation: 0.9
+  max_num_seqs: 64
+  max_num_batched_tokens: 8192
+  block_size: 16
+  prefix_caching: true
+  max_model_len: 40000
+replicas: 1
+routing: prefix-aware
+arms:
+  roomy: {}
+  tight: { engine: { gpu_memory_utilisation: 0.3 } }
+requests:
+  - { session: 1, at: 1.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 2, at: 2.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 3, at: 3.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 4, at: 4.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 5, at: 5.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 6, at: 6.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 7, at: 7.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 8, at: 8.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 9, at: 9.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 10, at: 10.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 11, at: 11.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 12, at: 12.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 13, at: 13.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 14, at: 14.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 15, at: 15.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 16, at: 16.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 17, at: 17.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 18, at: 18.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 19, at: 19.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 20, at: 20.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 21, at: 21.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 22, at: 22.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 23, at: 23.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 24, at: 24.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 25, at: 25.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 26, at: 26.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 27, at: 27.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 28, at: 28.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 29, at: 29.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 30, at: 30.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+checks:
+  - id: prefix-hit-rate
+    claim: The share of prompt tokens served from the GPU prefix cache falls when the pool is too small to keep the conversations.
+    kind: directional
+    metric: prefix_hit_rate
+    baseline: roomy
+    intervention: tight
+    effect: ratio
+    direction: decrease
+    band: [0.67, 1.5]
+    tolerance: "Within a factor of 1.5 of each other: both evict least recently used first, so which follow-ups hit is decided by the same order; BLIS evicts block by block, so a conversation can keep a part, and the TypeScript model evicts it whole."
+  - id: follow-up-time-to-first-token
+    claim: A follow-up's time to first token rises when its history was evicted and must be recomputed.
+    kind: directional
+    metric: followup_ttft_mean_s
+    baseline: roomy
+    intervention: tight
+    effect: ratio
+    direction: increase
+    band: [0.75, 1.33]
+    tolerance: "Within a factor of 1.33 of each other: the loss is the recompute of the same 3,000 tokens in both, priced by the fitted roofline, which agrees with BLIS's prefill cost to within the tolerance of the timing checks."
