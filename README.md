@@ -17,9 +17,9 @@
   <img alt="Static site" src="https://img.shields.io/badge/Backend-none-1BC070">
 </p>
 
-LLM Serving Explorer is an interactive, animated explanation of how a modern inference stack serves requests. A single graph starts empty and grows as requests arrive: text becomes tokens, the router picks a pod, the engine batches work step by step, and KV-cache blocks fill, move and get evicted on the GPU. It runs in slow motion in your browser, explains each event where it happens, and lets you change the model, hardware and policies while requests are in flight.
+LLM Serving Explorer is an interactive, animated explanation of how a modern inference stack serves requests. One graph starts empty and grows as requests arrive: text becomes tokens, the router picks a pod, the engine batches work step by step, and KV-cache blocks fill, move and are evicted on the GPU. It runs in slow motion in your browser and explains each event where it happens. In **Explore** mode you change the model, hardware and policies while requests are in flight. In **Calibrated** mode the same graph replays runs of [BLIS](https://github.com/inference-sim/inference-sim), a simulator built on the [llm-d](https://github.com/llm-d/llm-d) router's own code and a translation of [vLLM](https://github.com/vllm-project/vllm)'s scheduler.
 
-The simulation is an independent TypeScript model that runs entirely in the browser. It re-implements the scheduling and memory behaviour of [vLLM](https://github.com/vllm-project/vllm) (continuous batching, chunked prefill, paged KV blocks, block-level prefix caching, preemption by recompute) and the routing and prefill/decode design of [llm-d](https://github.com/llm-d/llm-d), as described in their documentation and, for key rules, checked against the vLLM source. Step times come from closed-form roofline formulas. It does not run vLLM or llm-d code and is not calibrated against a real deployment or a simulator, so the mechanisms follow the real systems while absolute numbers are indicative. See [How accurate is it?](#how-accurate-is-it)
+Explore mode is driven by an independent TypeScript model that re-implements vLLM's scheduling and memory behaviour (continuous batching, chunked prefill, paged KV blocks, block-level prefix caching, preemption by recompute) and llm-d's routing, flow control and prefill/decode design. It runs no vLLM or llm-d code. Instead, every push is compared with BLIS on shared scenarios: 38 of 46 checks agree (82.6 percent), and each of the other 8 is a recorded difference with its cause. BLIS is itself a simulator, so this is agreement with how llm-d and vLLM decide, not a measurement on a GPU cluster, and absolute timings remain indicative. See [Parity with BLIS, llm-d and vLLM](#parity-with-blis-llm-d-and-vllm).
 
 <p align="center">
   <img alt="Demo: ten requests on one pod, then a thousand at once with pods scaling up" src="docs/assets/demo.webp" width="100%">
@@ -52,7 +52,14 @@ Serving an LLM is a systems problem as much as a model problem. Throughput, late
 - Tier sizes and session behaviour (follow-up turns, idle time, churn)
 - The serving architecture, as a timeline from static batching to today's tiered, disaggregated stacks
 
-A built-in tutorial walks through the graph, and a step-through mode follows one request and stops the clock at each event.
+**How it explains**
+
+- **Tutorial.** A guided tour moves the view to each part of the graph in turn.
+- **Step-through.** Follows one conversation and stops the clock at each event. Back and Next replay the step's animation, and every step has a "Dive deeper" section with the theory behind it and links to the papers.
+- **Dive in.** Click a pod, the router or a request to see its numbers and the formulas they come from.
+- **Calibrated mode.** Four fixed scenarios (follow-up turns under prefix-aware routing, overload with shedding, KV pressure with a preemption, a steady 70B chat load) replayed from BLIS: arrival, the pod chosen with the router's scores, first and last token, and each pod's KV fill. Settings are read-only there, and the inside of a pod is drawn as totals because BLIS does not report single blocks or steps.
+
+Every source named on the site is a link, and all of the site's text lives in [`src/content/`](src/content/) as markdown.
 
 ## Getting Started
 
@@ -116,14 +123,44 @@ Every mechanism in the simulation is an implementation of a published or deploye
 
 The full list of sources, with links, is in [`src/sim/README.md`](src/sim/README.md#sources). Each module's README lists what it does not model.
 
+## Parity with BLIS, llm-d and vLLM
+
+The model is checked against [BLIS](https://github.com/inference-sim/inference-sim) (inference-sim), a discrete-event simulator that runs the llm-d router's code in front of a Go translation of vLLM 0.32's scheduler. Agreement with BLIS is therefore agreement with how those two systems route, queue, admit, preempt and account for KV memory.
+
+<!-- generated:parity-readme:start -->
+| Kind of check | What must hold | Checks | Agree | Known difference |
+|---|---|---|---|---|
+| Exact | Integers and decisions are equal: KV blocks per replica, cached prefix tokens, the pod chosen, which requests are shed or preempted | 14 | 10 | 4 |
+| Calibrated | A timing or rate is within the tolerance written in the scenario, after the cost model's efficiency factors are fitted to BLIS on separate scenarios | 24 | 22 | 2 |
+| Directional | The same intervention moves the same metric the same way by a similar factor (memory tiers, eviction, routing policy, autoscaling) | 8 | 6 | 2 |
+| **All** | | **46** | **38** | **8** |
+
+21 of the 27 approaches in the table above are covered by at least one check; 6 have no counterpart in BLIS and are counted neither way. BLIS commit `c79c7456`; regenerate with `pnpm conformance:summary && pnpm docs:sync`.
+<!-- generated:parity-readme:end -->
+
+In short, 38 of 46 checks agree (82.6 percent). The known differences are: KV blocks per replica off by 2 in about 28,000 and by 30 in about 75,000 (activation estimate and rounding); round robin, which here is Envoy's strict rotation and in llm-d a rotation among tied pods; time to first token and throughput when 32 requests arrive at one instant, where one compute-efficiency factor cannot follow BLIS's prefill cost; the host-memory tier's hit-rate counter, which BLIS reports as zero; and how far queue wait falls under autoscaling, because the two autoscalers follow different rules.
+
+**How it is achieved**
+
+1. **Shared scenarios.** Each check is a YAML file in [`conformance/scenarios/`](conformance/scenarios/) that describes a deployment, a request list and what must hold, with its tolerance and the reason for it written before the first run.
+2. **Translators.** A scenario is turned into parameters and a request trace for the TypeScript model, and into a scenario, deployment, router configuration and trace for BLIS, so both simulate the same requests.
+3. **A pinned BLIS and committed references.** [`conformance/blis.lock`](conformance/blis.lock) names one BLIS commit. Its output per scenario is committed, so the comparison on every push needs only Node. A nightly job rebuilds that commit and fails if the references are stale; a weekly job runs BLIS's `main` to show drift early.
+4. **Calibration for timings.** Step times come from a roofline with two efficiency factors and a host-time term. For the comparison these are fitted to BLIS per model and GPU on one set of scenarios and checked on another. The site's defaults are not changed by the fit.
+5. **No silent tolerance.** A check holds as written, or it is recorded as a known difference with its numbers and cause, and the test fails if that difference changes or disappears. Where the first comparison showed the model wrong against the vLLM source (the size of the KV pool, what a finished turn leaves cached, when a waiting request is admitted), the model was fixed.
+
+**What it does not show.** BLIS is a simulator, not a cluster: nothing here was measured on GPUs. The scenarios are small and constructed. Timings agree after a fit to BLIS, which says the cost model can follow BLIS, not that either matches hardware. Mechanisms with no counterpart in BLIS (static batching, admission rules that reserve memory for a whole prompt or a whole answer) cannot be checked at all, and BLIS's catalog has no MI300X.
+
+[docs/blis-parity.md](docs/blis-parity.md) has every known difference with its numbers, the fitted values and what is not verifiable.
+
 ## How accurate is it?
 
-The simulation is a teaching model, not a calibrated simulator. It aims to get the mechanisms and their orders of magnitude right.
+The simulation is a teaching model. It aims to get the mechanisms right and the magnitudes plausible.
 
 - **Exact where the sources are exact.** KV bytes per token, memory budgets, FLOPs, ridge points, roofline step times and speculative-decoding speed-ups are closed-form and tested against worked numbers.
-- **Adjustable where they are not.** Host time per step, tier copy rates and utilisation factors sit inside plausible ranges and are exposed as controls.
-- **Checked against source code where behaviour matters.** For example, vLLM's preemption order, its rule of admitting nothing in a step that preempted, and its default `max_num_seqs`.
-- **Deterministic.** A seed and a sequence of inputs always give the same event stream; ten such streams are pinned by tests.
+- **Checked against BLIS where BLIS has the mechanism.** See the section above.
+- **Checked against source code where behaviour matters.** For example, vLLM's preemption order, its rule of admitting nothing in a step that preempted, its sizing of the KV pool from the memory the driver reports, and its default `max_num_seqs`.
+- **Adjustable where the sources give a range.** Host time per step, tier copy rates and utilisation factors sit inside plausible ranges and are exposed as controls.
+- **Deterministic.** A seed and a sequence of inputs always give the same event stream; such streams are pinned by tests.
 
 [docs/design-choices.md](docs/design-choices.md) lists, topic by topic, what the sources say, where they disagree and which reading the model takes.
 
@@ -133,9 +170,13 @@ The simulation is a teaching model, not a calibrated simulator. It aims to get t
 |---|---|
 | [`src/sim/`](src/sim/) | The simulation: one module per concept (routing, batching, KV cache, ...), each with its own README, sources and tests |
 | [`src/sim/citations.ts`](src/sim/citations.ts) | The registry of every paper, document and datasheet the model relies on |
-| [`src/live/`](src/live/) | The user interface: canvas rendering, menus, inspector, tutorial and callouts |
+| [`src/live/`](src/live/) | The user interface: canvas rendering, menus, inspector, tutorial and step-through |
+| [`src/content/`](src/content/) | Every explanatory text on the site, as markdown |
+| [`src/replay/`](src/replay/) | Calibrated mode: plays a BLIS replay file on the same graph |
+| [`public/replay/`](public/replay/) | The replay files, generated from the pinned BLIS |
+| [`conformance/`](conformance/) | Scenarios, translators, BLIS references, calibration and the tests that compare the model with BLIS |
 | [`e2e/`](e2e/) | Playwright end-to-end tests |
-| [`docs/`](docs/) | Design choices and architecture decision records |
+| [`docs/`](docs/) | Design choices, the parity page and architecture decision records |
 
 The simulation has no dependency on the interface and can be run on its own:
 
@@ -154,9 +195,18 @@ To model a new paper, add an approach to the module that owns the decision: see 
 
 ```bash
 pnpm typecheck
-pnpm test         # unit tests, one suite per simulation module
+pnpm test         # unit tests, one suite per simulation module, and the comparison with the BLIS references
 pnpm test:e2e     # Playwright (first time: pnpm exec playwright install chromium)
-pnpm docs:sync    # regenerate the tables in the READMEs from the code
+pnpm docs:sync    # regenerate the tables in the READMEs and the parity page from the code
+```
+
+Regenerating what comes from BLIS needs Go and a build of the commit in `conformance/blis.lock` (see [`conformance/README.md`](conformance/README.md)):
+
+```bash
+BLIS_BIN=/path/to/blis pnpm conformance:reference   # BLIS output per scenario
+pnpm conformance:calibrate                          # refit the timing parameters
+pnpm conformance:summary                            # the parity figures
+BLIS_BIN=/path/to/blis pnpm replay:build            # replay files for Calibrated mode
 ```
 
 ## Contributing
