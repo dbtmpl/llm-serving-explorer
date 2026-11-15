@@ -256,17 +256,15 @@ test.describe("live graph view", () => {
     await expect(items.first()).toHaveJSProperty("open", true);
     await expect(items.first().locator(".lv-dive-body")).toBeVisible();
     // the buttons stay on screen and the box stays inside the window
-    const inside = async () => {
-      const vp = page.viewportSize()!;
-      for (const id of ["step-next", "step-back"]) {
-        const b = await page.getByTestId(id).boundingBox();
-        expect(b, id).not.toBeNull();
-        expect(b!.y + b!.height, id).toBeLessThanOrEqual(vp.height);
-        expect(b!.y, id).toBeGreaterThanOrEqual(0);
-      }
-      const bb = await box.boundingBox();
-      expect(bb!.y).toBeGreaterThanOrEqual(0);
-    };
+    // the box is docked again on the next frame after its height changes, so poll
+    const inside = () =>
+      expect
+        .poll(async () => {
+          const vp = page.viewportSize()!;
+          const rects = await Promise.all([page.getByTestId("step-next").boundingBox(), page.getByTestId("step-back").boundingBox(), box.boundingBox()]);
+          return rects.every((b) => b !== null && b.y >= 0 && b.y + b.height <= vp.height);
+        })
+        .toBe(true);
     await inside();
     // open them all: the text scrolls inside the box
     for (let i = 1; i < (await items.count()); i++) await items.nth(i).locator("summary").click();
@@ -286,14 +284,13 @@ test.describe("live graph view", () => {
     await expect(page.getByTestId("step-box")).toContainText("A user sends a message");
     const items = page.getByTestId("dive-item");
     for (let i = 0; i < (await items.count()); i++) await items.nth(i).locator("summary").click();
-    for (const id of ["step-next", "step-back"]) {
-      const b = (await page.getByTestId(id).boundingBox())!;
-      expect(b.y + b.height).toBeLessThanOrEqual(780);
-      expect(b.x + b.width).toBeLessThanOrEqual(390);
-    }
-    const bb = (await page.getByTestId("step-box").boundingBox())!;
-    expect(bb.y).toBeGreaterThanOrEqual(0);
-    expect(bb.y + bb.height).toBeLessThanOrEqual(780);
+    // the box is docked again on the next frame after its height changes, so poll
+    await expect
+      .poll(async () => {
+        const rects = await Promise.all([page.getByTestId("step-next").boundingBox(), page.getByTestId("step-back").boundingBox(), page.getByTestId("step-box").boundingBox()]);
+        return rects.every((r) => r !== null && r.y >= 0 && r.y + r.height <= 780 && r.x >= 0 && r.x + r.width <= 390);
+      })
+      .toBe(true);
   });
 
   /** Follow one request to the end of the walkthrough, returning every step title. */
@@ -411,7 +408,8 @@ test.describe("live graph view", () => {
     await page.getByTestId("speed-1").click();
     await expect(page.getByTestId("step-box")).toContainText("A user sends a message");
     await expect.poll(() => guideFits(page), { timeout: 10_000 }).toBe(true);
-    await page.mouse.move(700, 400);
+    // beside the step box, which scrolls its own text when the wheel is over it
+    await page.mouse.move(1250, 600);
     await page.mouse.wheel(0, 600);
     const s1 = await page.evaluate(() => (window as unknown as LiveWin).__live.scene.cam.s);
     await page.waitForTimeout(600);
