@@ -80,7 +80,11 @@ Why count tokens, not requests
 Reading a prompt takes work in proportion to its tokens, each token in context takes {perToken} of GPU memory, and each output token needs another pass through the model. So a 10,000-token request costs about a hundred times a 100-token one.
 
 ### detail
-That is why providers limit each customer in tokens per minute as well as requests per minute [@openaiRateLimits], and why a gateway counts tokens before spending GPU time [@envoyAiGatewayRateLimit]. This prompt: {tokens} tokens, {kv} of memory.
+That is why providers limit each customer in tokens per minute as well as requests per minute [@openaiRateLimits], and why a gateway counts tokens before spending GPU time [@envoyAiGatewayRateLimit]. This prompt: {tokens} tokens, {kv} of memory. The memory per token comes from the model's shape: one key and one value vector for each layer and each key-value head.
+
+$$\text{KV bytes per token} = 2 \cdot n_{\text{layers}} \cdot n_{\text{kv heads}} \cdot d_{\text{head}} \cdot b$$
+
+where $b$ is the bytes per stored number (2, for 16-bit floats) and $d_{\text{head}}$ the length of one vector [@kwon2023].
 
 ## `walk.deadline` A deadline is attached
 _Where:_ Step-through only: beside the gateway and prompt assembler, the first time a prompt has been counted. The body depends on the "shed requests waiting longer than" setting.
