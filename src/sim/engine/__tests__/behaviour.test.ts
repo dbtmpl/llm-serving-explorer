@@ -51,7 +51,7 @@ describe("simulation behaviour snapshots", () => {
     "disaggregated prefill/decode": () => play({ disagg: true, returnProb: 1, maxTurns: 2, thinkTimeS: 1 }, [[0, 20, 0]], 60),
     "speculative decoding with overlap": () => play({ specDecode: true, overlap: true, outputTokens: 300 }, [[0, 12, 1]], 40, 11),
     "load shedding with steady arrivals": () => play({ maxPods: 1, shedAfterS: 3, outputTokens: 600, arrivalRate: 3 }, [[0, 40, 0]], 40),
-    "70B on 4 GPUs, scale up and down": () => play({ model: "llama-3-70b", tp: 4, maxPods: 4, scaleDownIdleS: 3, returnProb: 0 }, [[0, 30, 0]], 80)
+    "70B on 4 GPUs, scale up and down": () => play({ model: "llama-3.1-70b", tp: 4, maxPods: 4, scaleDownIdleS: 3, returnProb: 0 }, [[0, 30, 0]], 80)
   };
   for (const [name, run] of Object.entries(cases)) {
     it(name, () => {

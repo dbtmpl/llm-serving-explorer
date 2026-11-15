@@ -52,14 +52,14 @@ describe("changing parameters mid-run", () => {
     const w = world({ returnProb: 0 });
     spawnBurst(w, 10);
     run(w, 3);
-    setParam(w, "model", "llama-3-70b");
+    setParam(w, "model", "llama-3.1-70b");
     setParam(w, "tp", 4);
     run(w, 200, () => w.m.completed === 10);
     expect(w.m.completed).toBe(10);
     expect(w.pods.every((p) => p.spec.tp === 4)).toBe(true);
   });
   it("a model that does not fit its GPUs fails to start instead of serving", () => {
-    const w = world({ model: "llama-3-70b", tp: 1 });
+    const w = world({ model: "llama-3.1-70b", tp: 1 });
     spawnBurst(w, 1);
     run(w, 10);
     expect(w.pods[0]!.state).toBe("failed");

@@ -24,7 +24,7 @@ export const kinds = (w: World): Set<string> => new Set(w.events.map((e) => e.ki
 export const world = (over: Partial<Params> = {}, seed?: number): World => createWorld({ ...DEFAULT_PARAMS, ...over }, seed);
 
 export const LLAMA_8B = MODELS["llama-3.1-8b"]!;
-export const LLAMA_70B = MODELS["llama-3-70b"]!;
+export const LLAMA_70B = MODELS["llama-3.1-70b"]!;
 export const H100 = GPUS.h100!;
 
 /** Llama 3.1 8B in BF16 on one H100 at 0.9 memory utilisation, plus overrides. */

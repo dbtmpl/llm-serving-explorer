@@ -14,8 +14,8 @@ export interface NameMap {
 export const MODEL_NAMES: Record<string, NameMap> = {
   /** Llama 3.1 8B: 32 layers, 8 KV heads, head dimension 128 in both catalogues. */
   "llama-3.1-8b": { typescript: "llama-3.1-8b", blis: "llama-3.1-8b-instruct" },
-  /** Llama 3 70B and 3.1 70B share one architecture: 80 layers, 8 KV heads, head dimension 128. */
-  "llama-70b": { typescript: "llama-3-70b", blis: "llama-3.1-70b-instruct" }
+  /** Llama 3.1 70B in both catalogues: 80 layers, 8 KV heads, head dimension 128. */
+  "llama-70b": { typescript: "llama-3.1-70b", blis: "llama-3.1-70b-instruct" }
 };
 
 export const GPU_NAMES: Record<string, NameMap> = {

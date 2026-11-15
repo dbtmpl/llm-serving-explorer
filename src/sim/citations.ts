@@ -324,11 +324,11 @@ export const CITATIONS = {
     kind: "datasheet",
     url: "https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct"
   },
-  llama370Card: {
-    short: "Meta, Llama 3 70B model card",
-    title: "meta-llama/Meta-Llama-3-70B-Instruct (architecture in config.json)",
+  llama3170Card: {
+    short: "Meta, Llama 3.1 70B model card",
+    title: "meta-llama/Llama-3.1-70B-Instruct (architecture in config.json)",
     kind: "datasheet",
-    url: "https://huggingface.co/meta-llama/Meta-Llama-3-70B-Instruct"
+    url: "https://huggingface.co/meta-llama/Llama-3.1-70B-Instruct"
   },
   nvidiaH100: {
     short: "NVIDIA H100 datasheet",
