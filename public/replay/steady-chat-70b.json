@@ -1,0 +1,98 @@
+{
+  "schema": 1,
+  "id": "steady-chat-70b",
+  "title": "Steady chat, Llama 3.1 70B",
+  "blis": {
+    "commit": "c79c745619b16a8019339e3bbc79ee5e2923b258",
+    "engineVersion": "0.32.0",
+    "routerModule": "github.com/llm-d/llm-d-router v1.0.0-blis.4",
+    "catalogHash": "db74e4bb49f75d658e5d0850934da60daf513274b937a03b7ab994760bd6d21f",
+    "registryHash": "8dbcf3b85eed842f2bc798b34d2b95716fc58117750f4164d869b26770353fe0"
+  },
+  "params": {
+    "model": "llama-70b",
+    "gpu": "h200",
+    "tp": 4,
+    "replicas": 2,
+    "routing": "prefix-aware",
+    "maxNumSeqs": 12,
+    "maxNumBatchedTokens": 8192,
+    "gpuMemoryUtilisation": 0.9,
+    "prefixCaching": true,
+    "queueDeadlineS": 0,
+    "kvBlocksPerReplica": 74760,
+    "blockTokens": 16
+  },
+  "scorers": [
+    {
+      "name": "queue-scorer",
+      "weight": 2
+    },
+    {
+      "name": "kv-cache-utilization-scorer",
+      "weight": 2
+    },
+    {
+      "name": "prefix-cache-scorer",
+      "weight": 3
+    }
+  ],
+  "totals": {
+    "preemptions": 0,
+    "cacheHitRate": 0.6641,
+    "completed": 42,
+    "shed": 0,
+    "endS": 52.279598
+  },
+  "requests": [
+    {"id":0,"session":1,"round":0,"arrival":1.08,"inputTokens":1150,"outputTokens":210,"cachedTokens":0,"fate":"completed","pod":0,"dispatch":1.08,"start":1.120402,"firstToken":1.214128,"lastToken":4.949254,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,1,0],[1,1,0]]},
+    {"id":1,"session":2,"round":0,"arrival":2.59,"inputTokens":1860,"outputTokens":120,"cachedTokens":0,"fate":"completed","pod":1,"dispatch":2.59,"start":2.630651,"firstToken":2.769078,"lastToken":4.818655,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,0.99897,0],[1,1,0]]},
+    {"id":2,"session":3,"round":0,"arrival":4.03,"inputTokens":2070,"outputTokens":150,"cachedTokens":0,"fate":"completed","pod":0,"dispatch":4.03,"start":4.079239,"firstToken":4.248312,"lastToken":6.819835,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,0.99889,0],[1,0.998381,0]]},
+    {"id":3,"session":4,"round":0,"arrival":5.6,"inputTokens":1450,"outputTokens":260,"cachedTokens":0,"fate":"completed","pod":1,"dispatch":5.6,"start":5.640507,"firstToken":5.753018,"lastToken":10.310233,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,0.998194,0],[1,1,0]]},
+    {"id":4,"session":5,"round":0,"arrival":7.06,"inputTokens":1840,"outputTokens":140,"cachedTokens":0,"fate":"completed","pod":0,"dispatch":7.06,"start":7.100644,"firstToken":7.2378,"lastToken":9.631797,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,1,0],[1,0.998716,0]]},
+    {"id":5,"session":6,"round":0,"arrival":8.61,"inputTokens":1360,"outputTokens":240,"cachedTokens":0,"fate":"completed","pod":1,"dispatch":8.61,"start":8.654055,"firstToken":8.778198,"lastToken":12.901371,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,0.998381,0],[1,0.998636,0]]},
+    {"id":6,"session":7,"round":0,"arrival":10.04,"inputTokens":1300,"outputTokens":210,"cachedTokens":0,"fate":"completed","pod":0,"dispatch":10.04,"start":10.080455,"firstToken":10.183555,"lastToken":13.948737,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,1,0],[1,0.997378,0]]},
+    {"id":7,"session":8,"round":0,"arrival":11.51,"inputTokens":2330,"outputTokens":160,"cachedTokens":0,"fate":"completed","pod":0,"dispatch":11.51,"start":11.55631,"firstToken":11.742057,"lastToken":14.514541,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,0.998836,0],[1,0.998729,0]]},
+    {"id":8,"session":9,"round":0,"arrival":13.06,"inputTokens":1270,"outputTokens":190,"cachedTokens":0,"fate":"completed","pod":1,"dispatch":13.06,"start":13.100444,"firstToken":13.201666,"lastToken":16.56094,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,0.99675,0],[1,1,0]]},
+    {"id":9,"session":1,"round":1,"arrival":14.23,"inputTokens":1510,"outputTokens":150,"cachedTokens":1344,"fate":"completed","pod":0,"dispatch":14.23,"start":14.283201,"firstToken":14.334322,"lastToken":17.02104,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,0.997927,0.708333],[1,0.998876,0]]},
+    {"id":10,"session":10,"round":0,"arrival":14.6,"inputTokens":1460,"outputTokens":130,"cachedTokens":0,"fate":"completed","pod":1,"dispatch":14.6,"start":14.642984,"firstToken":14.773389,"lastToken":17.021583,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,0.998716,0],[1,0.998863,0]]},
+    {"id":11,"session":11,"round":0,"arrival":16.09,"inputTokens":1770,"outputTokens":140,"cachedTokens":0,"fate":"completed","pod":0,"dispatch":16.09,"start":16.138224,"firstToken":16.288221,"lastToken":18.845579,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,0.998649,0],[1,0.997512,0]]},
+    {"id":12,"session":2,"round":1,"arrival":16.54,"inputTokens":2090,"outputTokens":170,"cachedTokens":1968,"fate":"completed","pod":1,"dispatch":16.54,"start":16.586724,"firstToken":16.635258,"lastToken":19.692981,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,0.997138,0],[1,0.997459,0.878788]]},
+    {"id":13,"session":3,"round":1,"arrival":17.58,"inputTokens":2300,"outputTokens":120,"cachedTokens":2208,"fate":"completed","pod":0,"dispatch":17.58,"start":17.632607,"firstToken":17.810181,"lastToken":19.884183,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,0.998448,0.888889],[1,0.998194,0]]},
+    {"id":14,"session":12,"round":0,"arrival":17.59,"inputTokens":2110,"outputTokens":130,"cachedTokens":0,"fate":"completed","pod":0,"dispatch":17.59,"start":17.632607,"firstToken":17.810181,"lastToken":20.056513,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,0.998448,0],[1,0.998194,0]]},
+    {"id":15,"session":13,"round":0,"arrival":19.08,"inputTokens":1890,"outputTokens":150,"cachedTokens":0,"fate":"completed","pod":1,"dispatch":19.08,"start":19.129654,"firstToken":19.287309,"lastToken":21.882367,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,0.996174,0],[1,0.998127,0]]},
+    {"id":16,"session":4,"round":1,"arrival":19.15,"inputTokens":1830,"outputTokens":90,"cachedTokens":1696,"fate":"completed","pod":1,"dispatch":19.15,"start":19.287264,"firstToken":19.33674,"lastToken":20.883158,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,0.996174,0],[1,0.998127,0.758621]]},
+    {"id":17,"session":14,"round":0,"arrival":20.57,"inputTokens":830,"outputTokens":140,"cachedTokens":0,"fate":"completed","pod":0,"dispatch":20.57,"start":20.61029,"firstToken":20.684145,"lastToken":23.103283,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,1,0],[1,0.996763,0]]},
+    {"id":18,"session":5,"round":1,"arrival":21.31,"inputTokens":2130,"outputTokens":100,"cachedTokens":1968,"fate":"completed","pod":0,"dispatch":21.31,"start":21.352735,"firstToken":21.403785,"lastToken":23.118671,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,0.999264,0.823529],[1,0.998315,0]]},
+    {"id":19,"session":6,"round":1,"arrival":22.11,"inputTokens":1690,"outputTokens":160,"cachedTokens":1584,"fate":"completed","pod":1,"dispatch":22.11,"start":22.150591,"firstToken":22.180688,"lastToken":24.91844,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,0.997405,0],[1,1,0.777778]]},
+    {"id":20,"session":7,"round":1,"arrival":23.19,"inputTokens":1580,"outputTokens":150,"cachedTokens":1504,"fate":"completed","pod":0,"dispatch":23.19,"start":23.230553,"firstToken":23.258728,"lastToken":25.845295,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,1,0.8],[1,0.998529,0]]},
+    {"id":21,"session":8,"round":1,"arrival":25.56,"inputTokens":2690,"outputTokens":160,"cachedTokens":2480,"fate":"completed","pod":0,"dispatch":25.56,"start":25.610941,"firstToken":25.665392,"lastToken":28.409339,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,0.998555,0.837209],[1,1,0]]},
+    {"id":22,"session":9,"round":1,"arrival":26.36,"inputTokens":1560,"outputTokens":150,"cachedTokens":1456,"fate":"completed","pod":1,"dispatch":26.36,"start":26.400546,"firstToken":26.430471,"lastToken":29.020284,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,0.997713,0],[1,1,0.76]]},
+    {"id":23,"session":10,"round":1,"arrival":28.2,"inputTokens":1800,"outputTokens":100,"cachedTokens":1584,"fate":"completed","pod":1,"dispatch":28.2,"start":28.250299,"firstToken":28.304649,"lastToken":30.014284,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,0.997619,0],[1,0.998609,0.758621]]},
+    {"id":24,"session":1,"round":2,"arrival":28.98,"inputTokens":1860,"outputTokens":90,"cachedTokens":1648,"fate":"completed","pod":0,"dispatch":28.98,"start":29.020651,"firstToken":29.057498,"lastToken":30.609937,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,1,0.766667],[1,0.99703,0]]},
+    {"id":25,"session":11,"round":1,"arrival":29.79,"inputTokens":2030,"outputTokens":70,"cachedTokens":1904,"fate":"completed","pod":0,"dispatch":29.79,"start":29.847605,"firstToken":29.896392,"lastToken":31.090176,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,0.998408,0.84375],[1,0.998422,0]]},
+    {"id":26,"session":2,"round":2,"arrival":30.19,"inputTokens":2440,"outputTokens":150,"cachedTokens":2256,"fate":"completed","pod":1,"dispatch":30.19,"start":30.230854,"firstToken":30.266221,"lastToken":32.857615,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,0.996669,0],[1,1,0.820513]]},
+    {"id":27,"session":12,"round":1,"arrival":31.59,"inputTokens":2430,"outputTokens":90,"cachedTokens":2224,"fate":"completed","pod":0,"dispatch":31.59,"start":31.63085,"firstToken":31.66762,"lastToken":33.215931,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,1,0.842105],[1,0.997887,0]]},
+    {"id":28,"session":13,"round":1,"arrival":32.58,"inputTokens":2260,"outputTokens":140,"cachedTokens":2032,"fate":"completed","pod":1,"dispatch":32.58,"start":32.622156,"firstToken":32.677578,"lastToken":35.098505,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,0.997913,0],[1,0.997846,0.805556]]},
+    {"id":29,"session":3,"round":2,"arrival":33.03,"inputTokens":2520,"outputTokens":70,"cachedTokens":2416,"fate":"completed","pod":0,"dispatch":33.03,"start":33.077629,"firstToken":33.125231,"lastToken":34.329471,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,0.9979,0.875],[1,0.998087,0]]},
+    {"id":30,"session":14,"round":1,"arrival":34.22,"inputTokens":1080,"outputTokens":140,"cachedTokens":960,"fate":"completed","pod":0,"dispatch":34.22,"start":34.260985,"firstToken":34.30907,"lastToken":36.725014,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,0.997833,0.705882],[1,0.998034,0]]},
+    {"id":31,"session":4,"round":2,"arrival":34.35,"inputTokens":2100,"outputTokens":170,"cachedTokens":1904,"fate":"completed","pod":1,"dispatch":34.35,"start":34.39804,"firstToken":34.451329,"lastToken":37.397168,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,0.996923,0],[1,0.99802,0.848485]]},
+    {"id":32,"session":5,"round":2,"arrival":35.61,"inputTokens":2390,"outputTokens":60,"cachedTokens":2224,"fate":"completed","pod":0,"dispatch":35.61,"start":35.664258,"firstToken":35.715699,"lastToken":36.738609,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,0.999024,0.868421],[1,0.998181,0]]},
+    {"id":33,"session":6,"round":2,"arrival":36.16,"inputTokens":2070,"outputTokens":60,"cachedTokens":1840,"fate":"completed","pod":1,"dispatch":36.16,"start":36.209308,"firstToken":36.264726,"lastToken":37.289084,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,0.996964,0],[1,0.998154,0.787879]]},
+    {"id":34,"session":7,"round":2,"arrival":38.09,"inputTokens":1830,"outputTokens":170,"cachedTokens":1728,"fate":"completed","pod":0,"dispatch":38.09,"start":38.13064,"firstToken":38.160535,"lastToken":41.103985,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,1,0.827586],[1,1,0]]},
+    {"id":35,"session":8,"round":2,"arrival":39.66,"inputTokens":3060,"outputTokens":140,"cachedTokens":2848,"fate":"completed","pod":0,"dispatch":39.66,"start":39.706413,"firstToken":39.761204,"lastToken":42.170137,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,0.998395,0.875],[1,1,0]]},
+    {"id":36,"session":9,"round":2,"arrival":40.36,"inputTokens":1780,"outputTokens":100,"cachedTokens":1696,"fate":"completed","pod":1,"dispatch":40.36,"start":40.400623,"firstToken":40.429365,"lastToken":42.134191,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,0.99576,0],[1,1,0.857143]]},
+    {"id":37,"session":10,"round":2,"arrival":43,"inputTokens":2080,"outputTokens":70,"cachedTokens":1888,"fate":"completed","pod":1,"dispatch":43,"start":43.040728,"firstToken":43.076425,"lastToken":44.265258,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,1,0],[1,1,0.848485]]},
+    {"id":38,"session":11,"round":2,"arrival":43.94,"inputTokens":2310,"outputTokens":100,"cachedTokens":2096,"fate":"completed","pod":0,"dispatch":43.94,"start":43.980808,"firstToken":44.018025,"lastToken":45.724511,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,1,0.837838],[1,0.998208,0]]},
+    {"id":39,"session":12,"round":2,"arrival":45.79,"inputTokens":2600,"outputTokens":100,"cachedTokens":2512,"fate":"completed","pod":0,"dispatch":45.79,"start":45.83091,"firstToken":45.860175,"lastToken":47.567567,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,1,0.902439],[1,1,0]]},
+    {"id":40,"session":13,"round":2,"arrival":46.98,"inputTokens":2580,"outputTokens":60,"cachedTokens":2384,"fate":"completed","pod":1,"dispatch":46.98,"start":47.020903,"firstToken":47.057109,"lastToken":48.074571,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,0.997766,0],[1,1,0.853659]]},
+    {"id":41,"session":14,"round":2,"arrival":49.47,"inputTokens":1370,"outputTokens":160,"cachedTokens":1216,"fate":"completed","pod":0,"dispatch":49.47,"start":49.510479,"firstToken":49.543453,"lastToken":52.279598,"resumedAt":null,"preemptedAt":null,"droppedAt":null,"scores":[[1,1,0.727273],[1,1,0]]}
+  ],
+  "series": {
+    "intervalS": 1,
+    "pods": [
+    {"kv":[0,0.0008,0.001,0.0011,0.0026,0.0018,0.0015,0.0012,0.0016,0.001,0.0009,0.002,0.0032,0.0032,0.002,0.0013,0.0026,0.0029,0.0051,0.0036,0.0003,0.0019,0.0026,0.0013,0.0014,0.002,0.0023,0.0023,0.001,0.0017,0.0027,0.0008,0.0021,0.0024,0.0014,0.0016,0.0022,0,0.0013,0.0023,0.0043,0.0028,0.0004,0,0.0019,0.0017,0.0022,0.0013,0,0.0005,0.0012,0.0012,0.0013],"running":[0,0.79,1,1,1.84,1,0.81,0.76,1,0.63,0.82,1.43,2,1.94,1.21,1,1.84,1.71,2.84,1.88,0.37,1.63,2,0.95,1,1.21,1,1,0.4,1.08,1.61,0.42,1,1.12,1.05,1.32,1.45,0,0.84,1.28,2,1.1,0.16,0,0.98,0.86,1,0.56,0,0.46,1,1,1],"waiting":[0,0,0,0,0.02,0,0,0,0,0,0,0.02,0,0,0.02,0,0.02,0.03,0,0,0,0.02,0,0,0,0.02,0,0,0,0.02,0,0,0,0.02,0.02,0.02,0,0,0,0.02,0,0,0,0,0,0,0,0,0,0,0,0,0]},
+    {"kv":[0,0,0.0004,0.0016,0.0013,0.0003,0.0013,0.0013,0.0017,0.0026,0.0017,0.0013,0.0012,0.0009,0.0015,0.0024,0.0027,0.0018,0.0018,0.0037,0.003,0.0015,0.0012,0.0015,0.0014,0,0.0008,0.0014,0.0025,0.0016,0.0015,0.0021,0.0025,0.0019,0.003,0.002,0.0032,0.0012,0,0,0.0009,0.0015,0.0002,0.0016,0.0005,0,0,0.0021,0.0002,0,0,0,0],"running":[0,0,0.23,1,0.81,0.25,1,1,1.33,2,1.3,1,0.89,0.8,1.34,2,1.95,1.02,1,2.23,1.88,0.88,0.82,1,0.91,0,0.57,1,1.73,1.01,0.74,1,1.21,1,1.58,1.09,1.77,0.68,0,0,0.57,1,0.13,0.92,0.26,0,0,0.94,0.07,0,0,0,0],"waiting":[0,0,0,0,0,0,0,0,0.02,0,0,0,0,0,0.02,0,0.02,0,0,0.03,0,0,0,0,0,0,0,0,0.02,0,0,0,0.02,0,0.02,0,0.02,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]}
+    ]
+  }
+}
