@@ -7,8 +7,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { BLOCK_TOKENS, CONFORMANCE_DIR, type Scenario } from "../scenario.js";
-import { microseconds, sortRows, type BlisProvenance, type Fate, type Reduced, type Reference, type RequestRow } from "../record.js";
-import { toBlis } from "../translate/toBlis.js";
+import { NO_AGGREGATES, microseconds, sortRows, type BlisProvenance, type Fate, type Reduced, type Reference, type RequestRow } from "../record.js";
+import { scenarioInputHash, toBlis } from "../translate/toBlis.js";
 
 export const BLIS_LOCK = path.join(CONFORMANCE_DIR, "blis.lock");
 
@@ -41,7 +41,9 @@ interface Result {
   data: { catalog: { hash: string }; registry: { hash: string } };
   request_rows: Row[];
   requests: { dropped?: Record<string, number> };
-  reports: { engine: { cluster: { kv_capacity_tokens_per_replica: number; preemptions: number } } };
+  metrics?: { step_interval_mean_ms?: { samples: number } };
+  breakdowns?: { pd?: { kv_transfer_mean_ms?: number; disaggregated_requests?: number } };
+  reports: { engine: { cluster: { kv_capacity_tokens_per_replica: number; preemptions: number; cache_hit_rate?: number; cpu_tier_hit_rate?: number } } };
 }
 
 /**
@@ -57,16 +59,19 @@ function fateOf(s: Scenario, result: Result, row: Row): Fate {
   throw new Error(`${s.id}: BLIS dropped requests for several causes (${causes.join(", ")}); the rows cannot be attributed one by one`);
 }
 
-export function reduceBlis(s: Scenario, result: Result): Reduced {
+export function reduceBlis(s: Scenario, arm: string, result: Result): Reduced {
+  const d = s.arms[arm]!;
   const cluster = result.reports.engine.cluster;
   if (cluster.kv_capacity_tokens_per_replica % BLOCK_TOKENS) throw new Error(`${s.id}: KV capacity ${cluster.kv_capacity_tokens_per_replica} is not a whole number of blocks`);
-  const wanted = new Map(s.requests.map((r) => [`s${r.session}/${r.round}`, r]));
+  const wanted = new Map(d.requests.map((r) => [`s${r.session}/${r.round}`, r]));
   const seen = new Set<string>();
   const rows: RequestRow[] = [];
-  const requestsPerPod = new Array<number>(s.replicas).fill(0);
+  const requestsPerPod = new Array<number>(d.replicas).fill(0);
+  let completedOutputs = 0;
   for (const r of result.request_rows) {
-    if (!r.session_id) throw new Error(`${s.id}: BLIS row ${r.id} has no session_id`);
-    const session = Number(r.session_id.slice(1));
+    // a replay carries the session in every row; a generated stream numbers its requests in arrival order
+    if (!r.session_id && !d.stream) throw new Error(`${s.id}: BLIS row ${r.id} has no session_id`);
+    const session = r.session_id ? Number(r.session_id.slice(1)) : Number(r.id.replace("request_", "")) + 1;
     const round = r.round_index ?? 0;
     const key = `s${session}/${round}`;
     const asked = wanted.get(key);
@@ -74,6 +79,7 @@ export function reduceBlis(s: Scenario, result: Result): Reduced {
     seen.add(key);
     const pod = r.instance === undefined ? null : Number(r.instance.replace("instance_", ""));
     if (pod !== null) requestsPerPod[pod] = (requestsPerPod[pod] ?? 0) + 1;
+    if (r.fate === "completed") completedOutputs += (r.output_tokens ?? asked.outputTokens) - 1;
     rows.push({
       session,
       round,
@@ -90,13 +96,28 @@ export function reduceBlis(s: Scenario, result: Result): Reduced {
   }
   const missing = [...wanted.keys()].filter((k) => !seen.has(k));
   if (missing.length) throw new Error(`${s.id}: BLIS reported no row for ${missing.join(", ")}`);
+  // Tokens per decode step under speculation: BLIS reports its steps (`step_interval` samples) but not per sequence, so
+  // this is only defined when requests run one at a time and each prompt fits one prefill step: then the steps are
+  // one prefill step per request plus the decode steps, and every token after the first came from a decode step.
+  const steps = result.metrics?.step_interval_mean_ms?.samples ?? 0;
+  const decodeSteps = steps - rows.length;
+  const pd = result.breakdowns?.pd;
+  const aggregates = {
+    ...NO_AGGREGATES,
+    prefixHitRate: cluster.cache_hit_rate ?? null,
+    cpuTierHitRate: cluster.cpu_tier_hit_rate ?? null,
+    kvTransferMeanS: pd?.kv_transfer_mean_ms === undefined ? null : pd.kv_transfer_mean_ms / 1e3,
+    specTokensPerStep: d.speculative && decodeSteps > 0 ? completedOutputs / decodeSteps : null,
+    prefillPoolRequests: d.disagg ? (pd?.disaggregated_requests ?? 0) : null
+  };
   return {
     simulator: "blis",
     scenario: s.id,
     kvBlocksPerReplica: cluster.kv_capacity_tokens_per_replica / BLOCK_TOKENS,
     requests: sortRows(rows),
     preemptions: cluster.preemptions,
-    requestsPerPod
+    requestsPerPod,
+    aggregates
   };
 }
 
@@ -110,35 +131,40 @@ function routerModule(binary: string): string {
 }
 
 /**
- * Write the scenario's BLIS input to a scratch directory, run `blis replay`, and reduce the Result.
+ * Write each arm's BLIS input to a scratch directory, run it, and reduce the Result.
  * Throws with BLIS's own message when it refuses the scenario.
  */
 export function runBlis(s: Scenario, binary: string, keep?: string): BlisRun {
-  const input = toBlis(s);
-  const dir = keep ?? mkdtempSync(path.join(tmpdir(), `blis-${s.id}-`));
-  mkdirSync(dir, { recursive: true });
-  try {
-    for (const [file, text] of Object.entries(input.files)) {
-      const target = path.join(dir, file);
-      mkdirSync(path.dirname(target), { recursive: true });
-      writeFileSync(target, text);
-    }
+  const records: Record<string, Reduced> = {};
+  let provenance: BlisProvenance | undefined;
+  for (const arm of Object.keys(s.arms)) {
+    const input = toBlis(s, arm);
+    const dir = keep ? path.join(keep, arm) : mkdtempSync(path.join(tmpdir(), `blis-${s.id}-${arm}-`));
+    mkdirSync(dir, { recursive: true });
     try {
-      execFileSync(binary, input.args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 28 });
-    } catch (e) {
-      const err = e as { stderr?: string; message: string };
-      throw new Error(`${s.id}: blis replay failed:\n${err.stderr ?? err.message}`);
+      for (const [file, text] of Object.entries(input.files)) {
+        const target = path.join(dir, file);
+        mkdirSync(path.dirname(target), { recursive: true });
+        writeFileSync(target, text);
+      }
+      try {
+        execFileSync(binary, input.args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 28 });
+      } catch (e) {
+        const err = e as { stderr?: string; message: string };
+        throw new Error(`${s.id}/${arm}: blis ${input.args[0]} failed:\n${err.stderr ?? err.message}`);
+      }
+      const result = JSON.parse(readFileSync(path.join(dir, "result.json"), "utf8")) as Result;
+      provenance ??= {
+        commit: lockedCommit(),
+        catalogHash: result.data.catalog.hash,
+        registryHash: result.data.registry.hash,
+        engineVersion: result.engine.version,
+        routerModule: routerModule(binary)
+      };
+      records[arm] = reduceBlis(s, arm, result);
+    } finally {
+      if (!keep) rmSync(dir, { recursive: true, force: true });
     }
-    const result = JSON.parse(readFileSync(path.join(dir, "result.json"), "utf8")) as Result;
-    const provenance: BlisProvenance = {
-      commit: lockedCommit(),
-      catalogHash: result.data.catalog.hash,
-      registryHash: result.data.registry.hash,
-      engineVersion: result.engine.version,
-      routerModule: routerModule(binary)
-    };
-    return { reference: { scenario: s.id, inputHash: input.inputHash, blis: provenance, record: reduceBlis(s, result) } };
-  } finally {
-    if (!keep) rmSync(dir, { recursive: true, force: true });
   }
+  return { reference: { scenario: s.id, inputHash: scenarioInputHash(s), blis: provenance!, records } };
 }

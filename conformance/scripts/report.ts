@@ -9,23 +9,24 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { evaluate } from "../compare.js";
 import type { Reference } from "../record.js";
-import { runTypescript } from "../run/typescript.js";
+import { runTypescriptArms } from "../run/typescript.js";
 import { REFERENCE_DIR, loadScenario, scenarioIds } from "../scenario.js";
 
 const ids = process.argv[2] ? [process.argv[2]] : scenarioIds();
 for (const id of ids) {
   const scenario = loadScenario(id);
   const file = path.join(REFERENCE_DIR, `${id}.json`);
-  const { reduced } = runTypescript(scenario);
   if (!existsSync(file)) {
     console.log(`${id}: no reference yet`);
     continue;
   }
+  const ts = runTypescriptArms(scenario);
   const ref = JSON.parse(readFileSync(file, "utf8")) as Reference;
   for (const check of scenario.checks) {
-    const o = evaluate(check, reduced, ref.record);
+    const o = evaluate(check, ts, ref.records);
     const n = Object.keys(o.differences).length;
-    console.log(`${id} / ${check.id}: ${n === 0 ? "agrees" : `${n} difference(s)`}`);
+    const note = check.kind === "exact" ? "" : ` ${JSON.stringify({ typescript: o.typescript, blis: o.blis, ...o.detail })}`;
+    console.log(`${id} / ${check.id} [${check.kind}]: ${n === 0 ? "agrees" : `${n} difference(s)`}${note}`);
     if (n) console.log(JSON.stringify(o.differences, null, 1));
   }
 }
