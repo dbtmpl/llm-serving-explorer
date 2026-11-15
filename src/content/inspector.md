@@ -18,13 +18,17 @@ This session has been pruned.
 _Where:_ Dive-in panel of the gateway and prompt assembler, below the cost rows.
 
 ### text
-Hop 1: the gateway authenticates the caller, counts the prompt in tokens and applies rate limits. Providers limit tokens per minute as well as requests per minute because cost follows tokens ([OpenAI][@openaiRateLimits], [Envoy AI Gateway][@envoyAiGatewayRateLimit]). It attaches a request id and a deadline: how long the request may wait in the router's queue before it is rejected rather than answered late ([@llmdFlowControl]; the slider "shed requests waiting longer than"). Hop 2: the prompt assembler reads the history from the conversation store and builds system prompt + history + new message. Their order decides what the prefix cache (the saved work of earlier tokens) can reuse, and the router uses the prompt's identity to find a pod that already holds it ([@llmdKvCacheIndexer]). The site draws gateway and assembler as one node; real deployments differ in where counting happens. The request still travels to the pod as text; the engine's own server there applies the model's chat template and tokenises again, giving the token ids the model really consumes ([@vllmOpenAiServer]). From here on the unit of work is the token. Prefill cost is 2N per token plus an attention term that grows with the square of the prompt, which equals 2N at {crossover} tokens of context for this model.
+Hop 1: the gateway authenticates the caller, counts the prompt in tokens and applies rate limits. Providers limit tokens per minute as well as requests per minute because cost follows tokens ([OpenAI][@openaiRateLimits], [Envoy AI Gateway][@envoyAiGatewayRateLimit]). It attaches a request id and a deadline: how long the request may wait in the router's queue before it is rejected rather than answered late, which is called load shedding ([@llmdFlowControl]; the slider "shed requests waiting longer than"). Hop 2: the prompt assembler reads the history from the conversation store and builds system prompt + history + new message. Their order decides what the prefix cache (the saved work of earlier tokens) can reuse, and the router uses the prompt's identity to find a pod that already holds it ([@llmdKvCacheIndexer]). The site draws gateway and assembler as one node; real deployments differ in where counting happens. The request still travels to the pod as text; the engine's own server there applies the model's chat template and tokenises again, giving the token ids the model really consumes ([@vllmOpenAiServer]). From here on the unit of work is the token. Prefill cost is 2N per token plus an attention term that grows with the square of the prompt, which equals 2N at {crossover} tokens of context for this model.
 
 ## `gateway.note` Router
 _Where:_ Dive-in panel of the router, below the table of the last routing decision.
 
 ### text
-A request is pinned to its pod from admission until it finishes, because its saved work (its KV cache) lives in that pod's memory. The prefix-aware router gives every ready pod a score and picks the highest: 3 × (share of the prompt the pod already has cached, scaled by the tier it sits in) + 2 × (share of its KV memory that is free) + 2 × (share of its capacity that is free). The weights are [llm-d's recommended profile][@llmdScheduling] on the [Gateway API Inference Extension][@gatewayInferenceExtension]; how much a copy in HBM, DRAM, SSD or the remote pool counts (HBM most) is this model's own choice. So a pod holding the cache wins unless it is too busy, and a pod at capacity (`max_num_seqs` plus a short queue allowance) is not a candidate. Least-loaded sends the request to the pod with the fewest requests, like [Envoy's least-request balancer][@envoyLoadBalancing]; round-robin takes the pods in turn, so returning sessions land on cold pods and prefill again.
+A request is pinned to its pod from admission until it finishes, because its saved work (its KV cache) lives in that pod's memory. The prefix-aware router gives every ready pod $p$ a score and picks the highest:
+
+$$\text{score}(p) = [[wCache]]\,c_p + [[wKv]]\,m_p + [[wQueue]]\,q_p$$
+
+Here $c_p$ is the share of the prompt that pod $p$ already has cached (scaled down by the memory tier it sits in), $m_p$ the share of its KV memory that is free and $q_p$ the share of its request capacity that is free; each is between 0 and 1. The weights are [llm-d's recommended profile][@llmdScheduling] on the [Gateway API Inference Extension][@gatewayInferenceExtension]; how much a copy in HBM, DRAM, SSD or the remote pool counts (HBM most) is this model's own choice. So a pod holding the cache wins unless it is too busy (the other pods lead on $m$ and $q$ together by more than the cache term $[[wCache]]\,c_p$ is worth), and a pod at capacity (`max_num_seqs` plus a short queue allowance) is not a candidate. Least-loaded sends the request to the pod with the fewest requests, like [Envoy's least-request balancer][@envoyLoadBalancing]; round-robin takes the pods in turn, so returning sessions land on cold pods and prefill again.
 
 ## `store.note` Conversation store
 _Where:_ Dive-in panel of the conversation store, below its counters.
@@ -54,7 +58,7 @@ This pod has been terminated.
 _Where:_ Dive-in panel of a pod, group "GPU memory and KV blocks", below the memory rows. The tensor-parallel sentence is added when a pod spans more than one GPU.
 
 ### text
-The KV pool is what is left after the other three. The engine budgets {utilisation} of the memory the driver reports, which is more than the name of the GPU suggests: {nominal} for {reported} reported [@vllmMemoryProfiling]. The pool is split into fixed blocks that need not be contiguous; a per-sequence block table maps logical to physical blocks, so a sequence holds what it uses and waste is confined to its last block. Each coloured cell in the graph stands for {cellBlocks} blocks; pale cells are cached but idle.
+The KV pool is what remains of the share the engine may use, after the weights and the activations and CUDA graphs; the headroom, the part above `gpu_memory_utilization`, lies outside that share and is never used. The engine budgets {utilisation} of the memory the driver reports, which is more than the name of the GPU suggests: {nominal} for {reported} reported [@vllmMemoryProfiling]. The pool is split into fixed blocks that need not be contiguous; a per-sequence block table maps logical to physical blocks, so a sequence holds what it uses and waste is confined to its last block. Each coloured cell in the graph stands for {cellBlocks} blocks; pale cells are cached but idle.
 
 ### tensor-parallel
 With tensor parallelism every GPU holds a slice of every sequence's KV heads, so the {tp} grids fill together.
@@ -63,7 +67,11 @@ With tensor parallelism every GPU holds a slice of every sequence's KV heads, so
 _Where:_ Dive-in panel of a pod, group "Roofline and throughput", below the throughput rows.
 
 ### text
-A step cannot run faster than its arithmetic allows or than its data can arrive; the ridge is the arithmetic intensity (FLOPs per byte read) where those two limits meet [@williams2009]. Decode reads {weights} of weights to make one token per sequence, so it sits left of the ridge at any batch: throughput is set by bandwidth and context length, not FLOPs. Prefill does thousands of FLOPs per byte and runs at the flat roof.
+A step cannot run faster than its arithmetic allows or than its data can arrive [@williams2009]:
+
+$$t_{\text{step}} = \max\!\left(\frac{\text{FLOPs}}{\text{peak FLOP/s}},\ \frac{\text{bytes read}}{\text{memory bandwidth}}\right)$$
+
+The ridge is the arithmetic intensity (FLOPs per byte read) where the two terms are equal, $\text{peak FLOP/s} \div \text{bandwidth}$. Decode reads {weights} of weights to make one token per sequence, so it sits left of the ridge at any batch: throughput is set by bandwidth and context length, not FLOPs. Prefill does thousands of FLOPs per byte and runs at the flat roof.
 
 ## `pod.tiers.note` Memory tiers and eviction
 _Where:_ Dive-in panel of a pod, group "Memory tiers and eviction", below the table of tiers.

@@ -23,6 +23,20 @@ describe("prefix-cache-aware routing (llm-d endpoint picker)", () => {
     expect(policy.score(busy)).toBeCloseTo(3.75, 12);
     expect(policy.score(busy)).toBeLessThan(policy.score(facts()));
   });
+  it("flips exactly where the other pod's lead on the two load terms passes the cache term (3 for a full HBM copy)", () => {
+    // pod A holds the whole prompt in HBM with a 75%-full pool; pod B is empty. Lead of B on the load terms: 2 · 0.75 + 2 · load/16.
+    const a = (load: number) => policy.score(facts({ cachedFraction: 1, cacheLocation: "hbm", kvUtilisation: 0.75, load }));
+    const b = policy.score(facts());
+    expect(a(11)).toBeGreaterThan(b); // lead 2.875 < 3
+    expect(a(12)).toBeCloseTo(b, 12); // lead 3.0: a tie, which the first candidate wins
+    expect(a(13)).toBeLessThan(b); // lead 3.125 > 3
+    // with 96% of the prompt cached the cache term is 2.88, so the flip is earlier
+    const partial = (load: number) => policy.score(facts({ cachedFraction: 0.96, cacheLocation: "hbm", kvUtilisation: 0.75, load }));
+    expect(partial(11)).toBeGreaterThan(b); // lead 2.875 < 2.88
+    expect(partial(12)).toBeLessThan(b); // lead 3.0 > 2.88
+    // the queue term alone can never outweigh a full copy: its largest lead is 2 (an idle pod against one at capacity)
+    expect(policy.score(facts({ cachedFraction: 1, cacheLocation: "hbm", load: 15 }))).toBeGreaterThan(b);
+  });
   it("values a cached copy less the further down the tiers it sits", () => {
     const at = (cacheLocation: CandidateFacts["cacheLocation"]) => policy.score(facts({ cachedFraction: 1, cacheLocation }));
     expect(at("hbm")).toBeGreaterThan(at("dram"));

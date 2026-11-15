@@ -4,10 +4,10 @@
  * to, which variant to use, and the values to fill in. `title`, `body` and `detail` of a Callout
  * are already-filled markdown, rendered with <Rich>.
  */
-import { stepText } from "../content/index.js";
+import { diveConcepts, stepText, type DiveConcept } from "../content/index.js";
 import { fmtGB, fmtInt, fmtMs } from "./format.js";
 import type { Scene, Target } from "./render.js";
-import { POD_QUEUE_SLACK, type SimEvent, type World } from "../sim/index.js";
+import { POD_QUEUE_SLACK, SCORER_WEIGHTS, TIER_AFFINITY, prefixAwareTerms, type SimEvent, type World } from "../sim/index.js";
 
 export interface Callout {
   key: string;
@@ -28,6 +28,8 @@ export interface Callout {
   body: string;
   /** markdown; a second paragraph, shown in step-through mode */
   detail?: string;
+  /** the theory behind this step: the concepts of its `dive` field, shown as "Dive deeper" in the step-through box */
+  dive: DiveConcept[];
   tone: "info" | "prefill" | "decode" | "dram" | "ssd" | "remote" | "evict";
   /** shown only the first time it happens */
   once?: boolean;
@@ -50,6 +52,40 @@ export interface Callout {
   queuedAt?: { t: number; vt: number };
 }
 
+/** The load of the cached pod at which an idle pod, whose KV pool is empty, first outscores it, with a pool `kvUse` in use. */
+export function overtakeLoad(capacity: number, kvUse: number): number {
+  const cached = (load: number) => prefixAwareTerms({ cachedFraction: 1, cacheLocation: "hbm", kvUtilisation: kvUse, load, capacity });
+  const total = (t: ReturnType<typeof cached>) => t.cache.term + t.kv.term + t.queue.term;
+  const idle = total(prefixAwareTerms({ cachedFraction: 0, cacheLocation: null, kvUtilisation: 0, load: 0, capacity }));
+  let load = 0;
+  while (load < capacity && total(cached(load)) >= idle) load++;
+  return load;
+}
+
+/** The numbers that explain the routing score in words (the detail of `req.routed`); all come from the model. */
+export function scoreFacts(w: World) {
+  const slots = w.params.maxNumSeqs;
+  const cap = slots + POD_QUEUE_SLACK;
+  const loadMax = SCORER_WEIGHTS.kvUtilisation + SCORER_WEIGHTS.queue;
+  const exampleKv = 0.75;
+  return {
+    cap,
+    slots,
+    slack: POD_QUEUE_SLACK,
+    wCache: SCORER_WEIGHTS.prefixCache,
+    wKv: SCORER_WEIGHTS.kvUtilisation,
+    wQueue: SCORER_WEIGHTS.queue,
+    loadMax,
+    lead96: (SCORER_WEIGHTS.prefixCache * 0.96).toFixed(2),
+    exampleKv: exampleKv * 100,
+    exampleLoad: overtakeLoad(cap, exampleKv),
+    affHbm: TIER_AFFINITY.hbm,
+    affDram: TIER_AFFINITY.dram,
+    affSsd: TIER_AFFINITY.ssd,
+    affRemote: TIER_AFFINITY.remote
+  };
+}
+
 /** Which field of the `req.routed` entry describes each routing policy. */
 const HOW = { "prefix-aware": "how-prefix-aware", "least-loaded": "how-least-loaded", "round-robin": "how-round-robin" } as const;
 
@@ -59,7 +95,7 @@ export type Meta = Pick<Callout, "key" | "target" | "tone"> & Partial<Pick<Callo
 export type Say = Parameters<typeof stepText>;
 
 /** Build a callout: where it goes and when (meta), and which entry of step-through.md fills it. */
-export const make = (content: string, meta: Meta, values?: Say[2], pick?: Say[1]): Callout => ({ ...meta, content, ...stepText(content, pick, values) });
+export const make = (content: string, meta: Meta, values?: Say[2], pick?: Say[1]): Callout => ({ ...meta, content, ...stepText(content, pick, values), dive: diveConcepts(content) });
 
 export function calloutFor(e: SimEvent, w: World): Callout[] {
   const pod = (part: "engine" | "gpu" | "roofline" | "tiers" = "engine"): Target => ({ type: "pod", id: e.podId!, part });
@@ -96,7 +132,7 @@ export function calloutFor(e: SimEvent, w: World): Callout[] {
     case "pod.loading":
       return p ? [make("pod.loading", { key: "loading", once: true, target: pod("gpu"), tone: "info" }, { weights: fmtGB(p.budget.weights), cold: `${w.params.coldStartS} s` })] : [];
     case "pod.ready":
-      return p ? [make("pod.ready", { key: "ready", once: true, target: pod("gpu"), tone: "info" }, { kv: fmtGB(p.budget.kv * p.spec.tp), blocks: fmtInt(p.budget.poolBlocks) })] : [];
+      return p ? [make("pod.ready", { key: "ready", once: true, target: pod("gpu"), tone: "info" }, { weights: fmtGB(p.budget.weights), work: fmtGB(p.budget.activations + p.budget.graphs), headroom: fmtGB(p.budget.headroom), kv: fmtGB(p.budget.kv), blocks: fmtInt(p.budget.poolBlocks) })] : [];
     case "pod.failed":
       return p ? [make("pod.failed", { key: `failed${e.podId}`, target: pod("gpu"), tone: "evict" }, { fixed: fmtGB(p.budget.weights + p.budget.activations + p.budget.graphs), usable: fmtGB(p.budget.device - p.budget.headroom) })] : [];
     case "req.routed": {
@@ -105,7 +141,7 @@ export function calloutFor(e: SimEvent, w: World): Callout[] {
         make(
           "req.routed",
           { key: "routed", once: true, target: { type: "gateway" }, tone: "info" },
-          { podId: e.podId!, ...(policy === "prefix-aware" ? { cap: w.params.maxNumSeqs + POD_QUEUE_SLACK } : {}) },
+          { podId: e.podId!, ...(policy === "prefix-aware" ? scoreFacts(w) : {}) },
           {
             body: [HOW[policy], e.via === "prefill" && "via-prefill", e.via === "decode-only" && "via-decode-only"],
             detail: `detail-${policy}`

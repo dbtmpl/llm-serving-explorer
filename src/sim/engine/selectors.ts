@@ -4,6 +4,9 @@
 import type { World } from "../core/types.js";
 import { THROUGHPUT_WINDOW_S, UNITS } from "./constants.js";
 
+/** Seconds since the first request was sent; 0 while none has been. This is the clock the page shows. */
+export const elapsed = (w: World): number => (w.startedAt === null ? 0 : w.t - w.startedAt);
+
 /** Output tokens emitted during the last second. */
 export function tokensPerSecond(w: World): number {
   let n = 0;

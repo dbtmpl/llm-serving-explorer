@@ -134,6 +134,9 @@ export function podGeom(tp: number): PodGeom {
   return { h: stripY + 110, gpus, lanesY: 40, stripY, gaugeY: stripY + 20, tiersY: stripY + 58 };
 }
 
+/** The four parts of one GPU's memory box, left to right. */
+export type GpuPart = "weights" | "work" | "kv" | "headroom";
+
 /** Horizontal split of one GPU's memory into weights | activations and CUDA graphs | KV | headroom. */
 function hbmSplit(pod: Pod, g: { x: number; y: number; w: number; h: number }) {
   const b = pod.budget;
@@ -357,6 +360,38 @@ export class Scene {
     const { cam, ...rest } = structuredClone(snap);
     Object.assign(this, rest);
     if (camera) this.cam = cam;
+  }
+
+  /** Which part of a GPU's memory box lies under a screen point, with its size in bytes per GPU; for the hover tooltip. */
+  segmentAt(w: World, sx: number, sy: number): { podId: number; part: GpuPart; bytes: number } | null {
+    const p = this.toWorld(sx, sy);
+    for (const pod of w.pods) {
+      const r = this.podRect(pod);
+      if (!r || p.x < r.x || p.x > r.x + r.w || p.y < r.y || p.y > r.y + r.h) continue;
+      for (const gp of podGeom(pod.spec.tp).gpus) {
+        const s = hbmSplit(pod, gp);
+        const lx = p.x - r.x;
+        const ly = p.y - r.y;
+        if (ly < s.y || ly > s.y + s.h || lx < s.x0 || lx > s.kx + s.kw + s.hw) continue;
+        const b = pod.budget;
+        // the strip of activations and graphs can be a couple of pixels wide: give it a margin on both sides
+        const slack = 3 / this.cam.s;
+        const part: GpuPart = lx >= s.x0 + s.ww - slack && lx <= s.x0 + s.ww + s.aw + slack ? "work" : lx < s.x0 + s.ww ? "weights" : lx < s.kx + s.kw ? "kv" : "headroom";
+        const bytes = part === "weights" ? b.weights : part === "work" ? b.activations + b.graphs : part === "kv" ? Math.max(0, b.kv) : b.headroom;
+        return { podId: pod.id, part, bytes };
+      }
+    }
+    return null;
+  }
+
+  /** Screen position of the middle of one part of a pod's first GPU memory box (tests use it to point at a segment). */
+  segmentCenter(w: World, podId: number, part: GpuPart): P | null {
+    const pod = w.pods.find((x) => x.id === podId);
+    const r = pod && this.podRect(pod);
+    if (!pod || !r) return null;
+    const s = hbmSplit(pod, podGeom(pod.spec.tp).gpus[0]!);
+    const x = part === "weights" ? s.x0 + s.ww / 2 : part === "work" ? s.x0 + s.ww + s.aw / 2 : part === "kv" ? s.kx + s.kw / 2 : s.kx + s.kw + s.hw / 2;
+    return this.toScreen({ x: r.x + x, y: r.y + s.y + s.h / 2 });
   }
 
   hit(w: World, sx: number, sy: number): Target | null {

@@ -40,7 +40,9 @@ export function route(w: World, r: Req): boolean {
       const kvUtilisation = pod.budget.poolBlocks ? activeBlocks(pod) / pod.budget.poolBlocks : 1;
       return { podId: pod.id, load, cache, tier, kvUtilisation, score: policy.score({ cachedFraction: cache, cacheLocation: tier, kvUtilisation, load, capacity }) };
     });
+  let cursor = w.rr;
   const pick = (candidates: Candidate[]): Candidate => {
+    cursor = w.rr;
     const choice = policy.pick(candidates.map((c) => c.score), w.rr);
     w.rr = choice.cursor;
     return candidates[choice.index]!;
@@ -67,7 +69,7 @@ export function route(w: World, r: Req): boolean {
   r.stage = "toPod";
   r.stageStart = w.t;
   r.stageEnd = w.t + FRONTEND_HOPS.toPod;
-  w.lastRoute = { t: w.t, sid: r.sid, reqId: r.id, chosen: pod.id, policy: p.routing, capacity, candidates };
+  w.lastRoute = { t: w.t, sid: r.sid, reqId: r.id, chosen: pod.id, policy: p.routing, capacity, cursor, candidates };
   w.routeLog.push(w.lastRoute);
   if (w.routeLog.length > ROUTE_LOG_SIZE) w.routeLog.shift();
   emit(w, "req.routed", { podId: pod.id, sid: r.sid, reqId: r.id, cache: chosen.cache, tier: chosen.tier, load: chosen.load, n: candidates.length, via, role: pod.role });

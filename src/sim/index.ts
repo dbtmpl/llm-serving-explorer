@@ -26,6 +26,6 @@ export { MIN_OUTPUT_TOKENS, spawnBurst } from "./workload/index.js";
 export { loadTrace, type TraceRequest } from "./workload/trace.js";
 export { advance, setParam } from "./engine/tick.js";
 export { restartFleet } from "./engine/fleet.js";
-export { costPerMTok, kvFill, median, tokensPerSecond } from "./engine/selectors.js";
+export { costPerMTok, elapsed, kvFill, median, tokensPerSecond } from "./engine/selectors.js";
 
 export { ARCHITECTURES, DEFAULT_ARCH, type Architecture } from "./presets/architectures.js";
