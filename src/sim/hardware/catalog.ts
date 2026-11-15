@@ -52,12 +52,12 @@ export interface GpuSpec {
 /**
  * Architecture values are read from each model's published `config.json`. `N` is the parameter count
  * those values imply (embedding and untied output head, then per layer the attention projections and the
- * three feed-forward matrices): Llama 3.1 8B 8.03e9, Llama 3 70B 70.55e9. The 70B model is often called
+ * three feed-forward matrices): Llama 3.1 8B 8.03e9, Llama 3.1 70B 70.55e9. The 70B model is often called
  * "70B"; the weights a GPU holds are the 70.55e9.
  */
 export const MODELS: Record<string, ModelSpec> = {
   "llama-3.1-8b": { id: "llama-3.1-8b", label: "Llama 3.1 8B", N: 8.03e9, nL: 32, nH: 32, nKv: 8, dH: 128, d: 4096, dFf: 14336, vocab: 128256, source: "llama31Card" },
-  "llama-3-70b": { id: "llama-3-70b", label: "Llama 3 70B", N: 70.55e9, nL: 80, nH: 64, nKv: 8, dH: 128, d: 8192, dFf: 28672, vocab: 128256, source: "llama370Card" }
+  "llama-3.1-70b": { id: "llama-3.1-70b", label: "Llama 3.1 70B", N: 70.55e9, nL: 80, nH: 64, nKv: 8, dH: 128, d: 8192, dFf: 28672, vocab: 128256, source: "llama3170Card" }
 };
 
 /**

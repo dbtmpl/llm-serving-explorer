@@ -155,7 +155,7 @@ describe("callouts produced by real simulations", () => {
     ["preemption", { promptTokens: 4000, outputTokens: 1500, maxPods: 1, gpuMemUtil: 0.3, returnProb: 0 }, 12, 90],
     ["disaggregated and speculative", { disagg: true, specDecode: true, overlap: true, shedAfterS: 1, maxPods: 3 }, 60, 60],
     ["round robin, no prefix cache", { routing: "round-robin", prefixCaching: false, batching: "static", admission: "reserve" }, 20, 40],
-    ["model does not fit", { model: "llama-3-70b", tp: 1, maxPods: 1 }, 2, 10],
+    ["model does not fit", { model: "llama-3.1-70b", tp: 1, maxPods: 1 }, 2, 10],
     ["tiny tiers and a remote pool", { promptTokens: 10000, outputTokens: 60, maxPods: 1, gpuMemUtil: 0.5, dramGB: 1, ssdGB: 1, remoteGB: 1, returnProb: 0.8, thinkTimeS: 3 }, 40, 150],
     ["least loaded, churn", { routing: "least-loaded", arrivalRate: 2, returnProb: 0.8, thinkTimeS: 3, maxPods: 12 }, 50, 60]
   ];
@@ -191,7 +191,7 @@ describe("the step-through script produced from real simulations", () => {
     ["disaggregated", { disagg: true, returnProb: 1, maxTurns: 2, thinkTimeS: 1 }, 6, 50],
     ["preemption", { promptTokens: 4000, outputTokens: 1500, maxPods: 1, gpuMemUtil: 0.3, returnProb: 0 }, 12, 90],
     ["tiers under pressure", { promptTokens: 10000, outputTokens: 60, maxPods: 1, gpuMemUtil: 0.5, dramGB: 1, ssdGB: 1, remoteGB: 1, returnProb: 0.8, thinkTimeS: 3 }, 30, 100],
-    ["model does not fit", { model: "llama-3-70b", tp: 1, maxPods: 1 }, 2, 10]
+    ["model does not fit", { model: "llama-3.1-70b", tp: 1, maxPods: 1 }, 2, 10]
   ];
   it("every event of every scenario turns into steps whose texts are filled and parseable", () => {
     const ids = new Set<string>();

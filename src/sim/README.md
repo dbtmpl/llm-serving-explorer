@@ -135,7 +135,7 @@ When a paper introduces a decision that has no home yet (for example KV compress
 - **TF Serving repository.** [TensorFlow Serving](https://github.com/tensorflow/serving).
 - **NVIDIA Dynamo repository.** [NVIDIA Dynamo: datacenter-scale distributed inference serving framework](https://github.com/ai-dynamo/dynamo).
 - **Meta, Llama 3.1 8B model card.** [meta-llama/Llama-3.1-8B-Instruct (architecture in config.json)](https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct).
-- **Meta, Llama 3 70B model card.** [meta-llama/Meta-Llama-3-70B-Instruct (architecture in config.json)](https://huggingface.co/meta-llama/Meta-Llama-3-70B-Instruct).
+- **Meta, Llama 3.1 70B model card.** [meta-llama/Llama-3.1-70B-Instruct (architecture in config.json)](https://huggingface.co/meta-llama/Llama-3.1-70B-Instruct).
 - **NVIDIA H100 datasheet.** [NVIDIA H100 Tensor Core GPU](https://www.nvidia.com/en-us/data-center/h100/).
 - **NVIDIA H200 datasheet.** [NVIDIA H200 Tensor Core GPU](https://www.nvidia.com/en-us/data-center/h200/).
 - **NVIDIA DGX B200 datasheet.** [NVIDIA DGX B200 (Blackwell B200)](https://www.nvidia.com/en-us/data-center/dgx-b200/).

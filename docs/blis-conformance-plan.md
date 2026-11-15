@@ -22,7 +22,7 @@ Measured on this machine, not assumed:
 | `--trace-level decisions` records the router's score for every endpoint on every routing decision | Routing can be compared decision by decision |
 | Upstream now models tiered KV offload (host DRAM, NVMe, remote object storage), prefill/decode pools with KV transfer, speculative decoding, flow control and an autoscaler loop | Most of what ADR 0004 listed as missing in the old pin now has a counterpart |
 | No event stream (`--events-output`), no WebAssembly target and no stepping interface exist upstream | The calibrated mode cannot be interactive; step-level replay still needs an upstream change |
-| The catalog has `llama-3.1-8b-instruct`, `llama-3.1-70b-instruct`, H100, H200, B200. It has no MI300X and no Llama 3 70B | Conformance scenarios use the shared subset; the site's 70B entry should become Llama 3.1 70B (same architecture) |
+| The catalog has `llama-3.1-8b-instruct`, `llama-3.1-70b-instruct`, H100, H200, B200. It has no MI300X and no Llama 3 70B (done: the entry is now Llama 3.1 70B) | Conformance scenarios use the shared subset; the site's 70B entry should become Llama 3.1 70B (same architecture) |
 
 ## Coverage: which concept is checked how
 

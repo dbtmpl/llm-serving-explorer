@@ -70,7 +70,7 @@ export function kvBytesPerToken(m: ModelSpec): number {
  * feed-forward width (the up and gate projections are split by column; Shoeybi et al., 2019). The logits
  * are gathered over the whole vocabulary for sampling, so they are not split.
  *
- * Example: Llama 3.1 8B, one GPU: 8192 · (2·4096 + 2·14336) · 2 + 256 · 128256 · 4 = 735.3 MB. Llama 3 70B on
+ * Example: Llama 3.1 8B, one GPU: 8192 · (2·4096 + 2·14336) · 2 + 256 · 128256 · 4 = 735.3 MB. Llama 3.1 70B on
  * four GPUs: 8192 · (2·8192 + 2·28672/4) · 2 + 256 · 128256 · 4 = 634.7 MB, where it would be 1.34 GB unsplit.
  *
  * BLIS prices the same pass as 11 (one GPU) or 5 (four GPUs) bf16 hidden-state rows per token of the step,
