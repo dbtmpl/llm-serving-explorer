@@ -4,14 +4,38 @@ import { GATE_TIMEOUT_S, end, newScript, stepsFor, type Script } from "./walkthr
 import { TOUR, TourArt } from "./Tutorial.js";
 import { Inspector } from "./Inspector.js";
 import { Rich } from "./Rich.js";
-import { architectureText, panelFields, panelText } from "../content/index.js";
+import { architectureText, panelFields, panelText, replayFields, replayText } from "../content/index.js";
 import { fmtGB, fmtInt, fmtMs } from "./format.js";
 import { C, Scene, TONE, type Free, type GpuPart, type Target } from "./render.js";
+import { ReplayRun } from "../replay/adapter.js";
+import { blankRun } from "../replay/blank.js";
+import { loadReplay } from "../replay/load.js";
+import { BlisBadge, ModeToggle, ReadOnlySettings, ScenarioPanel, type Mode } from "../replay/ReplayPanels.js";
+import { ReplayInspector } from "../replay/ReplayInspector.js";
+import { DEFAULT_REPLAY, type ReplayId } from "../replay/scenarios.js";
+import type { ReplayFile } from "../replay/schema.js";
+import { exploreRun, type Run, type RunWorld } from "./run.js";
 import { ARCHITECTURES, DEFAULT_ARCH, DEFAULT_PARAMS, GPUS, MODELS, advance, costPerMTok, createWorld, elapsed, evictIdleNow, kvFill, livePods, median, setParam, spawnBurst, tokensPerSecond, type Params, type World } from "../sim/index.js";
 import "./live.css";
 
 const EMPTY_TEXT = panelFields("empty", { title: "title", text: "text", hint: "hint" });
 const SPEEDS = [0.02, 0.05, 0.1, 0.25, 0.5, 1];
+/** A replay runs at BLIS's own pace at 1×; its scenarios last from under a minute to a few, so it also offers faster. */
+const REPLAY_SPEEDS = [0.5, 1, 2, 5, 10];
+const EXPLORE_SPEED = 0.1;
+const REPLAY_SPEED = 1;
+/** The text drawn on each pod where a replay has no per-step detail (src/content/replay.md). */
+const AGGREGATE_NOTE = (() => {
+  const l = replayFields("pod.aggregate", { a: "line-1", b: "line-2", c: "line-3", d: "line-4" });
+  return [l.a, l.b, l.c, l.d].join("\n");
+})();
+
+interface Calibrated {
+  id: ReplayId;
+  status: "loading" | "ready" | "failed";
+  file: ReplayFile | null;
+  error: string;
+}
 const CALLOUT_TTL = 9;
 
 interface Shown extends Callout {
@@ -157,6 +181,12 @@ export function LiveView() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const worldRef = useRef<World>(createWorld({ ...DEFAULT_PARAMS }));
   const sceneRef = useRef(new Scene());
+  // what drives the canvas: the TypeScript model, or (Calibrated mode) a BLIS replay
+  const exploreRef = useRef<Run>(exploreRun(() => worldRef.current));
+  const runRef = useRef<Run>(exploreRef.current);
+  const loadToken = useRef(0);
+  const [mode, setMode] = useState<Mode>("explore");
+  const [cal, setCal] = useState<Calibrated>({ id: DEFAULT_REPLAY, status: "loading", file: null, error: "" });
   const [playing, setPlaying] = useState(true);
   const [speed, setSpeed] = useState(0.1);
   const [explain, setExplain] = useState(true);
@@ -184,7 +214,8 @@ export function LiveView() {
   const leftRef = useRef<HTMLDivElement>(null);
   const rightRef = useRef<HTMLDivElement>(null);
   const [panels, setPanels] = useState(true);
-  const w = worldRef.current;
+  const calibrated = mode === "calibrated";
+  const w: RunWorld = runRef.current.world;
   const p = w.params;
 
   useEffect(() => {
@@ -194,7 +225,7 @@ export function LiveView() {
     let raf = 0;
     let last = performance.now();
     let lastRefresh = 0;
-    (window as unknown as { __live: unknown }).__live = { world: () => worldRef.current, scene };
+    (window as unknown as { __live: unknown }).__live = { world: () => worldRef.current, run: () => runRef.current, scene };
     /**
      * Guided stretch (tutorial card or held step-through box): dock the card, work out the screen area
      * it leaves free and ask the scene to frame and highlight what the step is about. Wide screens put
@@ -269,7 +300,11 @@ export function LiveView() {
 
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
+      const run = runRef.current;
+      const calibrated = run.kind === "calibrated";
+      // the TypeScript model's own world: the step-through and the callouts read it, and they are off in Calibrated mode
       const world = worldRef.current;
+      const shown = run.world;
       const st = live.current;
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
@@ -299,13 +334,15 @@ export function LiveView() {
       const replay = st.replay;
       const running = st.playing && !st.held && !frozen;
       const animating = st.playing && (!st.held || !!st.held.animate || !!replay);
-      if (running) advance(world, dt * st.speed);
+      if (calibrated) {
+        if (st.playing) run.advance(dt * st.speed);
+      } else if (running) advance(world, dt * st.speed);
       else if (replay && st.playing && world.t < replay.t) advance(world, Math.min(dt * replay.rate, replay.t - world.t));
-      const events = world.events.splice(0);
+      const events = shown.events.splice(0);
       scene.focusSid = st.stepMode ? st.focus : null;
       guideScene(scene, st, cw, ch);
-      scene.update(world, events, dt, animating, cw, ch);
-      scene.draw(ctx, world, dpr);
+      scene.update(shown, events, dt, animating, cw, ch);
+      scene.draw(ctx, shown, dpr);
 
       // step-through: follow one session and stop the clock at each thing that happens to it
       if (replay) {
@@ -350,7 +387,7 @@ export function LiveView() {
       }
 
       // callouts: new ones from this frame's events, then keep every box glued to its node
-      if (st.explain && !st.stepMode && st.tour === null && events.length) {
+      if (!calibrated && st.explain && !st.stepMode && st.tour === null && events.length) {
         let next: Shown[] | null = null;
         for (const c of events.flatMap((e) => calloutFor(e, world))) {
           // one box per kind of event at a time, however many pods it happens on
@@ -415,9 +452,9 @@ export function LiveView() {
     };
     const move = (e: PointerEvent) => {
       if (!drag) {
-        const seg = scene.segmentAt(worldRef.current, e.offsetX, e.offsetY);
+        const seg = scene.segmentAt(runRef.current.world, e.offsetX, e.offsetY);
         setTip((cur) => (seg ? { x: e.offsetX, y: e.offsetY, part: seg.part, bytes: seg.bytes } : cur ? null : cur));
-        canvas.style.cursor = scene.hit(worldRef.current, e.offsetX, e.offsetY) ? "pointer" : "grab";
+        canvas.style.cursor = scene.hit(runRef.current.world, e.offsetX, e.offsetY) ? "pointer" : "grab";
         return;
       }
       const dx = e.clientX - drag.x;
@@ -432,7 +469,7 @@ export function LiveView() {
     };
     const up = (e: PointerEvent) => {
       if (drag && !drag.moved) {
-        const t = scene.hit(worldRef.current, e.offsetX, e.offsetY);
+        const t = scene.hit(runRef.current.world, e.offsetX, e.offsetY);
         scene.selected = t;
         setSelected(t);
       }
@@ -666,6 +703,52 @@ export function LiveView() {
       /* private mode: the tour simply shows again next visit */
     }
   };
+  /** Start (or restart) a BLIS replay: the graph is cleared at once and the file is fetched; the clock starts when it has arrived. */
+  const startReplay = (id: ReplayId) => {
+    const token = ++loadToken.current;
+    const scene = sceneRef.current;
+    runRef.current = blankRun();
+    scene.reset("aggregate");
+    scene.aggregateNote = AGGREGATE_NOTE;
+    scene.selected = null;
+    setSelected(null);
+    setCal({ id, status: "loading", file: null, error: "" });
+    loadReplay(id)
+      .then((file) => {
+        if (token !== loadToken.current) return;
+        runRef.current = new ReplayRun(file);
+        scene.reset("aggregate");
+        scene.aggregateNote = AGGREGATE_NOTE;
+        setCal({ id, status: "ready", file, error: "" });
+        setPlaying(true);
+      })
+      .catch((e: unknown) => {
+        if (token === loadToken.current) setCal({ id, status: "failed", file: null, error: e instanceof Error ? e.message : String(e) });
+      });
+  };
+
+  /** Switching mode restarts the animation: a fresh model for Explore, the scenario from its first second for Calibrated. */
+  const switchMode = (m: Mode) => {
+    const st = live.current;
+    if (m === mode) return;
+    if (st.stepMode) toggleStep();
+    st.finish();
+    setTour(null);
+    st.callouts = [];
+    setCallouts([]);
+    setMode(m);
+    if (m === "calibrated") {
+      setSpeed(REPLAY_SPEED);
+      startReplay(cal.id);
+    } else {
+      loadToken.current++;
+      sceneRef.current.reset("blocks");
+      runRef.current = exploreRef.current;
+      reset();
+      setSpeed(EXPLORE_SPEED);
+    }
+  };
+
   useEffect(() => {
     let seen = false;
     try {
@@ -705,7 +788,8 @@ export function LiveView() {
 
   const live_ = livePods(w);
   const hit = w.m.promptTokens ? w.m.cachedTokens / w.m.promptTokens : 0;
-  const empty = w.sessions.size === 0 && w.pods.length === 0 && w.pending.length === 0;
+  const empty = !calibrated && w.sessions.size === 0 && w.pods.length === 0 && w.pending.length === 0;
+  const replay = calibrated && runRef.current instanceof ReplayRun ? runRef.current : null;
   const activePreset = PRESETS.find((x) => x.id === preset);
   const tiles: [string, string, string?][] = [
     ["in flight", String(w.reqs.size), w.gatewayQueue.length ? `${w.gatewayQueue.length} queued` : undefined],
@@ -715,7 +799,7 @@ export function LiveView() {
     ["TPOT p50", w.m.tpot.length ? fmtMs(median(w.m.tpot)) : "–"],
     ["KV pool", `${(kvFill(w) * 100).toFixed(0)}%`, w.m.evictions ? `${w.m.evictions} evicted` : undefined],
     ["prefix hits", `${(hit * 100).toFixed(0)}%`, w.m.preemptions ? `${w.m.preemptions} preempted` : undefined],
-    ["cost", w.m.tokensOut ? `$${costPerMTok(w).toFixed(2)}/M` : "–", "output tokens"]
+    calibrated ? ["shed", String(w.m.failed), "at the router"] : ["cost", w.m.tokensOut ? `$${costPerMTok(w).toFixed(2)}/M` : "–", "output tokens"]
   ];
 
   return (
@@ -851,6 +935,8 @@ export function LiveView() {
         </>
       )}
 
+      {calibrated && cal.file && <BlisBadge commit={cal.file.blis.commit} />}
+
       <div className="lv-hud" data-testid="hud">
         {tiles.map(([k, v, sub]) => (
           <div key={k}>
@@ -863,9 +949,14 @@ export function LiveView() {
 
       <div className="lv-col lv-left" ref={leftRef} hidden={!showLeft}>
         <section className="lv-panel">
+          <ModeToggle mode={mode} onChange={switchMode} />
+          <Rich text={calibrated ? replayText("mode.calibrated") : replayText("mode.explore")} className="lv-note" />
           <header>
-            <h2>Serving architecture</h2>
+            <h2>{calibrated ? "BLIS scenario" : "Serving architecture"}</h2>
           </header>
+          {calibrated && <ScenarioPanel id={cal.id} file={cal.file} status={cal.status} error={cal.error} onPick={startReplay} />}
+          {!calibrated && (
+            <>
           <select className="lv-select" data-testid="arch" value={arch} onChange={(e) => applyArch(e.target.value)} aria-label="Serving architecture">
             {ARCHITECTURES.map((a, i) => (
               <option key={a.id} value={a.id}>
@@ -888,7 +979,10 @@ export function LiveView() {
               </details>
             );
           })()}
+            </>
+          )}
         </section>
+        {!calibrated && (
         <section className="lv-panel">
           <header>
             <h2>Requests</h2>
@@ -920,16 +1014,28 @@ export function LiveView() {
             <Rich text={panelText("sessions.note", { returnPct: (p.returnProb * 100).toFixed(0), thinkTime: p.thinkTimeS, leavePct: ((1 - p.returnProb) * 100).toFixed(0) })} className="lv-note" />
           </Group>
         </section>
-        {selected && (
+        )}
+        {selected && !calibrated && (
           <Inspector
             w={w}
             target={selected}
             onClose={() => select(null)}
           />
         )}
+        {selected && replay && <ReplayInspector run={replay} target={selected} onClose={() => select(null)} />}
       </div>
 
       <div className="lv-col lv-right" ref={rightRef} hidden={!showRight} data-tour="right">
+        {calibrated && (
+          <section className="lv-panel">
+            <header>
+              <h2>Scenario settings</h2>
+              <span className="lv-fixed">read-only</span>
+            </header>
+            {cal.file && <ReadOnlySettings file={cal.file} />}
+          </section>
+        )}
+        {!calibrated && (
         <section className="lv-panel">
           <header>
             <h2>Infrastructure</h2>
@@ -994,29 +1100,37 @@ export function LiveView() {
             <Slider label="price per GPU-hour" value={p.pricePerGpuHour} min={0.5} max={10} step={0.1} fmt={(v) => `$${v.toFixed(2)}`} onChange={(v) => set("pricePerGpuHour", v)} />
           </Group>
         </section>
+        )}
         <section className="lv-panel">
           <Group title="Legend">
             <div className="lv-legend">
-              {(
-                [
-                  [C.prefill, "prefill (compute-bound)"],
-                  [C.decode, "decode, output tokens (memory-bound)"],
-                  [C.weights, "weights in HBM"],
-                  ["hsl(200 66% 60%)", "KV blocks of a running sequence"],
-                  ["hsl(200 38% 84%)", "KV blocks cached, session idle"],
-                  [C.dram, "KV in host DRAM"],
-                  [C.ssd, "KV on SSD"],
-                  [C.remote, "KV in the shared remote pool"],
-                  [C.sub, "conversation text read or saved"],
-                  [C.evict, "dropped or preempted"]
-                ] as const
+              {(calibrated
+                ? ([
+                    [C.prefill, "prefill"],
+                    [C.decode, "decode, output tokens"],
+                    [C.weights, "weights in HBM"],
+                    ["hsl(205 62% 60%)", "share of the KV pool in use"],
+                    [C.evict, "preemption"]
+                  ] as const)
+                : ([
+                    [C.prefill, "prefill (compute-bound)"],
+                    [C.decode, "decode, output tokens (memory-bound)"],
+                    [C.weights, "weights in HBM"],
+                    ["hsl(200 66% 60%)", "KV blocks of a running sequence"],
+                    ["hsl(200 38% 84%)", "KV blocks cached, session idle"],
+                    [C.dram, "KV in host DRAM"],
+                    [C.ssd, "KV on SSD"],
+                    [C.remote, "KV in the shared remote pool"],
+                    [C.sub, "conversation text read or saved"],
+                    [C.evict, "dropped or preempted"]
+                  ] as const)
               ).map(([c, l]) => (
                 <div key={l}>
                   <i className="lv-sw" style={{ background: c }} />
                   {l}
                 </div>
               ))}
-              <Rich text={panelText("legend.note")} className="lv-note" />
+              <Rich text={calibrated ? replayText("legend") : panelText("legend.note")} className="lv-note" />
             </div>
           </Group>
         </section>
@@ -1026,20 +1140,22 @@ export function LiveView() {
         <button className="lv-play" data-testid="play-toggle" onClick={() => setPlaying(!playing)} aria-label={playing ? "Pause" : "Play"}>
           {playing ? "❚❚" : "▶"}
         </button>
-        <div className="lv-clock" data-testid="clock">
+        <div className="lv-clock" data-testid="clock" title={replay?.finished ? replayText("finished") : undefined}>
           <b>{elapsed(w).toFixed(2)} s</b>
-          <span>simulated</span>
+          <span>{replay?.finished ? "replay finished" : calibrated ? "BLIS clock" : "simulated"}</span>
         </div>
         <div className="lv-speed">
           <span>slow motion</span>
           <div className="lv-seg">
-            {SPEEDS.map((s) => (
+            {(calibrated ? REPLAY_SPEEDS : SPEEDS).map((s) => (
               <button key={s} className={s === speed ? "on" : ""} data-testid={`speed-${s}`} onClick={() => setSpeed(s)}>
                 {s}×
               </button>
             ))}
           </div>
         </div>
+        {!calibrated && (
+          <>
         <button className={`lv-ghost ${stepMode ? "on" : ""}`} data-testid="step-toggle" onClick={toggleStep} title="Follow one session and stop at each thing that happens to it">
           step-through{stepMode ? (focus !== null ? ` · session ${focus}` : " · waiting for a request") : ""}
         </button>
@@ -1049,6 +1165,8 @@ export function LiveView() {
         <button className="lv-ghost" data-testid="tour-start" onClick={startTour}>
           tutorial
         </button>
+          </>
+        )}
         <button className={`lv-ghost ${panels ? "on" : ""}`} data-testid="toggle-panels" onClick={() => setPanels(!panels)}>
           menus
         </button>
@@ -1058,7 +1176,7 @@ export function LiveView() {
         >
           fit
         </button>
-        <button className="lv-ghost" data-testid="reset" onClick={() => reset()}>
+        <button className="lv-ghost" data-testid="reset" onClick={() => (calibrated ? startReplay(cal.id) : reset())}>
           reset
         </button>
       </div>
