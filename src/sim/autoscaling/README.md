@@ -7,7 +7,7 @@ How many pods should be running.
 <!-- generated:approaches:start -->
 | Concept | Approach | What it does | Fidelity | Verified against BLIS | Sources |
 |---|---|---|---|---|---|
-| Autoscaling | Target concurrency | Run enough pods that each carries at most its target number of requests. | Simplified | Yes: `autoscale-overload` | [Knative docs, autoscaling](https://knative.dev/docs/serving/autoscaling/autoscaling-concepts/); [llm-d docs, autoscaling](https://github.com/llm-d/llm-d/blob/main/docs/architecture/autoscaling/keda-epp.md) |
+| Autoscaling | Target concurrency | Run enough pods that each carries at most its target number of requests. | Simplified | Yes: `autoscale-overload` | [Knative docs, autoscaling](https://knative.dev/docs/serving/autoscaling/concurrency/); [llm-d docs, autoscaling](https://github.com/llm-d/llm-d/blob/main/docs/architecture/autoscaling/keda-epp.md) |
 <!-- generated:approaches:end -->
 
 Fidelity: **Exact** reproduces a published formula or rule and is tested against it. **Structural** follows the source's mechanism with our own constants, exposed as parameters. **Simplified** is a stand-in whose docstring says what is left out.
