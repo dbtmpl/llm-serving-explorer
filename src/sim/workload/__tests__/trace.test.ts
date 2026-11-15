@@ -31,6 +31,34 @@ describe("trace replay (docstring example)", () => {
   });
 });
 
+describe("the last sampled token has no KV (vLLM allocate_slots caches up to prompt + output - 1)", () => {
+  it("a history of 880 tokens, a multiple of 16, reuses 864: the last token's block is incomplete", () => {
+    const w = traceWorld();
+    loadTrace(
+      w,
+      [
+        { at: 1, session: 7, round: 0, newTokens: 860, outputTokens: 20 },
+        { at: 20, session: 7, round: 1, newTokens: 100, outputTokens: 40 }
+      ],
+      MIN_OUTPUT_TOKENS
+    );
+    run(w, 60, () => w.m.completed === 2);
+    const admitted = w.events.filter((e) => e.kind === "req.admitted");
+    expect(admitted.map((e) => [e.lIn, e.cached])).toEqual([
+      [860, 0],
+      [980, 864]
+    ]);
+  });
+  it("what a finished turn leaves cached is prompt + output - 1 tokens", () => {
+    const w = traceWorld();
+    loadTrace(w, [{ at: 1, session: 7, round: 0, newTokens: 860, outputTokens: 20 }], MIN_OUTPUT_TOKENS);
+    run(w, 30, () => w.m.completed === 1);
+    const [entry] = [...w.pods[0]!.entries.values()];
+    expect(entry!.tokens).toBe(879);
+    expect(entry!.blocks).toBe(55); // ceil(879 / 16): the last block is partly filled
+  });
+});
+
 describe("trace replay edge cases", () => {
   it("injects nothing before the first request is due, and everything exactly once", () => {
     const w = traceWorld();

@@ -37,9 +37,29 @@ function retireEntry(w: World, pod: Pod, r: Req): void {
   }
 }
 
+/**
+ * What a finished request leaves in the prefix cache: its prompt and answer except the last token.
+ *
+ * Source: vLLM's `allocate_slots` caches blocks up to `min(computed + scheduled, request.num_tokens)`
+ * (vllm/v1/core/kv_cache_manager.py), and a token's KV is computed only when the token is fed to the model
+ * in a step. The last token of the answer is sampled by the final step but never fed to the model, because
+ * the request finishes with it. So after a turn the cache holds `prompt + output - 1` tokens, in whole blocks.
+ * (BLIS's translation does the same: core/kv/manager.go, `min(mainModel, a.NumTokens)`.)
+ *
+ * Example: a turn of 860 prompt tokens and 20 answer tokens ends with 879 tokens of KV, so 54 blocks are
+ * cached (864 tokens), not 55. A follow-up whose history is those 880 tokens reuses 864 and prefills 16 more
+ * plus its new message, where counting the last token would reuse 880.
+ *
+ * Simplified: the model grows a sequence's blocks one token ahead of vLLM during decode, so the answer's last
+ * block can be allocated a step early; this cap only affects what is cached for the next turn.
+ */
+export const cachedAfterTurn = (promptTokens: number, outputTokens: number): number => promptTokens + outputTokens - 1;
+
 function finish(w: World, pod: Pod, r: Req): void {
   pod.running.splice(pod.running.indexOf(r.id), 1);
   w.reqs.delete(r.id);
+  const entry = pod.entries.get(r.sid);
+  if (entry) entry.tokens = Math.min(entry.tokens, cachedAfterTurn(r.lIn, r.lOut));
   retireEntry(w, pod, r);
   const s = w.sessions.get(r.sid);
   const ttft = r.tFirst - r.tCreate;

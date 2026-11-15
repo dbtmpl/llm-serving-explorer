@@ -37,15 +37,3 @@ checks:
     kind: exact
     quantity: prefix_cached_tokens
     tolerance: Block arithmetic on integers.
-    known_difference:
-      reason: >-
-        Round 2 of every conversation has a history of 2,480 tokens (2000 + 300 + 150 + 30), a multiple of 16. Both
-        simulators route it to the replica that holds the conversation (see pod-choice, which agrees). vLLM, and so BLIS,
-        never writes the KV of the last token a request samples, so the cache holds 2,479 tokens of that history and
-        reuses 2,464 (the last whole block, 2,464-2,479, is incomplete). The TypeScript model counts the last output token
-        as cached and reuses 2,480. Same cause as the one difference in the prefix-cache scenario.
-      differences:
-        s1/r2: { typescript: 2480, blis: 2464 }
-        s2/r2: { typescript: 2480, blis: 2464 }
-        s3/r2: { typescript: 2480, blis: 2464 }
-        s4/r2: { typescript: 2480, blis: 2464 }
