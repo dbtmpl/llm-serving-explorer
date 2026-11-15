@@ -9,18 +9,20 @@ import { TOUR } from "../../live/Tutorial.js";
 import { run, world } from "../../sim/testing.js";
 import { evictIdleNow, spawnBurst } from "../../sim/index.js";
 import { typeset } from "../../live/Rich.js";
+import { REPLAY_IDS } from "../../replay/scenarios.js";
 import { ALL_DOCS, DIVE_DEEPER, STEP_THROUGH, diveConcepts, blocks, citationKeys, fill, fillEntry, parseDoc, parseInline, placeholders, stepText } from "../index.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const srcDir = path.resolve(here, "../..");
 
-const liveSource = (): string => {
-  const dir = path.join(srcDir, "live");
+const sourceOf = (sub: string): string => {
+  const dir = path.join(srcDir, sub);
   return readdirSync(dir)
     .filter((f) => /\.tsx?$/.test(f))
     .map((f) => readFileSync(path.join(dir, f), "utf8"))
     .join("\n");
 };
+const liveSource = (): string => sourceOf("live");
 
 const withoutMath = (text: string): string => text.replace(/\$\$[\s\S]+?\$\$|\$[^$\n]+\$/g, "");
 /** The text must split into blocks and every formula in it must typeset (KaTeX throws on a mistake in the TeX). */
@@ -94,6 +96,14 @@ describe("code and content agree", () => {
     const used = new Set([...refs(/panelText\(\s*"([^"]+)"/g), ...refs(/panelFields\(\s*"([^"]+)"/g)]);
     for (const id of used) expect(ALL_DOCS.panels.entries.has(id), `code uses ${id}`).toBe(true);
     for (const id of ALL_DOCS.panels.entries.keys()) expect(used.has(id), `panels.md ${id} is not used by code`).toBe(true);
+  });
+  it("every calibrated-mode id used by code exists, and every replay.md entry is used", () => {
+    const code = `${source}\n${sourceOf("replay")}`;
+    const used = new Set([...code.matchAll(/replay(?:Text|Fields)\(\s*"([^"]+)"/g)].map((m) => m[1]!));
+    // the scenario descriptions are chosen by id: `replayText(`scenario.${id}`, ...)`
+    if (/replayText\(\s*`scenario\.\$\{/.test(code)) for (const id of REPLAY_IDS) used.add(`scenario.${id}`);
+    for (const id of used) expect(ALL_DOCS.replay.entries.has(id), `code uses ${id}`).toBe(true);
+    for (const id of ALL_DOCS.replay.entries.keys()) expect(used.has(id), `replay.md ${id} is not used by code`).toBe(true);
   });
   it("tutorial entries are the tour steps, in order", () => {
     expect(TOUR.map((t) => t.id)).toEqual([...ALL_DOCS.tutorial.entries.keys()]);

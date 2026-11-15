@@ -6,6 +6,7 @@
 import architecturesRaw from "./architectures.md?raw";
 import inspectorRaw from "./inspector.md?raw";
 import panelsRaw from "./panels.md?raw";
+import replayRaw from "./replay.md?raw";
 import stepThroughRaw from "./step-through.md?raw";
 import diveRaw from "./dive-deeper.md?raw";
 import tutorialRaw from "./tutorial.md?raw";
@@ -18,11 +19,12 @@ export const STEP_THROUGH = parseDoc(stepThroughRaw, "step-through.md");
 export const TUTORIAL = parseDoc(tutorialRaw, "tutorial.md");
 export const INSPECTOR = parseDoc(inspectorRaw, "inspector.md");
 export const PANELS = parseDoc(panelsRaw, "panels.md");
+export const REPLAY = parseDoc(replayRaw, "replay.md");
 export const DIVE_DEEPER = parseDoc(diveRaw, "dive-deeper.md");
 export const ARCHITECTURE_TEXT = parseDoc(architecturesRaw, "architectures.md");
 
 /** Every document with its raw text, for tests and tooling. */
-export const ALL_DOCS = { "step-through": STEP_THROUGH, tutorial: TUTORIAL, inspector: INSPECTOR, panels: PANELS, architectures: ARCHITECTURE_TEXT, "dive-deeper": DIVE_DEEPER } as const;
+export const ALL_DOCS = { "step-through": STEP_THROUGH, tutorial: TUTORIAL, inspector: INSPECTOR, panels: PANELS, replay: REPLAY, architectures: ARCHITECTURE_TEXT, "dive-deeper": DIVE_DEEPER } as const;
 
 /** One field of a step-through entry, unfilled (for texts the code repeats, such as the rows of a table). */
 export function stepField(id: string, field: string): string {
@@ -64,6 +66,16 @@ export function panelText(id: string, values: Values = {}): string {
 /** An entry of panels.md with several named fields (for example the empty-state screen). */
 export function panelFields<K extends string>(id: string, pick: Record<K, Pick>, values: Values = {}): Record<K, string> {
   return fillEntry(PANELS, id, pick, values);
+}
+
+/** A single-text entry of replay.md (the Calibrated mode). */
+export function replayText(id: string, values: Values = {}): string {
+  return fillEntry(REPLAY, id, { text: "text" }, values).text;
+}
+
+/** An entry of replay.md with several named fields (the badge, the lines of a pod's note). */
+export function replayFields<K extends string>(id: string, pick: Record<K, Pick>, values: Values = {}): Record<K, string> {
+  return fillEntry(REPLAY, id, pick, values);
 }
 
 /** The prose of one serving architecture; `id` is the architecture's id in src/sim/presets. */

@@ -9,6 +9,7 @@ Every piece of explanatory text on the website lives in a markdown file here, so
 | [`tutorial.md`](tutorial.md) | The guided tour cards | `src/live/Tutorial.tsx` |
 | [`inspector.md`](inspector.md) | The notes in the "dive in" panel | `src/live/Inspector.tsx` |
 | [`panels.md`](panels.md) | Empty-state card, scenario hints, notes in the menus, legend note | `src/live/LiveView.tsx` |
+| [`replay.md`](replay.md) | The Calibrated (BLIS replay) mode: what it is and is not evidence for, the BLIS badge, one description per scenario, the notes in its inspector | `src/replay/`, `src/live/LiveView.tsx` |
 | [`architectures.md`](architectures.md) | Name, what it adds and sources of each serving architecture | `src/live/LiveView.tsx`, by architecture id |
 
 ## Entry format
@@ -75,6 +76,6 @@ Fields chosen together are joined by a space, except around a formula or a table
 ## Adding or changing text
 
 1. Edit or add the entry in the markdown file. Keep the headline and `_Where:_` line accurate.
-2. In code, use the helper for the file: `stepText` (callouts, through `make(...)` in `src/live/callouts.ts`), `inspectorText` / `<Note id=...>` (Inspector), `panelText` / `panelFields` (panels), `tourText` (the tour, ids listed in `TARGETS` in `Tutorial.tsx`), `architectureText` (by architecture id). All are exported from `src/content/index.ts`.
+2. In code, use the helper for the file: `stepText` (callouts, through `make(...)` in `src/live/callouts.ts`), `inspectorText` / `<Note id=...>` (Inspector), `panelText` / `panelFields` (panels), `replayText` / `replayFields` (the calibrated mode), `tourText` (the tour, ids listed in `TARGETS` in `Tutorial.tsx`), `architectureText` (by architecture id). All are exported from `src/content/index.ts`.
 3. Render the result with `<Rich text={...} />` from `src/live/Rich.tsx` (`inline` for titles and text inside an element of your own).
 4. `pnpm test` checks that every entry is used by code, every id used by code exists, every `[@key]` resolves and every link is https.
