@@ -174,7 +174,7 @@ What is left is the KV pool
 {kv} of GPU memory is left: the KV pool, {blocks} blocks of 16 tokens. The KV cache holds the keys and values the model computed for every token it has read, so it never recomputes them.
 
 ### detail
-The grid of empty cells is that pool; each cell takes the colour of the session whose tokens it holds. It is what remains after weights, working space and a safety margin (`gpu_memory_utilization` [@vllmEngineArgs]), cut into blocks so no memory is wasted [@kwon2023]. It caps how many requests fit at once.
+The grid of empty cells is that pool; each cell takes the colour of the session whose tokens it holds. It is what remains of the memory the engine may use after weights, working space, the CUDA graphs it captures and a safety margin (`gpu_memory_utilization` of the memory the driver reports [@vllmEngineArgs], [@vllmMemoryProfiling]), cut into blocks so no memory is wasted [@kwon2023]. It caps how many requests fit at once.
 
 ## `pod.failed` The model does not fit
 _Where:_ Beside the GPU memory of a pod whose weights leave no room for a batch (every time, not only the first).
@@ -186,7 +186,7 @@ On the new pod, in GPU memory
 The model does not fit
 
 ### body
-Weights need {weights} of {hbm} per GPU, leaving no room for a batch. Raise tensor parallelism or pick a larger GPU.
+Weights, working space and CUDA graphs need {fixed} of the {usable} the engine may use per GPU, leaving no room for a batch. Raise tensor parallelism or pick a larger GPU.
 
 ## `req.routed` Routed to a pod
 _Where:_ Beside the router, the first time a request is sent to a pod. The body is one sentence about the routing policy in use, plus one about disaggregation when it applies. The detail is the formula or rule of that policy.

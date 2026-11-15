@@ -33,28 +33,47 @@ export interface GpuSpec {
   label: string;
   /** Peak dense 16-bit floating-point throughput, FLOP/s. */
   peak: number;
-  /** High-bandwidth memory capacity, bytes. */
+  /** High-bandwidth memory capacity as the vendor names it ("80 GB"), bytes. Used for labels. */
   hbm: number;
+  /**
+   * Memory the CUDA or ROCm driver reports for the device, bytes. This, not the datasheet figure, is
+   * what vLLM multiplies by `gpu_memory_utilization` (`request_memory` in vllm/v1/worker/utils.py:
+   * `ceil(total_memory * gpu_memory_utilization)`), so it sizes the KV pool. It is lower than the
+   * name suggests in GiB and higher in GB: an H100 sold as "80 GB" reports 79.19 GiB = 85.03 GB.
+   */
+  memory: number;
+  /** Where `memory` comes from: a measurement of the real device, or the datasheet when none is known. */
+  memorySource: CitationKey;
   /** Memory bandwidth, bytes/s. */
   bw: number;
   source: CitationKey;
 }
 
-/** Architecture values are read from each model's published `config.json`. */
+/**
+ * Architecture values are read from each model's published `config.json`. `N` is the parameter count
+ * those values imply (embedding and untied output head, then per layer the attention projections and the
+ * three feed-forward matrices): Llama 3.1 8B 8.03e9, Llama 3 70B 70.55e9. The 70B model is often called
+ * "70B"; the weights a GPU holds are the 70.55e9.
+ */
 export const MODELS: Record<string, ModelSpec> = {
   "llama-3.1-8b": { id: "llama-3.1-8b", label: "Llama 3.1 8B", N: 8.03e9, nL: 32, nH: 32, nKv: 8, dH: 128, d: 4096, dFf: 14336, vocab: 128256, source: "llama31Card" },
-  "llama-3-70b": { id: "llama-3-70b", label: "Llama 3 70B", N: 70e9, nL: 80, nH: 64, nKv: 8, dH: 128, d: 8192, dFf: 28672, vocab: 128256, source: "llama370Card" }
+  "llama-3-70b": { id: "llama-3-70b", label: "Llama 3 70B", N: 70.55e9, nL: 80, nH: 64, nKv: 8, dH: 128, d: 8192, dFf: 28672, vocab: 128256, source: "llama370Card" }
 };
 
 /**
+ * `memory` is what the driver reports, measured on real devices: the H100 and H200 figures are the
+ * `torch total_memory` that vLLM's own reports print (the cited issues), the B200's is the device total in the
+ * BLIS substrate catalogue (from a vLLM start-up log). No measured figure for the MI300X is cited here, so it
+ * keeps the datasheet's 192 GB; on a real MI300X the pool would be somewhat different.
+ *
  * Peak compute is the dense figure. Vendors of Hopper and Blackwell parts headline a number that
  * assumes structured sparsity; it is halved here, because LLM weights are dense.
  */
 export const GPUS: Record<string, GpuSpec> = {
-  h100: { id: "h100", label: "H100 SXM", peak: 989.5e12, hbm: 80e9, bw: 3.35e12, source: "nvidiaH100" },
-  h200: { id: "h200", label: "H200 SXM", peak: 989.5e12, hbm: 141e9, bw: 4.8e12, source: "nvidiaH200" },
-  b200: { id: "b200", label: "B200", peak: 2250e12, hbm: 180e9, bw: 7.7e12, source: "nvidiaB200" },
-  mi300x: { id: "mi300x", label: "MI300X", peak: 1307.4e12, hbm: 192e9, bw: 5.3e12, source: "amdMi300x" }
+  h100: { id: "h100", label: "H100 SXM", peak: 989.5e12, hbm: 80e9, memory: 85_029_158_912, memorySource: "vllmUsageStats", bw: 3.35e12, source: "nvidiaH100" },
+  h200: { id: "h200", label: "H200 SXM", peak: 989.5e12, hbm: 141e9, memory: 150_109_880_320, memorySource: "blisSubstrateCatalog", bw: 4.8e12, source: "nvidiaH200" },
+  b200: { id: "b200", label: "B200", peak: 2250e12, hbm: 180e9, memory: 191_503_007_744, memorySource: "blisSubstrateCatalog", bw: 7.7e12, source: "nvidiaB200" },
+  mi300x: { id: "mi300x", label: "MI300X", peak: 1307.4e12, hbm: 192e9, memory: 192e9, memorySource: "amdMi300x", bw: 5.3e12, source: "amdMi300x" }
 };
 
 /** Weight storage formats and their size per parameter. */

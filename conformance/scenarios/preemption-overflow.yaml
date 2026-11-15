@@ -5,7 +5,7 @@ title: Preemption when two growing sequences outgrow the KV pool
 # Either fits alone (58% of the pool); together they cannot, so when their joint context reaches the
 # pool the engine must free one of them. vLLM frees the most recently admitted sequence (B) and
 # recomputes it later. The sizes are chosen against the pool, not tuned to a result: the two pools
-# differ by a few percent (see kv-budget-8b-h100), and both are far from either extreme.
+# agree to a few blocks (see kv-budget-8b-h100), and both are far from either extreme.
 model: llama-3.1-8b
 gpu: h100
 engine:
@@ -36,13 +36,13 @@ checks:
         (BLIS series: one request waiting from t = 150 s to 191 s) until request 1 finishes, and no second preemption
         happens. The TypeScript model admits on the first chunk only. Request 2 is admitted again at once, prefills
         in chunks of 8,192 tokens until the pool is full, and the next chunk (or request 1's next block) preempts it
-        again: it is preempted 1,266 times (4 for lack of a decode block, 1,262 for lack of a prefill-chunk block)
-        until request 1 finishes. Each time it loses about 27,000 tokens of work. The pools differ (BLIS 3,599 blocks, the
-        TypeScript model 3,435) but both are well below the 4,000 blocks the two sequences need at their end, so a second
+        again: it is preempted 799 times
+        until request 1 finishes. Each time it loses about 27,000 tokens of work. The pools are close (BLIS 3,599 blocks, the
+        TypeScript model 3,601) but both are well below the 4,000 blocks the two sequences need at their end, so a second
         overflow is certain in either unless the waiting request is held back. This is a mechanism the TypeScript model
         lacks (read from its admit() and BLIS's scheduler; not tested by adding the gate), not a count that differs by rounding.
       differences:
-        value: { typescript: 1266, blis: 1 }
+        value: { typescript: 799, blis: 1 }
   - id: both-complete
     claim: Both requests complete.
     kind: exact

@@ -134,7 +134,7 @@ export function podGeom(tp: number): PodGeom {
   return { h: stripY + 110, gpus, lanesY: 40, stripY, gaugeY: stripY + 20, tiersY: stripY + 58 };
 }
 
-/** Horizontal split of one GPU's HBM into weights | activations | KV | headroom. */
+/** Horizontal split of one GPU's memory into weights | activations and CUDA graphs | KV | headroom. */
 function hbmSplit(pod: Pod, g: { x: number; y: number; w: number; h: number }) {
   const b = pod.budget;
   const x0 = g.x + 7;
@@ -142,9 +142,9 @@ function hbmSplit(pod: Pod, g: { x: number; y: number; w: number; h: number }) {
   const y = g.y + 22;
   const h = g.h - 30;
   const kv = Math.max(0, b.kv);
-  const total = b.weights + b.activations + kv + b.headroom;
+  const total = b.weights + b.activations + b.graphs + kv + b.headroom;
   const ww = (w * b.weights) / total;
-  const aw = Math.max(2, (w * b.activations) / total);
+  const aw = Math.max(2, (w * (b.activations + b.graphs)) / total);
   const hw = (w * b.headroom) / total;
   const kw = Math.max(0, w - ww - aw - hw);
   const rows = Math.max(1, Math.round(Math.sqrt((CELLS * h) / Math.max(1, kw))));

@@ -54,7 +54,7 @@ This pod has been terminated.
 _Where:_ Dive-in panel of a pod, group "GPU memory and KV blocks", below the memory rows. The tensor-parallel sentence is added when a pod spans more than one GPU.
 
 ### text
-The KV pool is what is left after the other three. It is split into fixed blocks that need not be contiguous; a per-sequence block table maps logical to physical blocks, so a sequence holds what it uses and waste is confined to its last block. Each coloured cell in the graph stands for {cellBlocks} blocks; pale cells are cached but idle.
+The KV pool is what is left after the other three. The engine budgets {utilisation} of the memory the driver reports, which is more than the name of the GPU suggests: {nominal} for {reported} reported [@vllmMemoryProfiling]. The pool is split into fixed blocks that need not be contiguous; a per-sequence block table maps logical to physical blocks, so a sequence holds what it uses and waste is confined to its last block. Each coloured cell in the graph stands for {cellBlocks} blocks; pale cells are cached but idle.
 
 ### tensor-parallel
 With tensor parallelism every GPU holds a slice of every sequence's KV heads, so the {tp} grids fill together.

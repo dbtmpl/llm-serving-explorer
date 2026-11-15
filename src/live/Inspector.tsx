@@ -267,19 +267,19 @@ function PodView({ w, pod, part }: { w: World; pod: Pod; part: string }) {
         <Stack
           parts={[
             { label: `weights ÷ ${pod.spec.tp} GPU`, value: b.weights, color: C.weights, text: fmtGB(b.weights) },
-            { label: "activations, workspace", value: b.activations, color: "#94a3b8", text: fmtGB(b.activations, 2) },
+            { label: "activations, CUDA graphs", value: b.activations + b.graphs, color: "#94a3b8", text: fmtGB(b.activations + b.graphs, 2) },
             { label: "KV cache pool", value: b.kv, color: C.decode, text: fmtGB(b.kv) },
             { label: `headroom ${((1 - pod.spec.gpuMemUtil) * 100).toFixed(0)}%`, value: b.headroom, color: "#dbe2ea", text: fmtGB(b.headroom) }
           ]}
         />
-        <Row k="per GPU HBM" v={fmtGB(b.hbm, 0)} />
+        <Row k="per GPU HBM" v={`${fmtGB(b.hbm, 0)} (driver reports ${fmtGB(b.device)})`} />
         <Row k="replica pool" v={`${fmtInt(b.poolBlocks)} blocks`} />
         <Row k="in use" v={`${fmtInt(pod.usedBlocks)} blocks · ${((100 * pod.usedBlocks) / Math.max(1, b.poolBlocks)).toFixed(0)}%`} />
         <Row k="max seqs at 4k/32k/128k" v={[4096, 32768, 131072].map((L) => maxBatch(pod.spec, L)).join(" / ")} />
         <BlockAnatomy pod={pod} />
         <Row k="KV per token" v={`${(mkv / 1024).toFixed(0)} KiB`} />
         <Row k="one block (16 tokens)" v={`${((BLOCK_TOKENS * mkv) / 2 ** 20).toFixed(1)} MiB`} />
-        <Note id="pod.gpu.note" values={{ cellBlocks: fmtInt(b.poolBlocks / 200), ...(pod.spec.tp > 1 ? { tp: pod.spec.tp } : {}) }} extra={pod.spec.tp > 1 ? ["tensor-parallel"] : []} />
+        <Note id="pod.gpu.note" values={{ cellBlocks: fmtInt(b.poolBlocks / 200), utilisation: `${(pod.spec.gpuMemUtil * 100).toFixed(0)}%`, nominal: fmtGB(b.hbm, 0), reported: fmtGB(b.device), ...(pod.spec.tp > 1 ? { tp: pod.spec.tp } : {}) }} extra={pod.spec.tp > 1 ? ["tensor-parallel"] : []} />
       </>
     );
   }

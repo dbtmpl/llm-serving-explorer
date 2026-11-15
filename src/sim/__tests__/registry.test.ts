@@ -30,6 +30,7 @@ describe("citation registry", () => {
     for (const arch of ARCHITECTURES) for (const key of arch.citations) used.add(key);
     const { GPUS, MODELS } = await import("../hardware/catalog.js");
     for (const entry of [...Object.values(GPUS), ...Object.values(MODELS)]) used.add(entry.source);
+    for (const gpu of Object.values(GPUS)) used.add(gpu.memorySource);
     // cited in docstrings as related work that is deliberately not modelled
     const relatedWorkOnly: CitationKey[] = ["yu2023", "sun2024", "zheng2023"];
     for (const key of relatedWorkOnly) used.add(key);
