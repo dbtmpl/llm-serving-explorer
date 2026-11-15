@@ -45,7 +45,7 @@ _Where:_ Tutorial card 5, pointing at the router.
 Router
 
 ### text
-Hop 3. Small trains of squares are counted prompts on their way to a pod. The router scores the pods and picks one; by default the pod that already holds the session's saved work (its KV cache) wins unless it is too busy. Squares stacked above it are requests waiting for a free pod.
+Hop 3. Small trains of squares are counted prompts on their way to a pod. The router scores the pods and picks one; by default the pod that already holds the session's saved work (its KV cache) wins unless it is too busy: busier than another pod by more than the cache saves. Squares stacked above it are requests waiting for a free pod.
 
 ## `weights` A pod and its GPUs
 _Where:_ Tutorial card 6, pointing at the GPU memory of a pod.
@@ -54,7 +54,7 @@ _Where:_ Tutorial card 6, pointing at the GPU memory of a pod.
 A pod and its GPUs
 
 ### text
-A pod is one replica of the model on one or more GPUs. Each GPU box is its memory: the dark block fills while weights load, then comes a thin strip of activations and captured CUDA graphs, the grid of KV blocks, and hatched headroom that is never used.
+A pod is one replica of the model on one or more GPUs. Each GPU box is its memory: the dark block fills while weights load, then comes a thin strip of activations and captured CUDA graphs, the grid of KV blocks (what remains of the memory the engine may use), and hatched headroom, the part above `gpu_memory_utilization` that is left unused.
 
 ## `slots` The running batch
 _Where:_ Tutorial card 7, pointing at the running batch of a pod.

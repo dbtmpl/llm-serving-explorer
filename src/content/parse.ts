@@ -85,21 +85,36 @@ export function parseDoc(raw: string, name: string): Doc {
 }
 
 const PLACEHOLDER = /\{([a-zA-Z][a-zA-Z0-9]*)\}/g;
+/** `[[name]]` is a placeholder that may also stand inside a formula, where `{...}` is TeX. */
+const BRACKETED = /\[\[([a-zA-Z][a-zA-Z0-9]*)\]\]/g;
+/** Formulas (`$$...$$`, `$...$`) may contain braces that are TeX, not placeholders. */
+const MATH = /\$\$[\s\S]+?\$\$|\$[^$\n]+\$/g;
+const outsideMath = (template: string): string => template.replace(MATH, "");
 
 export type Values = Readonly<Record<string, string | number>>;
 
 /** The names of the `{placeholders}` in a template. */
 export function placeholders(template: string): string[] {
-  return [...template.matchAll(PLACEHOLDER)].map((m) => m[1]!);
+  return [...[...outsideMath(template).matchAll(PLACEHOLDER)], ...template.matchAll(BRACKETED)].map((m) => m[1]!);
 }
 
 /** Fill `{name}` placeholders. A placeholder without a value throws. */
 export function fill(template: string, values: Values = {}): string {
-  return template.replace(PLACEHOLDER, (_, key: string) => {
-    if (!(key in values)) throw new Error(`placeholder {${key}} has no value in: ${template.slice(0, 60)}`);
+  // formulas are kept as they are
+  const value = (_: string, key: string): string => {
+    if (!(key in values)) throw new Error(`placeholder ${key} has no value in: ${template.slice(0, 60)}`);
     return String(values[key]);
-  });
+  };
+  const maths = (template.match(MATH) ?? []).map((m) => m.replace(BRACKETED, value));
+  const filled = template.replace(MATH, "\u0000").replace(PLACEHOLDER, value).replace(BRACKETED, value);
+  let i = 0;
+  return filled.replace(/\u0000/g, () => maths[i++]!);
 }
+
+const lastParagraph = (text: string): string => text.slice(text.includes("\n\n") ? text.lastIndexOf("\n\n") + 2 : 0);
+
+/** Whether a paragraph is a formula or a table, which must stay a paragraph of its own. */
+const isBlock = (paragraph: string): boolean => /^\s*(\$\$|\|)/.test(paragraph);
 
 /** One output field is made of one or more content fields joined by a space; falsy parts are skipped. */
 export type Pick = string | readonly (string | false | null | undefined)[];
@@ -122,7 +137,7 @@ export function fillEntry<K extends string>(doc: Doc, id: string, pick: Record<K
         for (const p of placeholders(template)) used.add(p);
         return fill(template, values);
       })
-      .join(" ");
+      .reduce((acc, part, i) => (i === 0 ? part : acc + (isBlock(lastParagraph(acc)) || isBlock(part) ? "\n\n" : " ") + part), "");
   }
   for (const k of Object.keys(values)) if (!used.has(k)) throw new Error(`${doc.name}: entry ${id}: value ${k} is not used by any chosen field`);
   return out;

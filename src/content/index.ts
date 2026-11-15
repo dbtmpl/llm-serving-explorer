@@ -11,7 +11,7 @@ import tutorialRaw from "./tutorial.md?raw";
 import { fillEntry, parseDoc, type Pick, type Values } from "./parse.js";
 
 export { fill, fillEntry, hasField, parseDoc, placeholders, type Doc, type Entry, type Pick, type Values } from "./parse.js";
-export { citation, citationKeys, paragraphs, parseInline, type Inline } from "./inline.js";
+export { blocks, citation, citationKeys, paragraphs, parseInline, type Block, type Inline } from "./inline.js";
 
 export const STEP_THROUGH = parseDoc(stepThroughRaw, "step-through.md");
 export const TUTORIAL = parseDoc(tutorialRaw, "tutorial.md");
@@ -21,6 +21,13 @@ export const ARCHITECTURE_TEXT = parseDoc(architecturesRaw, "architectures.md");
 
 /** Every document with its raw text, for tests and tooling. */
 export const ALL_DOCS = { "step-through": STEP_THROUGH, tutorial: TUTORIAL, inspector: INSPECTOR, panels: PANELS, architectures: ARCHITECTURE_TEXT } as const;
+
+/** One field of a step-through entry, unfilled (for texts the code repeats, such as the rows of a table). */
+export function stepField(id: string, field: string): string {
+  const text = STEP_THROUGH.entries.get(id)?.fields[field];
+  if (text === undefined) throw new Error(`step-through.md: entry ${id} has no field ${field}`);
+  return text;
+}
 
 /** A single-text entry of inspector.md; `extra` names more fields to append (optional sentences). */
 export function inspectorText(id: string, values: Values = {}, extra: readonly string[] = []): string {

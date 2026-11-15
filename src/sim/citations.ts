@@ -270,6 +270,24 @@ export const CITATIONS = {
     kind: "docs",
     url: "https://platform.openai.com/docs/guides/rate-limits"
   },
+  sreHandlingOverload: {
+    short: "Google SRE book, Handling Overload",
+    title: "Site Reliability Engineering, chapter 21: Handling Overload (load shedding, graceful degradation)",
+    kind: "docs",
+    url: "https://sre.google/sre-book/handling-overload/"
+  },
+  awsLoadShedding: {
+    short: "AWS Builders' Library, load shedding",
+    title: "Using load shedding to avoid overload (Amazon Builders' Library)",
+    kind: "docs",
+    url: "https://aws.amazon.com/builders-library/using-load-shedding-to-avoid-overload/"
+  },
+  openaiChatCompletions: {
+    short: "OpenAI API reference, chat completions",
+    title: "OpenAI API reference: create chat completion (the request and response format other engines copy)",
+    kind: "docs",
+    url: "https://developers.openai.com/api/reference/typescript/resources/chat/subresources/completions/methods/create"
+  },
   envoyAiGatewayRateLimit: {
     short: "Envoy AI Gateway docs, usage-based rate limiting",
     title: "Envoy AI Gateway: usage-based rate limiting (limits counted in tokens)",

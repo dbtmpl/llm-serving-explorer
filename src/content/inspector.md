@@ -24,7 +24,11 @@ Hop 1: the gateway authenticates the caller, counts the prompt in tokens and app
 _Where:_ Dive-in panel of the router, below the table of the last routing decision.
 
 ### text
-A request is pinned to its pod from admission until it finishes, because its saved work (its KV cache) lives in that pod's memory. The prefix-aware router gives every ready pod a score and picks the highest: 3 × (share of the prompt the pod already has cached, scaled by the tier it sits in) + 2 × (share of its KV memory that is free) + 2 × (share of its capacity that is free). The weights are [llm-d's recommended profile][@llmdScheduling] on the [Gateway API Inference Extension][@gatewayInferenceExtension]; how much a copy in HBM, DRAM, SSD or the remote pool counts (HBM most) is this model's own choice. So a pod holding the cache wins unless it is too busy, and a pod at capacity (`max_num_seqs` plus a short queue allowance) is not a candidate. Least-loaded sends the request to the pod with the fewest requests, like [Envoy's least-request balancer][@envoyLoadBalancing]; round-robin takes the pods in turn, so returning sessions land on cold pods and prefill again.
+A request is pinned to its pod from admission until it finishes, because its saved work (its KV cache) lives in that pod's memory. The prefix-aware router gives every ready pod $p$ a score and picks the highest:
+
+$$\text{score}(p) = [[wCache]]\,c_p + [[wKv]]\,m_p + [[wQueue]]\,q_p$$
+
+Here $c_p$ is the share of the prompt that pod $p$ already has cached (scaled down by the memory tier it sits in), $m_p$ the share of its KV memory that is free and $q_p$ the share of its request capacity that is free; each is between 0 and 1. The weights are [llm-d's recommended profile][@llmdScheduling] on the [Gateway API Inference Extension][@gatewayInferenceExtension]; how much a copy in HBM, DRAM, SSD or the remote pool counts (HBM most) is this model's own choice. So a pod holding the cache wins unless it is too busy (the other pods lead on $m$ and $q$ together by more than the cache term $[[wCache]]\,c_p$ is worth), and a pod at capacity (`max_num_seqs` plus a short queue allowance) is not a candidate. Least-loaded sends the request to the pod with the fewest requests, like [Envoy's least-request balancer][@envoyLoadBalancing]; round-robin takes the pods in turn, so returning sessions land on cold pods and prefill again.
 
 ## `store.note` Conversation store
 _Where:_ Dive-in panel of the conversation store, below its counters.
@@ -54,7 +58,7 @@ This pod has been terminated.
 _Where:_ Dive-in panel of a pod, group "GPU memory and KV blocks", below the memory rows. The tensor-parallel sentence is added when a pod spans more than one GPU.
 
 ### text
-The KV pool is what is left after the other three. The engine budgets {utilisation} of the memory the driver reports, which is more than the name of the GPU suggests: {nominal} for {reported} reported [@vllmMemoryProfiling]. The pool is split into fixed blocks that need not be contiguous; a per-sequence block table maps logical to physical blocks, so a sequence holds what it uses and waste is confined to its last block. Each coloured cell in the graph stands for {cellBlocks} blocks; pale cells are cached but idle.
+The KV pool is what remains of the share the engine may use, after the weights and the activations and CUDA graphs; the headroom, the part above `gpu_memory_utilization`, lies outside that share and is never used. The engine budgets {utilisation} of the memory the driver reports, which is more than the name of the GPU suggests: {nominal} for {reported} reported [@vllmMemoryProfiling]. The pool is split into fixed blocks that need not be contiguous; a per-sequence block table maps logical to physical blocks, so a sequence holds what it uses and waste is confined to its last block. Each coloured cell in the graph stands for {cellBlocks} blocks; pale cells are cached but idle.
 
 ### tensor-parallel
 With tensor parallelism every GPU holds a slice of every sequence's KV heads, so the {tp} grids fill together.

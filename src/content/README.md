@@ -47,8 +47,25 @@ Shown only in step-through mode.
 | `[text](https://example.org)` | a link (https only) |
 | `[@key]` | a link whose text is the citation's `short` and whose href is its `url` in `src/sim/citations.ts` |
 | `[custom text][@key]` | the same link with your own text |
+| `$x_p$` | an inline formula, typeset with [KaTeX](https://katex.org/) (TeX syntax) |
 
 Every paper, project, repository, documentation page or datasheet named in the text is linked this way. If the source is not in `CITATIONS` yet, add it there first (see the rules in [`src/sim/README.md`](../sim/README.md)); an unknown `@key` throws. Links open in a new tab. Never cite or mention internal sources.
+
+## Blocks: formulas and tables
+
+A block is a paragraph of its own (blank lines around it).
+
+A **formula** is a paragraph that starts and ends with `$$`:
+
+```
+$$\text{score}(p) = [[wCache]]\,c_p + [[wKv]]\,m_p + [[wQueue]]\,q_p$$
+```
+
+It is typeset by KaTeX at runtime (HTML for the eye, MathML for screen readers); the stylesheet and fonts are bundled with the site, nothing is loaded from a CDN. Inside a formula `{...}` is TeX, not a placeholder, so a value that belongs in a formula is written `[[name]]` (this form also works outside formulas). Put the legend of a formula under it as a table, one row per symbol, in beginner terms.
+
+A **table** is a paragraph whose lines all start with `|`: a header row, a `|---|` rule and rows of the same width. Cells take the inline markup above. A table whose rows depend on the simulation is assembled by the code from fields of the entry (a `head-*` field with the header and rule, a `row-*` field per row), filled with `fill` and passed in as one `{table}` value.
+
+Fields chosen together are joined by a space, except around a formula or a table, which keep a paragraph of their own. `pnpm test` typesets every formula, so a TeX mistake fails there.
 
 ## Adding or changing text
 
