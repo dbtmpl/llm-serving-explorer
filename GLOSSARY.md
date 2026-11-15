@@ -20,7 +20,7 @@
 - **Prefix caching:** Reusing KV blocks across requests that share the same leading tokens.
 - **Eviction:** Dropping a cached KV block, or moving it to a lower memory tier, to make room.
 - **Preemption:** Taking a running request out of the batch and freeing its KV blocks when memory runs out. The request is recomputed later.
-- **HBM:** High-bandwidth memory, the GPU's own memory. Holds the weights and the KV cache.
+- **HBM:** High-bandwidth memory, the GPU's own memory. Holds the weights, working space, captured CUDA graphs and the KV cache. A GPU's name rounds its size ("80 GB"); the driver reports a little more (85.0 GB for an H100), and the engine budgets from that figure.
 - **Memory tiers:** The places KV can live below HBM: host DRAM, local SSD and a remote pool shared by all pods.
 - **P/D disaggregation:** Running prefill and decode on separate pools of pods and transferring the KV cache between them.
 - **Tensor parallelism (TP):** Splitting one model's weights and KV cache across several GPUs in a pod.

@@ -48,7 +48,8 @@ describe("admission in the engine", () => {
     expect(reserve.t).toBeLessThan(onDemand.t);
   });
   it("a request whose context can never fit the pool is failed, not queued forever", () => {
-    const w = world({ model: "llama-3-70b", tp: 2, promptTokens: 8000 });
+    // 70B on two H100s keeps about 7.9 GB of KV, 24,000 tokens at 327,680 bytes each
+    const w = world({ model: "llama-3-70b", tp: 2, promptTokens: 40000 });
     spawnBurst(w, 1);
     run(w, 10);
     expect(w.pods[0]!.state).toBe("ready");

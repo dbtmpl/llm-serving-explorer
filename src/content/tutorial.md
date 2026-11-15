@@ -54,7 +54,7 @@ _Where:_ Tutorial card 6, pointing at the GPU memory of a pod.
 A pod and its GPUs
 
 ### text
-A pod is one replica of the model on one or more GPUs. Each GPU box is its memory: the dark block fills while weights load, then comes a thin strip of activations, the grid of KV blocks, and hatched headroom that is never used.
+A pod is one replica of the model on one or more GPUs. Each GPU box is its memory: the dark block fills while weights load, then comes a thin strip of activations and captured CUDA graphs, the grid of KV blocks, and hatched headroom that is never used.
 
 ## `slots` The running batch
 _Where:_ Tutorial card 7, pointing at the running batch of a pod.

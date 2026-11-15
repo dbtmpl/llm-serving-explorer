@@ -31,8 +31,8 @@ export const flopCount: ApproachMeta = {
 export const kvFootprint: ApproachMeta = {
   id: "kv-bytes-per-token",
   name: "KV bytes per token and memory budget",
-  summary: "Two vectors per layer and KV head per token; the KV pool is what weights, activations and headroom leave.",
-  citations: ["kwon2023", "vllmEngineArgs"],
+  summary: "Two vectors per layer and KV head per token; the KV pool is what weights, activations, CUDA graphs and headroom leave of the memory the driver reports.",
+  citations: ["kwon2023", "vllmEngineArgs", "vllmMemoryProfiling", "blisSubstrateMemory"],
   fidelity: "exact"
 };
 

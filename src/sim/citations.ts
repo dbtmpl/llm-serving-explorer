@@ -174,6 +174,30 @@ export const CITATIONS = {
     kind: "docs",
     url: "https://docs.vllm.ai/en/latest/configuration/engine_args.html"
   },
+  vllmMemoryProfiling: {
+    short: "vLLM source, worker memory profiling",
+    title: "vLLM worker: request_memory (ceil(total_memory x gpu_memory_utilization)) and determine_available_memory (KV memory = requested - non-KV memory - CUDA-graph estimate)",
+    kind: "source",
+    url: "https://github.com/vllm-project/vllm/blob/main/vllm/v1/worker/gpu_worker.py"
+  },
+  vllmUsageStats: {
+    short: "vLLM pull request 26836",
+    title: "vLLM usage stats of an H100 80GB HBM3: gpu_memory_per_device 85029158912 bytes (79.19 GiB)",
+    kind: "source",
+    url: "https://github.com/vllm-project/vllm/pull/26836"
+  },
+  blisSubstrateCatalog: {
+    short: "BLIS substrate catalogue, hardware",
+    title: "blis-substrate catalog/hardware/*.yaml: MemoryGiB measured as the device total the CUDA driver reports",
+    kind: "source",
+    url: "https://github.com/inference-sim/blis-substrate/tree/main/catalog/hardware"
+  },
+  blisSubstrateMemory: {
+    short: "BLIS substrate registry, cost-model-memory",
+    title: "blis-substrate registry cost-model-memory: CUDA-graph capture memory, median of 22 vLLM start-up logs (1.08 GiB)",
+    kind: "source",
+    url: "https://github.com/inference-sim/blis-substrate/blob/main/registry/coefficients/cost-model-memory.yaml"
+  },
   tensorrtLlm: {
     short: "TensorRT-LLM docs",
     title: "TensorRT-LLM: scheduler policies (GuaranteedNoEvict)",

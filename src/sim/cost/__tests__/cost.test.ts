@@ -37,22 +37,37 @@ describe("memory (Kwon et al. 2023; vLLM engine arguments; Shoeybi et al. 2019)"
     expect(weightBytes(LLAMA_8B, "bf16") / 1e9).toBeCloseTo(16.06, 2);
     expect(weightBytes(LLAMA_8B, "fp8") / 1e9).toBeCloseTo(8.03, 2);
   });
-  it("the KV pool is what weights, activations and headroom leave: 80 − 16.06 − 0.74 − 8 = 55.2 GB", () => {
+  it("the KV pool is what weights, activations and CUDA graphs leave of the requested share: 76.53 − 16.06 − 0.74 − 1.16 = 58.57 GB", () => {
     expect(activationBytes(LLAMA_8B) / 1e9).toBeCloseTo(0.735, 2);
     const b = memoryBudget(replica());
-    expect(b.kv / 1e9).toBeCloseTo(55.2, 1);
-    expect(b.headroom / 1e9).toBeCloseTo(8, 6);
-    expect(Math.abs(b.poolBlocks - 26323)).toBeLessThan(5);
+    expect(b.device).toBe(85_029_158_912); // 79.19 GiB, what the driver reports for an H100 sold as 80 GB
+    expect(b.hbm).toBe(80e9); // the label
+    expect(b.kv / 1e9).toBeCloseTo(58.57, 2);
+    expect(b.headroom / 1e9).toBeCloseTo(8.5, 2); // device minus ceil(0.9 * device)
+    expect(b.poolBlocks).toBe(27928); // BLIS: 27,926 (conformance/scenarios/kv-budget-8b-h100.yaml)
     expect(b.blockBytes).toBe(16 * 131072);
   });
+  it("vLLM requests ceil(driver-reported memory × utilisation), so a larger reported figure gives a larger pool", () => {
+    const h200 = GPUS.h200!;
+    expect(memoryBudget(replica({ gpu: h200 })).device).toBe(150_109_880_320);
+    expect(memoryBudget(replica({ gpu: h200 })).headroom).toBe(150_109_880_320 - Math.ceil(150_109_880_320 * 0.9));
+  });
+  it("activations keep the whole residual stream on each GPU but only 1/tp of the feed-forward width", () => {
+    // 8192 · (2·8192 + 2·28672/4) · 2 + 256 · 128256 · 4
+    expect(activationBytes(LLAMA_70B, 4)).toBe(8192 * (2 * 8192 + (2 * 28672) / 4) * 2 + 256 * 128256 * 4);
+    expect(activationBytes(LLAMA_70B, 4)).toBeLessThan(activationBytes(LLAMA_70B, 1));
+  });
   it("tensor parallelism splits the weights: 70B fits on 4 H100s, barely on 2, not on 1", () => {
-    expect(memoryBudget(replica({ model: LLAMA_70B, tp: 4 })).kv / 1e9).toBeCloseTo(35.66, 1);
-    expect(memoryBudget(replica({ model: LLAMA_70B, tp: 2 })).kv / 1e9).toBeCloseTo(0.66, 1);
+    expect(memoryBudget(replica({ model: LLAMA_70B, tp: 4 })).kv / 1e9).toBeCloseTo(39.46, 1);
+    expect(memoryBudget(replica({ model: LLAMA_70B, tp: 2 })).kv / 1e9).toBeCloseTo(3.95, 1);
     expect(memoryBudget(replica({ model: LLAMA_70B })).fits).toBe(false);
   });
+  it("70B on four H200s: 74,790 blocks (BLIS: 74,760)", () => {
+    expect(memoryBudget(replica({ model: LLAMA_70B, tp: 4, gpu: GPUS.h200! })).poolBlocks).toBe(74790);
+  });
   it("the largest batch at 4,096 tokens of context is pool bytes over bytes per sequence", () => {
-    expect(maxBatch(replica(), 4096)).toBe(102);
-    expect(maxBatch(replica({ model: LLAMA_70B, tp: 4 }), 4096)).toBe(106);
+    expect(maxBatch(replica(), 4096)).toBe(109);
+    expect(maxBatch(replica({ model: LLAMA_70B, tp: 4 }), 4096)).toBe(117);
   });
 });
 
