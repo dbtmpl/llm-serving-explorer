@@ -1,0 +1,48 @@
+{
+  "scenario": "preemption-overflow",
+  "inputHash": "babcf6d935d59e08463340b7241502d80c50251ee8376e4e0abd1def18a1a7ae",
+  "blis": {
+    "commit": "c79c745619b16a8019339e3bbc79ee5e2923b258",
+    "catalogHash": "db74e4bb49f75d658e5d0850934da60daf513274b937a03b7ab994760bd6d21f",
+    "registryHash": "8dbcf3b85eed842f2bc798b34d2b95716fc58117750f4164d869b26770353fe0",
+    "engineVersion": "0.32.0",
+    "routerModule": "github.com/llm-d/llm-d-router v1.0.0-blis.4"
+  },
+  "record": {
+    "simulator": "blis",
+    "scenario": "preemption-overflow",
+    "kvBlocksPerReplica": 3599,
+    "requests": [
+      {
+        "session": 1,
+        "round": 0,
+        "inputTokens": 16000,
+        "outputTokens": 16000,
+        "cachedTokens": 0,
+        "pod": 0,
+        "arrivalS": 1,
+        "firstTokenS": 1.473683,
+        "lastTokenS": 191.067135,
+        "fate": "completed",
+        "preemptions": null
+      },
+      {
+        "session": 2,
+        "round": 0,
+        "inputTokens": 16000,
+        "outputTokens": 16000,
+        "cachedTokens": 0,
+        "pod": 0,
+        "arrivalS": 1.5,
+        "firstTokenS": 1.986376,
+        "lastTokenS": 227.058001,
+        "fate": "completed",
+        "preemptions": null
+      }
+    ],
+    "preemptions": 1,
+    "requestsPerPod": [
+      2
+    ]
+  }
+}

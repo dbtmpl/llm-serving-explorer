@@ -1,0 +1,91 @@
+name: BLIS references
+
+# Rebuild BLIS at the commit pinned in conformance/blis.lock, regenerate the references the
+# conformance tests compare against, and fail if they differ from the committed ones. This is the
+# only place Go and BLIS are needed; the ordinary CI job reads the committed references.
+on:
+  schedule:
+    - cron: "23 3 * * *"
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - conformance/blis.lock
+      - conformance/scenarios/**
+      - conformance/translate/**
+      - conformance/run/**
+      - conformance/scripts/**
+      - .github/workflows/blis-references.yml
+  pull_request:
+    paths:
+      - conformance/blis.lock
+      - conformance/scenarios/**
+      - conformance/translate/**
+      - conformance/run/**
+      - conformance/scripts/**
+      - .github/workflows/blis-references.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: blis-references-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch inference-sim at the pinned commit
+        run: |
+          set -euo pipefail
+          commit="$(grep -v '^#' conformance/blis.lock | grep -E '^[0-9a-f]{40}$' | head -n 1)"
+          test -n "$commit" || { echo "conformance/blis.lock has no 40-character commit"; exit 1; }
+          git clone --quiet https://github.com/inference-sim/inference-sim.git "$RUNNER_TEMP/inference-sim"
+          git -C "$RUNNER_TEMP/inference-sim" checkout --quiet "$commit"
+          echo "BLIS_SRC=$RUNNER_TEMP/inference-sim" >> "$GITHUB_ENV"
+          # the Go version BLIS itself names for this commit, e.g. go1.27.2
+          echo "GO_VERSION=$(jq -r .toolchain "$RUNNER_TEMP/inference-sim/stack.json" | sed 's/^go//')" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+
+      - name: Build BLIS
+        run: |
+          set -euo pipefail
+          go version
+          cd "$BLIS_SRC"
+          go build -o "$RUNNER_TEMP/blis" main.go
+          echo "BLIS_BIN=$RUNNER_TEMP/blis" >> "$GITHUB_ENV"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Regenerate the references
+        run: pnpm conformance:reference
+
+      - name: Fail if they differ from the committed references
+        run: |
+          if [ -n "$(git status --porcelain -- conformance/reference)" ]; then
+            git status --short -- conformance/reference
+            git --no-pager diff -- conformance/reference
+            echo "::error::BLIS at the pinned commit no longer produces the committed references. Review the difference, update the scenarios' known_difference records if it is real, and commit the regenerated files."
+            exit 1
+          fi
+
+      - name: Run the conformance tests against the regenerated references
+        run: pnpm test:conformance

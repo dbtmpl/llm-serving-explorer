@@ -1,0 +1,50 @@
+id: preemption-overflow
+title: Preemption when two growing sequences outgrow the KV pool
+# The KV pool is made small (30% memory utilisation, about 55,000 tokens in both simulators) and two
+# requests each need 32,000 tokens by the time they finish: 16,000 of prompt and 16,000 generated.
+# Either fits alone (58% of the pool); together they cannot, so when their joint context reaches the
+# pool the engine must free one of them. vLLM frees the most recently admitted sequence (B) and
+# recomputes it later. The sizes are chosen against the pool, not tuned to a result: the two pools
+# differ by a few percent (see kv-budget-8b-h100), and both are far from either extreme.
+model: llama-3.1-8b
+gpu: h100
+engine:
+  tp: 1
+  gpu_memory_utilisation: 0.3
+  max_num_seqs: 12
+  max_num_batched_tokens: 8192
+  block_size: 16
+  prefix_caching: true
+  max_model_len: 40000   # BLIS refuses a pool that cannot hold one sequence of this length; each request here needs 32,000
+replicas: 1
+routing: prefix-aware
+requests:
+  - { session: 1, at: 1.0, turns: [[16000, 16000]] }
+  - { session: 2, at: 1.5, turns: [[16000, 16000]] }
+checks:
+  - id: preemption-count
+    claim: Exactly one preemption happens, and both requests finish.
+    kind: exact
+    quantity: preemptions
+    tolerance: A count of discrete engine events in a case built to produce exactly one.
+    known_difference:
+      reason: >-
+        Both simulators preempt request 2 (the newest) once when the joint context reaches the pool, and both recompute
+        it. They differ in what happens next. vLLM 0.32 admits a waiting request only if its WHOLE prompt fits in free
+        blocks (scheduler_reserve_full_isl, on by default; BLIS implements it as FullSequenceMustFit), and a preempted
+        request's prompt is its whole context so far, about half the pool. Request 1 still holds the other half, so request 2 waits
+        (BLIS series: one request waiting from t = 150 s to 191 s) until request 1 finishes, and no second preemption
+        happens. The TypeScript model admits on the first chunk only. Request 2 is admitted again at once, prefills
+        in chunks of 8,192 tokens until the pool is full, and the next chunk (or request 1's next block) preempts it
+        again: it is preempted 1,266 times (4 for lack of a decode block, 1,262 for lack of a prefill-chunk block)
+        until request 1 finishes. Each time it loses about 27,000 tokens of work. The pools differ (BLIS 3,599 blocks, the
+        TypeScript model 3,435) but both are well below the 4,000 blocks the two sequences need at their end, so a second
+        overflow is certain in either unless the waiting request is held back. This is a mechanism the TypeScript model
+        lacks (read from its admit() and BLIS's scheduler; not tested by adding the gate), not a count that differs by rounding.
+      differences:
+        value: { typescript: 1266, blis: 1 }
+  - id: both-complete
+    claim: Both requests complete.
+    kind: exact
+    quantity: request_fate
+    tolerance: Fate is discrete.

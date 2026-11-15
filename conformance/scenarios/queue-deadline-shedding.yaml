@@ -1,0 +1,39 @@
+id: queue-deadline-shedding
+title: Requests that wait too long at the router are shed
+# One replica with two batch slots receives fourteen long requests at once. Answers take about four
+# seconds, so the replica cannot start anything new for longer than the three-second queue budget:
+# whatever the router is still holding after three seconds must be shed. Which requests are held is
+# the question; the first ones to arrive are served first in both simulators.
+model: llama-3.1-8b
+gpu: h100
+engine:
+  tp: 1
+  gpu_memory_utilisation: 0.9
+  max_num_seqs: 2
+  max_num_batched_tokens: 8192
+  block_size: 16
+  prefix_caching: true
+replicas: 1
+routing: prefix-aware
+queue_deadline_s: 3
+requests:
+  - { session: 1, at: 1.0, turns: [[200, 400]] }
+  - { session: 2, at: 1.2, turns: [[200, 400]] }
+  - { session: 3, at: 1.4, turns: [[200, 400]] }
+  - { session: 4, at: 1.6, turns: [[200, 400]] }
+  - { session: 5, at: 1.8, turns: [[200, 400]] }
+  - { session: 6, at: 2.0, turns: [[200, 400]] }
+  - { session: 7, at: 2.2, turns: [[200, 400]] }
+  - { session: 8, at: 2.4, turns: [[200, 400]] }
+  - { session: 9, at: 2.6, turns: [[200, 400]] }
+  - { session: 10, at: 2.8, turns: [[200, 400]] }
+  - { session: 11, at: 3.0, turns: [[200, 400]] }
+  - { session: 12, at: 3.2, turns: [[200, 400]] }
+  - { session: 13, at: 3.4, turns: [[200, 400]] }
+  - { session: 14, at: 3.6, turns: [[200, 400]] }
+checks:
+  - id: which-requests-are-shed
+    claim: The same requests are shed by the queue deadline in both simulators.
+    kind: exact
+    quantity: request_fate
+    tolerance: A request is either served or shed; there is no partial outcome to give a tolerance to.

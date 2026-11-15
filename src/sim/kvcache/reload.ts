@@ -2,6 +2,11 @@
  * Reload decision: a session's KV sits in a lower tier. Load it back, or compute it again?
  */
 import type { ApproachMeta } from "../approach.js";
+import type { Params } from "../core/params.js";
+import type { ReplicaSpec } from "../hardware/catalog.js";
+import { seqLoad } from "../cost/flops.js";
+import { computeSeconds } from "../cost/roofline.js";
+import { tierBw } from "./tiers.js";
 
 export interface ReloadPolicy extends ApproachMeta {
   shouldLoad(loadSeconds: number, recomputeSeconds: number): boolean;
@@ -31,3 +36,14 @@ export const adaptiveReload: ReloadPolicy = {
   fidelity: "simplified",
   shouldLoad: (loadSeconds, recomputeSeconds) => loadSeconds <= recomputeSeconds
 };
+
+/**
+ * The two costs the reload decision compares, for KV of `tokens` tokens and `bytes` bytes that sits
+ * in `tier`: copying it back to GPU memory, and computing it again from the stored text. Used to
+ * show the decision; the engine makes the same comparison when a returning session is admitted.
+ */
+export function reloadTimes(params: Params, spec: ReplicaSpec, tier: "dram" | "ssd" | "remote", bytes: number, tokens: number): { loadSeconds: number; recomputeSeconds: number; loads: boolean } {
+  const loadSeconds = bytes / tierBw(params)[tier];
+  const recomputeSeconds = computeSeconds(spec, seqLoad(spec.model, 0, tokens).flops, params.mfu);
+  return { loadSeconds, recomputeSeconds, loads: adaptiveReload.shouldLoad(loadSeconds, recomputeSeconds) };
+}

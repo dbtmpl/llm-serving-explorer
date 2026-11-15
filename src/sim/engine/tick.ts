@@ -6,7 +6,7 @@ import type { World } from "../core/types.js";
 import { emit, livePods } from "../core/world.js";
 import { SHEDDING } from "../flowcontrol/index.js";
 import { FRONTEND_HOPS, tokenizeSeconds } from "../workload/frontend.js";
-import { newRequest, newSession } from "../workload/index.js";
+import { injectTrace, newRequest, newSession } from "../workload/index.js";
 import { failReq } from "./admit.js";
 import { CHURN_INTERVAL_S, CHURN_MIN_SESSIONS, HISTORY_SAMPLES, SAMPLE_INTERVAL_S, TERMINATED_LINGER_S, THROUGHPUT_WINDOW_S, TICK_S, TIME_EPSILON_S } from "./constants.js";
 import { autoscale, requeue, restartFleet, tickPod } from "./fleet.js";
@@ -23,6 +23,7 @@ function arrivals(w: World, h: number): void {
       newSession(w);
     }
   }
+  if (w.trace.length) injectTrace(w);
   while (w.pending.length && w.pending[0]! <= w.t) {
     w.pending.shift();
     newSession(w);

@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { kinds, run, world } from "../../testing.js";
+import { DEFAULT_PARAMS } from "../../core/params.js";
+import { kvBytesPerToken } from "../../cost/memory.js";
+import { kinds, replica, run, world } from "../../testing.js";
 import { spawnBurst } from "../../workload/index.js";
 import { BLOCK_TOKENS, blocksFor } from "../blocks.js";
 import { leastRecentlyUsed } from "../eviction.js";
 import { DISPLAY_CELLS } from "../hbm.js";
 import { preemptNewest } from "../preemption.js";
 import { blockHashPrefix } from "../prefix.js";
-import { adaptiveReload } from "../reload.js";
+import { evictIdleNow } from "../forced.js";
+import { adaptiveReload, reloadTimes } from "../reload.js";
 
 describe("paged blocks (Kwon et al., SOSP 2023)", () => {
   it("a context needs ceil(tokens / 16) blocks and wastes less than one", () => {
@@ -124,5 +127,66 @@ describe("the KV cache in the engine", () => {
     expect(w.m.completed).toBe(2);
     expect(kinds(w).has("scale.down")).toBe(true);
     expect(w.events.filter((e) => e.kind === "req.admitted").at(-1)!.cached).toBe(0);
+  });
+});
+
+describe("forced eviction (used only by the step-through walkthrough)", () => {
+  /** One finished request whose session goes idle, with caching on. */
+  const idleWorld = (over = {}) => {
+    const w = world({ returnProb: 0, maxPods: 1, ...over });
+    spawnBurst(w, 1);
+    run(w, 60, () => w.m.completed === 1);
+    w.events.length = 0;
+    return w;
+  };
+  it("moves the idle session's KV from HBM to DRAM and emits the same kv.move a real eviction does", () => {
+    const w = idleWorld();
+    const pod = w.pods[0]!;
+    const e = pod.entries.get(1)!;
+    expect(e.tier).toBe("hbm");
+    const blocks = e.blocks;
+    const cells = e.cells.length;
+    expect(evictIdleNow(w, 1, pod.id)).toBe(true);
+    const moves = w.events.filter((x) => x.kind === "kv.move");
+    expect(moves).toHaveLength(1);
+    expect(moves[0]).toMatchObject({ sid: 1, podId: pod.id, from: "hbm", to: "dram", tokens: e.tokens });
+    expect((moves[0]!.cells as number[]).length).toBe(cells);
+    expect(e.tier).toBe("dram");
+    expect(pod.usedBlocks).toBe(0);
+    expect(pod.dramBlocks).toBe(blocks);
+    expect(w.m.evictions).toBe(1);
+  });
+  it("drops the KV when no tier has room, and the session is then rebuilt from text", () => {
+    const w = idleWorld({ dramGB: 0, ssdGB: 0, remoteGB: 0 });
+    expect(evictIdleNow(w, 1)).toBe(true);
+    expect(w.events.some((x) => x.kind === "kv.drop" && x.sid === 1)).toBe(true);
+    expect(w.pods[0]!.entries.has(1)).toBe(false);
+  });
+  it("does nothing for a session that is running, unknown, or not in GPU memory", () => {
+    const w = world({ returnProb: 0, maxPods: 1 });
+    spawnBurst(w, 1);
+    run(w, 4, () => w.reqs.size > 0 && w.pods[0]?.entries.get(1)?.active === true);
+    expect(w.pods[0]!.entries.get(1)?.active).toBe(true);
+    expect(evictIdleNow(w, 1)).toBe(false);
+    expect(evictIdleNow(w, 99)).toBe(false);
+    run(w, 60, () => w.m.completed === 1);
+    expect(evictIdleNow(w, 1, 12345)).toBe(false);
+    expect(evictIdleNow(w, 1)).toBe(true);
+    expect(evictIdleNow(w, 1)).toBe(false);
+  });
+});
+
+describe("reload estimate", () => {
+  it("matches the documented example: 3,000 tokens from DRAM load, over a 1 Gbit/s link they are recomputed", () => {
+    const spec = replica();
+    const bytes = 3000 * kvBytesPerToken(spec.model);
+    const dram = reloadTimes({ ...DEFAULT_PARAMS, dramGBs: 20 }, spec, "dram", bytes, 3000);
+    expect(dram.loadSeconds).toBeCloseTo(0.0197, 3);
+    expect(dram.recomputeSeconds).toBeGreaterThan(0.05);
+    expect(dram.recomputeSeconds).toBeLessThan(0.15);
+    expect(dram.loads).toBe(true);
+    const slow = reloadTimes({ ...DEFAULT_PARAMS, remoteGbps: 1 }, spec, "remote", bytes, 3000);
+    expect(slow.loadSeconds).toBeCloseTo(3.1, 1);
+    expect(slow.loads).toBe(false);
   });
 });

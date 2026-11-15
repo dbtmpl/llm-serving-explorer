@@ -1,0 +1,37 @@
+id: routing-least-loaded
+title: Least-loaded routing over four replicas
+# Three long answers (about eight seconds each) keep three replicas busy; then four short requests,
+# a second apart, arrive while those three are still running. Only the fourth replica is idle, so a
+# policy that routes to the fewest requests in flight has exactly one right answer for each short
+# request. The first three requests tie (everything idle) and may go anywhere, so replicas are
+# named by first use.
+model: llama-3.1-8b
+gpu: h100
+engine:
+  tp: 1
+  gpu_memory_utilisation: 0.9
+  max_num_seqs: 12
+  max_num_batched_tokens: 8192
+  block_size: 16
+  prefix_caching: true
+replicas: 4
+routing: least-loaded
+requests:
+  - { session: 1, at: 1.0, turns: [[300, 800]] }
+  - { session: 2, at: 1.5, turns: [[300, 800]] }
+  - { session: 3, at: 2.0, turns: [[300, 800]] }
+  - { session: 4, at: 3.0, turns: [[300, 20]] }
+  - { session: 5, at: 4.0, turns: [[300, 20]] }
+  - { session: 6, at: 5.0, turns: [[300, 20]] }
+  - { session: 7, at: 6.0, turns: [[300, 20]] }
+checks:
+  - id: pod-choice
+    claim: The first three requests land on three different replicas and every short request goes to the one idle replica.
+    kind: exact
+    quantity: routed_pod
+    tolerance: A routing decision is a discrete choice, and the scenario leaves exactly one least-loaded replica at each decision.
+  - id: requests-per-pod
+    claim: One replica serves the four short requests and the others one long request each.
+    kind: exact
+    quantity: requests_per_pod
+    tolerance: Counts of discrete decisions.

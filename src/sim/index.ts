@@ -18,8 +18,12 @@ export { decodeCurve } from "./cost/throughput.js";
 export { BLOCK_TOKENS, blocksFor } from "./kvcache/blocks.js";
 export { DISPLAY_CELLS, activeBlocks } from "./kvcache/hbm.js";
 export { tierBw, tierCapBlocks } from "./kvcache/tiers.js";
-
-export { spawnBurst } from "./workload/index.js";
+export { evictIdleNow } from "./kvcache/forced.js";
+export { reloadTimes } from "./kvcache/reload.js";
+export { SCORER_WEIGHTS, TIER_AFFINITY, prefixAwareTerms } from "./routing/prefixAware.js";
+export { POD_QUEUE_SLACK } from "./routing/index.js";
+export { MIN_OUTPUT_TOKENS, spawnBurst } from "./workload/index.js";
+export { loadTrace, type TraceRequest } from "./workload/trace.js";
 export { advance, setParam } from "./engine/tick.js";
 export { restartFleet } from "./engine/fleet.js";
 export { costPerMTok, kvFill, median, tokensPerSecond } from "./engine/selectors.js";

@@ -9,12 +9,14 @@ import { DECIDER, transferSeconds } from "../disaggregation/index.js";
 import { activeBlocks } from "../kvcache/hbm.js";
 import { POD_QUEUE_SLACK, routingPolicy, type CacheLocation } from "../routing/index.js";
 import { FRONTEND_HOPS } from "../workload/frontend.js";
+import { ROUTE_LOG_SIZE } from "./constants.js";
 
 interface Candidate {
   podId: number;
   load: number;
   cache: number;
   tier: CacheLocation | null;
+  kvUtilisation: number;
   score: number;
 }
 
@@ -36,7 +38,7 @@ export function route(w: World, r: Req): boolean {
       const cache = tier && r.lIn > 0 ? Math.min(1, (local ? local.tokens : far!.tokens) / r.lIn) : 0;
       const load = podLoad(pod);
       const kvUtilisation = pod.budget.poolBlocks ? activeBlocks(pod) / pod.budget.poolBlocks : 1;
-      return { podId: pod.id, load, cache, tier, score: policy.score({ cachedFraction: cache, cacheLocation: tier, kvUtilisation, load, capacity }) };
+      return { podId: pod.id, load, cache, tier, kvUtilisation, score: policy.score({ cachedFraction: cache, cacheLocation: tier, kvUtilisation, load, capacity }) };
     });
   const pick = (candidates: Candidate[]): Candidate => {
     const choice = policy.pick(candidates.map((c) => c.score), w.rr);
@@ -65,7 +67,9 @@ export function route(w: World, r: Req): boolean {
   r.stage = "toPod";
   r.stageStart = w.t;
   r.stageEnd = w.t + FRONTEND_HOPS.toPod;
-  w.lastRoute = { t: w.t, sid: r.sid, chosen: pod.id, policy: p.routing, candidates };
+  w.lastRoute = { t: w.t, sid: r.sid, reqId: r.id, chosen: pod.id, policy: p.routing, capacity, candidates };
+  w.routeLog.push(w.lastRoute);
+  if (w.routeLog.length > ROUTE_LOG_SIZE) w.routeLog.shift();
   emit(w, "req.routed", { podId: pod.id, sid: r.sid, reqId: r.id, cache: chosen.cache, tier: chosen.tier, load: chosen.load, n: candidates.length, via, role: pod.role });
   return true;
 }

@@ -1,0 +1,165 @@
+{
+  "scenario": "prefix-cache",
+  "inputHash": "8e7aff0d981ac28cf639cc269088be2ddcae696b72b60e62cd5f344212f583e7",
+  "blis": {
+    "commit": "c79c745619b16a8019339e3bbc79ee5e2923b258",
+    "catalogHash": "db74e4bb49f75d658e5d0850934da60daf513274b937a03b7ab994760bd6d21f",
+    "registryHash": "8dbcf3b85eed842f2bc798b34d2b95716fc58117750f4164d869b26770353fe0",
+    "engineVersion": "0.32.0",
+    "routerModule": "github.com/llm-d/llm-d-router v1.0.0-blis.4"
+  },
+  "record": {
+    "simulator": "blis",
+    "scenario": "prefix-cache",
+    "kvBlocksPerReplica": 27926,
+    "requests": [
+      {
+        "session": 1,
+        "round": 0,
+        "inputTokens": 1000,
+        "outputTokens": 50,
+        "cachedTokens": 0,
+        "pod": 0,
+        "arrivalS": 1,
+        "firstTokenS": 1.067103,
+        "lastTokenS": 1.537087,
+        "fate": "completed",
+        "preemptions": null
+      },
+      {
+        "session": 1,
+        "round": 1,
+        "inputTokens": 1150,
+        "outputTokens": 40,
+        "cachedTokens": 1040,
+        "pod": 0,
+        "arrivalS": 21,
+        "firstTokenS": 21.053883,
+        "lastTokenS": 21.428258,
+        "fate": "completed",
+        "preemptions": null
+      },
+      {
+        "session": 1,
+        "round": 2,
+        "inputTokens": 1290,
+        "outputTokens": 40,
+        "cachedTokens": 1184,
+        "pod": 0,
+        "arrivalS": 41,
+        "firstTokenS": 41.05392,
+        "lastTokenS": 41.428593,
+        "fate": "completed",
+        "preemptions": null
+      },
+      {
+        "session": 1,
+        "round": 3,
+        "inputTokens": 1543,
+        "outputTokens": 30,
+        "cachedTokens": 1328,
+        "pod": 0,
+        "arrivalS": 61,
+        "firstTokenS": 61.055869,
+        "lastTokenS": 61.334863,
+        "fate": "completed",
+        "preemptions": null
+      },
+      {
+        "session": 2,
+        "round": 0,
+        "inputTokens": 777,
+        "outputTokens": 33,
+        "cachedTokens": 0,
+        "pod": 0,
+        "arrivalS": 2,
+        "firstTokenS": 2.063504,
+        "lastTokenS": 2.37003,
+        "fate": "completed",
+        "preemptions": null
+      },
+      {
+        "session": 2,
+        "round": 1,
+        "inputTokens": 847,
+        "outputTokens": 33,
+        "cachedTokens": 800,
+        "pod": 0,
+        "arrivalS": 22,
+        "firstTokenS": 22.052694,
+        "lastTokenS": 22.35934,
+        "fate": "completed",
+        "preemptions": null
+      },
+      {
+        "session": 2,
+        "round": 2,
+        "inputTokens": 896,
+        "outputTokens": 33,
+        "cachedTokens": 864,
+        "pod": 0,
+        "arrivalS": 42,
+        "firstTokenS": 42.052493,
+        "lastTokenS": 42.359227,
+        "fate": "completed",
+        "preemptions": null
+      },
+      {
+        "session": 2,
+        "round": 3,
+        "inputTokens": 930,
+        "outputTokens": 33,
+        "cachedTokens": 928,
+        "pod": 0,
+        "arrivalS": 62,
+        "firstTokenS": 62.050151,
+        "lastTokenS": 62.356944,
+        "fate": "completed",
+        "preemptions": null
+      },
+      {
+        "session": 3,
+        "round": 0,
+        "inputTokens": 2500,
+        "outputTokens": 200,
+        "cachedTokens": 0,
+        "pod": 0,
+        "arrivalS": 3,
+        "firstTokenS": 3.093021,
+        "lastTokenS": 5.018763,
+        "fate": "completed",
+        "preemptions": null
+      },
+      {
+        "session": 3,
+        "round": 1,
+        "inputTokens": 3000,
+        "outputTokens": 100,
+        "cachedTokens": 2688,
+        "pod": 0,
+        "arrivalS": 23,
+        "firstTokenS": 23.05887,
+        "lastTokenS": 24.019323,
+        "fate": "completed",
+        "preemptions": null
+      },
+      {
+        "session": 3,
+        "round": 2,
+        "inputTokens": 3105,
+        "outputTokens": 60,
+        "cachedTokens": 3088,
+        "pod": 0,
+        "arrivalS": 43,
+        "firstTokenS": 43.052005,
+        "lastTokenS": 43.62467,
+        "fate": "completed",
+        "preemptions": null
+      }
+    ],
+    "preemptions": 0,
+    "requestsPerPod": [
+      11
+    ]
+  }
+}

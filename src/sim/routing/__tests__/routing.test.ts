@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { run, world } from "../../testing.js";
 import { spawnBurst } from "../../workload/index.js";
-import { pickHighest, routingPolicy, type CandidateFacts } from "../index.js";
-import { SCORER_WEIGHTS, TIER_AFFINITY } from "../prefixAware.js";
+import { POD_QUEUE_SLACK, pickHighest, routingPolicy, type CandidateFacts } from "../index.js";
+import { SCORER_WEIGHTS, TIER_AFFINITY, prefixAware, prefixAwareTerms } from "../prefixAware.js";
 
 const facts = (over: Partial<CandidateFacts> = {}): CandidateFacts => ({ cachedFraction: 0, cacheLocation: null, kvUtilisation: 0, load: 0, capacity: 16, ...over });
 
@@ -79,5 +79,32 @@ describe("routing in the engine", () => {
     };
     expect(sameShare("prefix-aware")).toBeGreaterThan(0.9);
     expect(sameShare("round-robin")).toBeLessThan(0.6);
+  });
+});
+
+describe("prefix-aware score terms", () => {
+  it("add up to the score, and the example of the docstring gives 4.5", () => {
+    const c = { cachedFraction: 0.9, cacheLocation: "hbm" as const, kvUtilisation: 0.6, load: 8, capacity: 16 };
+    const t = prefixAwareTerms(c);
+    expect(t.cache.term + t.kv.term + t.queue.term).toBeCloseTo(prefixAware.score(c), 12);
+    expect(prefixAware.score(c)).toBeCloseTo(4.5, 12);
+    expect(t.cache.share).toBeCloseTo(0.9, 12);
+    expect(prefixAwareTerms({ ...c, cacheLocation: "dram" }).cache.share).toBeCloseTo(0.63, 12);
+    expect(prefixAwareTerms({ ...c, cacheLocation: null }).cache.term).toBe(0);
+  });
+  it("the engine records every candidate's utilisation and the pod capacity in the decision", () => {
+    const w = world({ minPods: 2, maxPods: 2 });
+    run(w, 5);
+    spawnBurst(w, 1);
+    run(w, 3, () => w.lastRoute !== null);
+    const d = w.lastRoute!;
+    expect(d.reqId).toBeGreaterThan(0);
+    expect(d.capacity).toBe(w.params.maxNumSeqs + POD_QUEUE_SLACK);
+    expect(d.candidates).toHaveLength(2);
+    for (const c of d.candidates) {
+      const t = prefixAwareTerms({ cachedFraction: c.cache, cacheLocation: c.tier, kvUtilisation: c.kvUtilisation, load: c.load, capacity: d.capacity });
+      expect(c.score).toBeCloseTo(t.cache.term + t.kv.term + t.queue.term, 9);
+    }
+    expect(w.routeLog.at(-1)).toBe(d);
   });
 });

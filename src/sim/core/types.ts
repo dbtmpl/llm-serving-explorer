@@ -6,6 +6,7 @@ import type { StepCost } from "../cost/roofline.js";
 import type { PodRole } from "../disaggregation/index.js";
 import type { ReplicaSpec } from "../hardware/catalog.js";
 import type { CacheLocation, RoutingId } from "../routing/index.js";
+import type { TraceRequest } from "../workload/trace.js";
 import type { Params } from "./params.js";
 
 /** Memory tiers on a pod's own node, fastest first. */
@@ -63,6 +64,8 @@ export interface Req {
 
 export interface Session {
   id: number;
+  /** The conversation's number in the trace it was injected from, when it came from one. */
+  traceId?: number;
   hue: number;
   turn: number;
   /** Tokens of conversation so far. */
@@ -136,9 +139,13 @@ export interface Pod {
 export interface RouteDecision {
   t: number;
   sid: number;
+  /** The request this decision was made for. */
+  reqId: number;
   chosen: number;
   policy: RoutingId;
-  candidates: { podId: number; load: number; cache: number; tier: CacheLocation | null; score: number }[];
+  /** Load at which a pod counts as full (`max_num_seqs` plus the queue slack). */
+  capacity: number;
+  candidates: { podId: number; load: number; cache: number; tier: CacheLocation | null; kvUtilisation: number; score: number }[];
 }
 
 export type SimEvent = { t: number; kind: string; podId?: number; sid?: number; reqId?: number; [k: string]: unknown };
@@ -184,8 +191,12 @@ export interface World {
   gatewayQueue: number[];
   /** Arrival times of sessions scheduled by a burst. */
   pending: number[];
+  /** Requests of a trace not yet sent, in time order (see workload/trace.ts). */
+  trace: TraceRequest[];
   events: SimEvent[];
   lastRoute: RouteDecision | null;
+  /** The most recent routing decisions, newest last, so the interface can explain one after others were made. */
+  routeLog: RouteDecision[];
   m: Metrics;
   history: Sample[];
   /** Routing policy state carried between decisions (the round-robin position). */
