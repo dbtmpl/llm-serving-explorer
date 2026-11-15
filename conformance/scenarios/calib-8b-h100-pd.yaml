@@ -1,0 +1,23 @@
+id: calib-8b-h100-pd
+title: Calibration data, prefill/decode split, Llama 3.1 8B on one H100 per pod
+role: calibration
+# One prefill pod and one decode pod; four requests 15 s apart, each of 1,000 to 8,000 tokens, all above the threshold, so every one is prefilled on the
+# prefill pod and its KV cache crosses to the decode pod. The fit sets the link rate (`linkGbps`) so that the mean hand-over time matches BLIS's.
+model: llama-3.1-8b
+gpu: h100
+engine:
+  tp: 1
+  gpu_memory_utilisation: 0.9
+  max_num_seqs: 64
+  max_num_batched_tokens: 8192
+  block_size: 16
+  prefix_caching: true
+replicas: 2
+routing: prefix-aware
+disagg: { prefill_replicas: 1, decode_replicas: 1, threshold_tokens: 512 }
+requests:
+  - { session: 1, at: 1.0, turns: [[1000, 64]] }
+  - { session: 2, at: 16.0, turns: [[2000, 64]] }
+  - { session: 3, at: 31.0, turns: [[4000, 64]] }
+  - { session: 4, at: 46.0, turns: [[8000, 64]] }
+checks: []

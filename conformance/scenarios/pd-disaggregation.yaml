@@ -1,0 +1,41 @@
+id: pd-disaggregation
+title: Prefill/decode split, which requests use the prefill pool and what the hand-over costs
+# One prefill pod and two decode pods. Four conversations of three turns start 0.6 s apart: the first prompt of each (3,000 tokens) is above the 512-token
+# threshold, so it is prefilled on the prefill pod and its KV cache is handed over; the two follow-ups (150 new tokens each, 20 s apart, when the decode pod
+# still holds the conversation) have far fewer uncached tokens than the threshold and are prefilled in place on their decode pod. The fitted link rate
+# (calibration scenario calib-8b-h100-pd) prices the hand-overs on the TypeScript side; BLIS prices them from its fabric.
+model: llama-3.1-8b
+gpu: h100
+engine:
+  tp: 1
+  gpu_memory_utilisation: 0.9
+  max_num_seqs: 64
+  max_num_batched_tokens: 8192
+  block_size: 16
+  prefix_caching: true
+replicas: 3
+routing: prefix-aware
+disagg: { prefill_replicas: 1, decode_replicas: 2, threshold_tokens: 512 }
+requests:
+  - { session: 1, at: 1.0, gap_s: 20, turns: [[3000, 100], [150, 40], [150, 40]] }
+  - { session: 2, at: 1.6, gap_s: 20, turns: [[3000, 100], [150, 40], [150, 40]] }
+  - { session: 3, at: 2.2, gap_s: 20, turns: [[3000, 100], [150, 40], [150, 40]] }
+  - { session: 4, at: 2.8, gap_s: 20, turns: [[3000, 100], [150, 40], [150, 40]] }
+checks:
+  - id: prefill-pool-requests
+    claim: Exactly the four first prompts go through the prefill pool; no follow-up does.
+    kind: exact
+    quantity: prefill_pool_requests
+    tolerance: A count of routing decisions made on integers (uncached tokens against the threshold), in a case where every prompt is far from it.
+  - id: kv-transfer-mean
+    claim: The mean hand-over time of a prompt's KV cache agrees with BLIS after the link rate is fitted.
+    kind: calibrated
+    metric: kv_transfer_mean_s
+    rel_tol: 0.20
+    tolerance: "20 percent: the link rate is fitted on four hand-overs of 1,000 to 8,000 tokens; BLIS prices whole blocks and adds a fixed floor, so a different prompt length moves the mean by rounding and the floor, not by a different rate."
+  - id: ttft-mean
+    claim: Mean time to first token across first prompts and follow-ups agrees with BLIS after calibration.
+    kind: calibrated
+    metric: ttft_mean_s
+    rel_tol: 0.30
+    tolerance: "30 percent: the same as for the single-pod timing scenarios; it adds the hand-over and a second queue, each priced by a fitted or modelled term."

@@ -1,0 +1,37 @@
+id: spec-decoding
+title: Speculative decoding, tokens per step and time per token
+# Held out from the calibration scenario (4 draft tokens, 3.0 accepted per step): 3 draft tokens and 2.2 accepted per step, five requests 15 s apart with
+# prompts of 300 to 6,000 tokens and answers of 300, each alone on the engine. BLIS takes the mean tokens per verification step as its input and prices a
+# step at the verify width (K + 1 positions) with its drafter (n-gram) free; the TypeScript model draws each step's accepted count from a per-token
+# acceptance probability (the one that gives the same mean) and prices the verify width plus a draft cost, fitted to zero on the calibration scenario.
+model: llama-3.1-8b
+gpu: h100
+engine:
+  tp: 1
+  gpu_memory_utilisation: 0.9
+  max_num_seqs: 64
+  max_num_batched_tokens: 8192
+  block_size: 16
+  prefix_caching: true
+replicas: 1
+routing: round-robin
+speculative: { k: 3, acceptance_length: 2.2 }
+requests:
+  - { session: 1, at: 1.0, turns: [[300, 300]] }
+  - { session: 2, at: 16.0, turns: [[700, 300]] }
+  - { session: 3, at: 31.0, turns: [[1500, 300]] }
+  - { session: 4, at: 46.0, turns: [[3000, 300]] }
+  - { session: 5, at: 61.0, turns: [[6000, 300]] }
+checks:
+  - id: tokens-per-step
+    claim: A sequence gains the mean number of tokens per decode step that BLIS is given as its input.
+    kind: calibrated
+    metric: spec_tokens_per_step
+    rel_tol: 0.06
+    tolerance: "6 percent: BLIS spends its mean deterministically; the TypeScript model draws each step at random, and over about 1,200 steps three standard errors of the mean are 6 percent."
+  - id: tpot-mean
+    claim: Mean time per output token under speculation agrees with BLIS after calibration.
+    kind: calibrated
+    metric: tpot_mean_s
+    rel_tol: 0.12
+    tolerance: "12 percent: the same as for plain decoding (the fit leaves up to 9 percent on its calibration scenarios), since the verify step is priced on the same roofline."

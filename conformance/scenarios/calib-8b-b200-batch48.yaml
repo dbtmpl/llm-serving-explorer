@@ -1,0 +1,65 @@
+id: calib-8b-b200-batch48
+title: Calibration data, forty-eight sequences decoding together, Llama 3.1 8B on one B200
+role: calibration
+# Forty-eight requests 80 ms apart: the batch grows to 48 and decodes together, short context (KV reads and per-sequence host time matter more than at small batch).
+model: llama-3.1-8b
+gpu: b200
+engine:
+  tp: 1
+  gpu_memory_utilisation: 0.9
+  max_num_seqs: 64
+  max_num_batched_tokens: 8192
+  block_size: 16
+  prefix_caching: true
+replicas: 1
+routing: round-robin
+requests:
+  - { session: 1, at: 1.00, turns: [[1000, 600]] }
+  - { session: 2, at: 1.08, turns: [[1000, 600]] }
+  - { session: 3, at: 1.16, turns: [[1000, 600]] }
+  - { session: 4, at: 1.24, turns: [[1000, 600]] }
+  - { session: 5, at: 1.32, turns: [[1000, 600]] }
+  - { session: 6, at: 1.40, turns: [[1000, 600]] }
+  - { session: 7, at: 1.48, turns: [[1000, 600]] }
+  - { session: 8, at: 1.56, turns: [[1000, 600]] }
+  - { session: 9, at: 1.64, turns: [[1000, 600]] }
+  - { session: 10, at: 1.72, turns: [[1000, 600]] }
+  - { session: 11, at: 1.80, turns: [[1000, 600]] }
+  - { session: 12, at: 1.88, turns: [[1000, 600]] }
+  - { session: 13, at: 1.96, turns: [[1000, 600]] }
+  - { session: 14, at: 2.04, turns: [[1000, 600]] }
+  - { session: 15, at: 2.12, turns: [[1000, 600]] }
+  - { session: 16, at: 2.20, turns: [[1000, 600]] }
+  - { session: 17, at: 2.28, turns: [[1000, 600]] }
+  - { session: 18, at: 2.36, turns: [[1000, 600]] }
+  - { session: 19, at: 2.44, turns: [[1000, 600]] }
+  - { session: 20, at: 2.52, turns: [[1000, 600]] }
+  - { session: 21, at: 2.60, turns: [[1000, 600]] }
+  - { session: 22, at: 2.68, turns: [[1000, 600]] }
+  - { session: 23, at: 2.76, turns: [[1000, 600]] }
+  - { session: 24, at: 2.84, turns: [[1000, 600]] }
+  - { session: 25, at: 2.92, turns: [[1000, 600]] }
+  - { session: 26, at: 3.00, turns: [[1000, 600]] }
+  - { session: 27, at: 3.08, turns: [[1000, 600]] }
+  - { session: 28, at: 3.16, turns: [[1000, 600]] }
+  - { session: 29, at: 3.24, turns: [[1000, 600]] }
+  - { session: 30, at: 3.32, turns: [[1000, 600]] }
+  - { session: 31, at: 3.40, turns: [[1000, 600]] }
+  - { session: 32, at: 3.48, turns: [[1000, 600]] }
+  - { session: 33, at: 3.56, turns: [[1000, 600]] }
+  - { session: 34, at: 3.64, turns: [[1000, 600]] }
+  - { session: 35, at: 3.72, turns: [[1000, 600]] }
+  - { session: 36, at: 3.80, turns: [[1000, 600]] }
+  - { session: 37, at: 3.88, turns: [[1000, 600]] }
+  - { session: 38, at: 3.96, turns: [[1000, 600]] }
+  - { session: 39, at: 4.04, turns: [[1000, 600]] }
+  - { session: 40, at: 4.12, turns: [[1000, 600]] }
+  - { session: 41, at: 4.20, turns: [[1000, 600]] }
+  - { session: 42, at: 4.28, turns: [[1000, 600]] }
+  - { session: 43, at: 4.36, turns: [[1000, 600]] }
+  - { session: 44, at: 4.44, turns: [[1000, 600]] }
+  - { session: 45, at: 4.52, turns: [[1000, 600]] }
+  - { session: 46, at: 4.60, turns: [[1000, 600]] }
+  - { session: 47, at: 4.68, turns: [[1000, 600]] }
+  - { session: 48, at: 4.76, turns: [[1000, 600]] }
+checks: []

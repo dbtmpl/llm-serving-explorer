@@ -18,7 +18,10 @@ import { evaluate } from "../compare.js";
 import type { Reduced, Reference } from "../record.js";
 import { lockedCommit } from "../run/blis.js";
 import { runTypescriptArms } from "../run/typescript.js";
-import { REFERENCE_DIR, loadScenario, scenarioIds } from "../scenario.js";
+import { DEFAULT_PARAMS } from "../../src/sim/index.js";
+import { calibrateAll } from "../calibration/calibrate.js";
+import { loadFitted, pairKey } from "../calibration/fitted.js";
+import { REFERENCE_DIR, loadScenario, scenarioIds, usesCalibration } from "../scenario.js";
 import { scenarioInputHash } from "../translate/toBlis.js";
 
 const HASH = /^[0-9a-f]{64}$/;
@@ -80,3 +83,23 @@ for (const id of scenarioIds()) {
     }
   });
 }
+
+describe("calibration", () => {
+  it("fitted.json is what the fit produces from the committed references (run pnpm conformance:calibrate)", () => {
+    expect(calibrateAll()).toEqual(loadFitted());
+  }, 120_000);
+  it("has a fit for every pair that a calibrated or directional check uses", () => {
+    const fitted = loadFitted();
+    for (const id of scenarioIds()) {
+      const s = loadScenario(id);
+      if (!usesCalibration(s)) continue;
+      for (const d of Object.values(s.arms)) expect(fitted.pairs[pairKey(d.model, d.gpu, d.engine.tp)], `${id}: no calibration for ${d.model}/${d.gpu}/tp${d.engine.tp}`).toBeDefined();
+    }
+  });
+  it("never lets the fit move the site's defaults, and reports them beside the fitted values", () => {
+    for (const p of Object.values(loadFitted().pairs)) expect(p.defaults).toEqual({ mbu: DEFAULT_PARAMS.mbu, mfu: DEFAULT_PARAMS.mfu, hostMsBase: DEFAULT_PARAMS.hostMsBase, hostMsPerSeq: DEFAULT_PARAMS.hostMsPerSeq });
+  });
+  it("does not use a calibration scenario as a held-out check", () => {
+    for (const id of scenarioIds()) if (loadScenario(id).role === "calibration") expect(loadScenario(id).checks).toEqual([]);
+  });
+});

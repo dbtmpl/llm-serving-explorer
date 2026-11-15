@@ -1,0 +1,70 @@
+id: timing-70b-h200-chat
+title: Held-out timing, Llama 3.1 70B on four H200s, chat-like load
+# Held out from the calibration set: 30 requests 0.5 s apart with prompts of 500 to 4,000 tokens and answers of 80 to 200.
+model: llama-70b
+gpu: h200
+engine:
+  tp: 4
+  gpu_memory_utilisation: 0.9
+  max_num_seqs: 64
+  max_num_batched_tokens: 8192
+  block_size: 16
+  prefix_caching: true
+replicas: 1
+routing: round-robin
+requests:
+  - { session: 1, at: 1.00, turns: [[500, 100]] }
+  - { session: 2, at: 1.50, turns: [[2000, 200]] }
+  - { session: 3, at: 2.00, turns: [[1200, 150]] }
+  - { session: 4, at: 2.50, turns: [[4000, 80]] }
+  - { session: 5, at: 3.00, turns: [[500, 100]] }
+  - { session: 6, at: 3.50, turns: [[2000, 200]] }
+  - { session: 7, at: 4.00, turns: [[1200, 150]] }
+  - { session: 8, at: 4.50, turns: [[4000, 80]] }
+  - { session: 9, at: 5.00, turns: [[500, 100]] }
+  - { session: 10, at: 5.50, turns: [[2000, 200]] }
+  - { session: 11, at: 6.00, turns: [[1200, 150]] }
+  - { session: 12, at: 6.50, turns: [[4000, 80]] }
+  - { session: 13, at: 7.00, turns: [[500, 100]] }
+  - { session: 14, at: 7.50, turns: [[2000, 200]] }
+  - { session: 15, at: 8.00, turns: [[1200, 150]] }
+  - { session: 16, at: 8.50, turns: [[4000, 80]] }
+  - { session: 17, at: 9.00, turns: [[500, 100]] }
+  - { session: 18, at: 9.50, turns: [[2000, 200]] }
+  - { session: 19, at: 10.00, turns: [[1200, 150]] }
+  - { session: 20, at: 10.50, turns: [[4000, 80]] }
+  - { session: 21, at: 11.00, turns: [[500, 100]] }
+  - { session: 22, at: 11.50, turns: [[2000, 200]] }
+  - { session: 23, at: 12.00, turns: [[1200, 150]] }
+  - { session: 24, at: 12.50, turns: [[4000, 80]] }
+  - { session: 25, at: 13.00, turns: [[500, 100]] }
+  - { session: 26, at: 13.50, turns: [[2000, 200]] }
+  - { session: 27, at: 14.00, turns: [[1200, 150]] }
+  - { session: 28, at: 14.50, turns: [[4000, 80]] }
+  - { session: 29, at: 15.00, turns: [[500, 100]] }
+  - { session: 30, at: 15.50, turns: [[2000, 200]] }
+checks:
+  - id: ttft-mean
+    claim: Mean time to first token agrees with BLIS after calibration.
+    kind: calibrated
+    metric: ttft_mean_s
+    rel_tol: 0.30
+    tolerance: "30 percent: the fit leaves up to 34 percent in time to first token on its own calibration scenarios (BLIS's per-request front-end overhead and its prefill efficiency are not a roofline), so a held-out value within 30 percent shows the fit generalises as well as it fits."
+  - id: tpot-mean
+    claim: Mean time per output token agrees with BLIS after calibration.
+    kind: calibrated
+    metric: tpot_mean_s
+    rel_tol: 0.12
+    tolerance: "12 percent: the fit leaves up to 9 percent in time per token on its calibration scenarios (long contexts are the worst), so 12 percent allows for a different batch size and context length without admitting a wrong functional form."
+  - id: e2e-mean
+    claim: Mean end-to-end time agrees with BLIS after calibration.
+    kind: calibrated
+    metric: e2e_mean_s
+    rel_tol: 0.15
+    tolerance: "15 percent: end-to-end time is dominated by decoding (about 95 percent of it), so it should follow the time per token with a small addition from time to first token."
+  - id: throughput
+    claim: Output tokens per second over the run agree with BLIS after calibration.
+    kind: calibrated
+    metric: throughput_tokens_per_s
+    rel_tol: 0.10
+    tolerance: "10 percent: the load is open loop, so throughput over the run is the offered token rate plus the tail of the last answers; it differs only through the tail."

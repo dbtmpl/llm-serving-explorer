@@ -1,0 +1,33 @@
+id: calib-70b-h200-batch16-long
+title: Calibration data, sixteen long sequences decoding together, Llama 3.1 70B on four H200s
+role: calibration
+# Sixteen requests with 6,000-token prompts 200 ms apart: decode reads a long KV cache, so memory traffic is dominated by the KV and not the weights.
+model: llama-70b
+gpu: h200
+engine:
+  tp: 4
+  gpu_memory_utilisation: 0.9
+  max_num_seqs: 64
+  max_num_batched_tokens: 8192
+  block_size: 16
+  prefix_caching: true
+replicas: 1
+routing: round-robin
+requests:
+  - { session: 1, at: 1.00, turns: [[6000, 600]] }
+  - { session: 2, at: 1.20, turns: [[6000, 600]] }
+  - { session: 3, at: 1.40, turns: [[6000, 600]] }
+  - { session: 4, at: 1.60, turns: [[6000, 600]] }
+  - { session: 5, at: 1.80, turns: [[6000, 600]] }
+  - { session: 6, at: 2.00, turns: [[6000, 600]] }
+  - { session: 7, at: 2.20, turns: [[6000, 600]] }
+  - { session: 8, at: 2.40, turns: [[6000, 600]] }
+  - { session: 9, at: 2.60, turns: [[6000, 600]] }
+  - { session: 10, at: 2.80, turns: [[6000, 600]] }
+  - { session: 11, at: 3.00, turns: [[6000, 600]] }
+  - { session: 12, at: 3.20, turns: [[6000, 600]] }
+  - { session: 13, at: 3.40, turns: [[6000, 600]] }
+  - { session: 14, at: 3.60, turns: [[6000, 600]] }
+  - { session: 15, at: 3.80, turns: [[6000, 600]] }
+  - { session: 16, at: 4.00, turns: [[6000, 600]] }
+checks: []
