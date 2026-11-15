@@ -30,6 +30,7 @@ export function createWorld(params: Params = { ...DEFAULT_PARAMS }, seed: number
     arrivalAcc: 0,
     tokWindow: [],
     lastSample: 0,
+    startedAt: null,
     seen: { tokenizer: false, gateway: false },
     store: { turns: 0, tokens: 0 },
     remote: new Map(),

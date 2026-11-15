@@ -97,7 +97,7 @@ function telemetry(w: World): void {
     }
     emit(w, "churn", { sid: first, rate: p.arrivalRate, active: w.reqs.size, typing, idle, total: w.sessions.size });
   }
-  if (w.t - w.lastSample >= SAMPLE_INTERVAL_S) {
+  if (w.startedAt !== null && w.t - w.lastSample >= SAMPLE_INTERVAL_S) {
     w.lastSample = w.t;
     while (w.tokWindow.length && w.tokWindow[0]!.t < w.t - THROUGHPUT_WINDOW_S) w.tokWindow.shift();
     w.history.push({ t: w.t, tokS: tokensPerSecond(w), inflight: w.reqs.size, pods: livePods(w).length, kvFill: kvFill(w) });
@@ -116,7 +116,7 @@ function tick(w: World, h: number): void {
     const pod = w.pods[i]!;
     if (pod.state === "terminated" && w.t - pod.stateSince > TERMINATED_LINGER_S) w.pods.splice(i, 1);
   }
-  w.m.gpuSeconds += livePods(w).length * w.params.tp * h;
+  if (w.startedAt !== null) w.m.gpuSeconds += livePods(w).length * w.params.tp * h;
   telemetry(w);
 }
 
