@@ -415,8 +415,7 @@
         "kvTransferMeanS": null,
         "specTokensPerStep": null,
         "prefillPoolRequests": null,
-        "peakReplicas": null,
-        "finalReplicas": null
+        "peakReplicas": 1
       }
     }
   }

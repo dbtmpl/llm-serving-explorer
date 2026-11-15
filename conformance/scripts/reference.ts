@@ -30,7 +30,9 @@ if (!existsSync(binary)) die(`the BLIS binary ${binary} does not exist. Build it
 const src = process.env.BLIS_SRC;
 if (src) {
   const head = execFileSync("git", ["-C", src, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
-  if (head !== lockedCommit()) die(`BLIS_SRC is at ${head} but conformance/blis.lock names ${lockedCommit()}`);
+  // the weekly upstream job builds a newer commit on purpose (BLIS_UPSTREAM=1) and the references it writes name that commit
+  if (process.env.BLIS_UPSTREAM) process.env.BLIS_COMMIT = head;
+  else if (head !== lockedCommit()) die(`BLIS_SRC is at ${head} but conformance/blis.lock names ${lockedCommit()}`);
 }
 
 // the router configurations the translators ship must be the ones this binary's llm-d router ships

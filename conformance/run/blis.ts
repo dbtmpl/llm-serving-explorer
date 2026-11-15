@@ -164,7 +164,8 @@ export function runBlis(s: Scenario, binary: string, keep?: string): BlisRun {
       }
       const result = JSON.parse(readFileSync(path.join(dir, "result.json"), "utf8")) as Result;
       provenance ??= {
-        commit: lockedCommit(),
+        // the weekly upstream job regenerates against a newer commit than the pin and says so here
+        commit: process.env.BLIS_COMMIT ?? lockedCommit(),
         catalogHash: result.data.catalog.hash,
         registryHash: result.data.registry.hash,
         engineVersion: result.engine.version,
