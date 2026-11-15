@@ -59,11 +59,11 @@ Numbers are the TypeScript model's, then BLIS's.
 |---|---|---|---|
 | kv-budget-8b-h100 | KV blocks per replica | known difference (2 blocks) | 27,928 / 27,926 |
 | kv-budget-70b-h200-tp4 | KV blocks per replica | known difference (30 blocks) | 74,790 / 74,760 |
-| prefix-cache | cached prefix tokens, 8 follow-ups on one replica | known difference (1 of 8) | s2/r2: 880 / 864 |
+| prefix-cache | cached prefix tokens, 8 follow-ups on one replica | agrees | |
 | routing-round-robin | pod sequence; requests per pod | known difference | 3,3,3,3 / 4,4,3,1 |
 | routing-least-loaded | pod choice; requests per pod | agrees | |
 | routing-prefix-aware | conversation stays on its replica; pod choice | agrees | |
-| routing-prefix-aware | cached prefix tokens | known difference (4 of 8 follow-ups) | 2,480 / 2,464 |
+| routing-prefix-aware | cached prefix tokens | agrees | |
 | preemption-overflow | preemption count | known difference | 799 / 1 |
 | preemption-overflow | both requests complete | agrees | |
 | queue-deadline-shedding | which requests are shed | agrees | requests 9 to 14 shed in both |
@@ -71,7 +71,6 @@ Numbers are the TypeScript model's, then BLIS's.
 The differences, in short (the scenario files carry the full reasons):
 
 - **KV block budget.** Both size the pool as vLLM does: `ceil(driver-reported memory x utilisation)` less weights, activation peak and a CUDA-graph estimate. A first comparison found the TypeScript model 6 to 8 percent short, because it used the datasheet memory (80 GB for an H100; the driver reports 85.03 GB) and left out the graphs; both are now in the model. What remains, 2 and 30 blocks, is the activation estimate (BLIS takes 11 or 5 hidden-state rows per token from NVIDIA's memory model, the TypeScript model sums the buffers) and rounding of the weights.
-- **Last generated token.** vLLM never stores the KV of the last token it samples, so a follow-up whose history is an exact multiple of 16 tokens reuses one block less than the TypeScript model does.
 - **Round robin.** The llm-d router has no strict rotation: BLIS's `round-robin` configuration picks at random among tied replicas. The TypeScript policy models Envoy.
 - **Full-prompt admission gate.** vLLM 0.32 admits a waiting request only if its whole prompt fits (`scheduler_reserve_full_isl`, default on). The TypeScript model admits on the first chunk and, in a constructed overflow, preempts the same request over a thousand times where vLLM waits.
 

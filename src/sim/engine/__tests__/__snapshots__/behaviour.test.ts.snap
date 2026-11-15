@@ -25,7 +25,7 @@ exports[`simulation behaviour snapshots > 70B on 4 GPUs, scale up and down 1`] =
 exports[`simulation behaviour snapshots > default stack, 30 sessions with follow-ups 1`] = `
 {
   "counters": {
-    "cachedTokens": 212272,
+    "cachedTokens": 212224,
     "completed": 88,
     "drops": 0,
     "evictions": 0,
@@ -37,7 +37,7 @@ exports[`simulation behaviour snapshots > default stack, 30 sessions with follow
     "tokensOut": 13588,
   },
   "events": 6437,
-  "hash": "4b21eb26",
+  "hash": "eee44522",
   "meanTpot": 0.011673341,
   "meanTtft": 0.990429953,
   "pods": 3,
@@ -47,7 +47,7 @@ exports[`simulation behaviour snapshots > default stack, 30 sessions with follow
 exports[`simulation behaviour snapshots > disaggregated prefill/decode 1`] = `
 {
   "counters": {
-    "cachedTokens": 62144,
+    "cachedTokens": 62128,
     "completed": 40,
     "drops": 0,
     "evictions": 0,
@@ -59,7 +59,7 @@ exports[`simulation behaviour snapshots > disaggregated prefill/decode 1`] = `
     "tokensOut": 6390,
   },
   "events": 1174,
-  "hash": "173730b4",
+  "hash": "b53c09ce",
   "meanTpot": 0.012191579,
   "meanTtft": 1.95548876,
   "pods": 0,
@@ -103,7 +103,7 @@ exports[`simulation behaviour snapshots > load shedding with steady arrivals 1`]
     "tokensOut": 31189,
   },
   "events": 3869,
-  "hash": "65d6bc8e",
+  "hash": "f478a26",
   "meanTpot": 0.014206839,
   "meanTtft": 5.305930524,
   "pods": 1,
@@ -125,7 +125,7 @@ exports[`simulation behaviour snapshots > on-demand admission overload (preempti
     "tokensOut": 17691,
   },
   "events": 3090,
-  "hash": "7db5b7b2",
+  "hash": "e2bcb696",
   "meanTpot": 0.134907931,
   "meanTtft": 40.100407096,
   "pods": 0,
@@ -147,7 +147,7 @@ exports[`simulation behaviour snapshots > speculative decoding with overlap 1`] 
     "tokensOut": 11070,
   },
   "events": 3283,
-  "hash": "784ffef7",
+  "hash": "30c3ea0b",
   "meanTpot": 0.00444792,
   "meanTtft": 0.884089583,
   "pods": 1,
@@ -179,7 +179,7 @@ exports[`simulation behaviour snapshots > static batching, reserve to completion
 exports[`simulation behaviour snapshots > tiers under pressure 1`] = `
 {
   "counters": {
-    "cachedTokens": 564496,
+    "cachedTokens": 564464,
     "completed": 88,
     "drops": 47,
     "evictions": 66,
@@ -190,10 +190,10 @@ exports[`simulation behaviour snapshots > tiers under pressure 1`] = `
     "reloads": 13,
     "tokensOut": 3670,
   },
-  "events": 2253,
-  "hash": "d894c0dd",
-  "meanTpot": 0.238890647,
-  "meanTtft": 16.108871014,
+  "events": 2254,
+  "hash": "179c615",
+  "meanTpot": 0.238892544,
+  "meanTtft": 16.108987753,
   "pods": 1,
 }
 `;
