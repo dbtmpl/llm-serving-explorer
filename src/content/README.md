@@ -5,6 +5,7 @@ Every piece of explanatory text on the website lives in a markdown file here, so
 | File | What it holds | Used by |
 |---|---|---|
 | [`step-through.md`](step-through.md) | Floating callouts in "explain" mode and the held box in step-through mode | `src/live/callouts.ts` |
+| [`dive-deeper.md`](dive-deeper.md) | The "Dive deeper" drop-downs of the step-through box: the theory behind each step, one entry per concept | `src/content/index.ts` (`diveConcepts`), `src/live/LiveView.tsx` |
 | [`tutorial.md`](tutorial.md) | The guided tour cards | `src/live/Tutorial.tsx` |
 | [`inspector.md`](inspector.md) | The notes in the "dive in" panel | `src/live/Inspector.tsx` |
 | [`panels.md`](panels.md) | Empty-state card, scenario hints, notes in the menus, legend note | `src/live/LiveView.tsx` |
@@ -33,6 +34,10 @@ Shown only in step-through mode.
 - Fields are `###` subsections with a lower-case name. The names depend on the file (`title`/`body`/`detail`/`at` for callouts, where `at` says where in the system the step happens and only step-through shows it, `title`/`text` for the tour, `text` for single notes, `name`/`adds`/`source` for architectures).
 - Where the code picks between variants or adds an optional sentence (plurals, the three routing policies, the disaggregation sentence), each variant is its own field with a clear name (`title-one`, `title-many`, `how-round-robin`, `cap`). The code names the fields it wants; chosen fields are joined with a space.
 - Paragraphs are separated by a blank line.
+
+### Dive deeper
+
+`dive-deeper.md` has one entry per concept with fields `title`, `body` (80 to 180 words, at least one `[@key]` citation) and an optional `formula` (a `$$ ... $$` block). Which concepts a step shows is decided in one place: the `### dive` field of the step's entry in `step-through.md`, a comma-separated list of concept ids in the order they are shown (1 to 4). Every step the step-through shows has one; explain-only entries (`step.tokens.batch`, `step.spec`, `step.mixed`, `churn`, `scale.down`, `fleet.restart`) do not. A concept used by several steps is written once, and its `_Where:_` line lists exactly the steps that use it (a test checks both directions). The box renders each concept as a native `<details>`, closed whenever the step changes.
 
 ## Placeholders
 

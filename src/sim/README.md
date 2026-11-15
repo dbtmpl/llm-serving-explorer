@@ -129,9 +129,27 @@ When a paper introduces a decision that has no home yet (for example KV compress
 - **Google SRE book, Handling Overload.** [Site Reliability Engineering, chapter 21: Handling Overload (load shedding, graceful degradation)](https://sre.google/sre-book/handling-overload/).
 - **AWS Builders' Library, load shedding.** [Using load shedding to avoid overload (Amazon Builders' Library)](https://aws.amazon.com/builders-library/using-load-shedding-to-avoid-overload/).
 - **OpenAI API reference, chat completions.** [OpenAI API reference: create chat completion (the request and response format other engines copy)](https://developers.openai.com/api/reference/typescript/resources/chat/subresources/completions/methods/create).
+- **Liu et al., 2024 (Andes).** [Andes: Defining and Enhancing Quality-of-Experience in LLM-Based Text Streaming Services](https://arxiv.org/abs/2404.16283).
+- **Agrawal et al., 2024 (Etalon).** [Etalon: Holistic Performance Evaluation Framework for LLM Inference Systems](https://arxiv.org/abs/2407.07000).
+- **Little, 1961.** [A Proof for the Queuing Formula: L = λW](https://doi.org/10.1287/opre.9.3.383).
+- **Shazeer, 2019.** [Fast Transformer Decoding: One Write-Head is All You Need (multi-query attention)](https://arxiv.org/abs/1911.02150).
+- **Ainslie et al., EMNLP 2023.** [GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints](https://arxiv.org/abs/2305.13245).
+- **Pope et al., 2022.** [Efficiently Scaling Transformer Inference](https://arxiv.org/abs/2211.05102).
+- **Chen et al., 2023.** [Accelerating Large Language Model Decoding with Speculative Sampling](https://arxiv.org/abs/2302.01318).
+- **Dean and Barroso, CACM 2013.** [The Tail at Scale](https://doi.org/10.1145/2408776.2408794).
+- **Sennrich et al., ACL 2016.** [Neural Machine Translation of Rare Words with Subword Units (byte-pair encoding)](https://arxiv.org/abs/1508.07909).
+- **Kudo and Richardson, 2018.** [SentencePiece: A simple and language independent subword tokenizer and detokenizer](https://arxiv.org/abs/1808.06226).
+- **Hugging Face docs, chat templates.** [Hugging Face Transformers: chat templates (message list to the model's token format)](https://huggingface.co/docs/transformers/chat_templating).
+- **Fielding, 2000, REST.** [Architectural Styles and the Design of Network-based Software Architectures, chapter 5: Representational State Transfer (the stateless constraint)](https://ics.uci.edu/~fielding/pubs/dissertation/rest_arch_style.htm).
+- **Fowler, Event Sourcing.** [Martin Fowler: Event Sourcing (an append-only log as the record, state derived from it)](https://martinfowler.com/eaaDev/EventSourcing.html).
+- **gRPC docs, deadlines.** [gRPC: deadlines (a deadline is set by the caller and propagated down the call chain)](https://grpc.io/docs/guides/deadlines/).
+- **Fu et al., OSDI 2024 (ServerlessLLM).** [ServerlessLLM: Low-Latency Serverless Inference for Large Language Models](https://arxiv.org/abs/2401.14351).
+- **WHATWG, server-sent events.** [HTML Living Standard: server-sent events (the stream format chat-completions APIs use)](https://html.spec.whatwg.org/multipage/server-sent-events.html).
+- **Reddi et al., ISCA 2020 (MLPerf Inference).** [MLPerf Inference Benchmark](https://arxiv.org/abs/1911.02549).
+- **Srivatsa et al., 2024 (Preble).** [Preble: Efficient Distributed Prompt Scheduling for LLM Serving](https://arxiv.org/abs/2407.00023).
 - **Envoy AI Gateway docs, usage-based rate limiting.** [Envoy AI Gateway: usage-based rate limiting (limits counted in tokens)](https://aigateway.envoyproxy.io/docs/capabilities/traffic/usage-based-ratelimiting).
 - **llm-d KV-cache indexer.** [llm-d KV-cache: indexer that maps a prompt's KV-block keys to the pods holding them](https://github.com/llm-d/llm-d-kv-cache).
-- **vLLM docs, OpenAI-compatible server.** [vLLM: OpenAI-compatible server (chat completions, chat template, streaming)](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html).
+- **vLLM docs, chat-completions server.** [vLLM: OpenAI-compatible server (chat completions, chat template, streaming)](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html).
 - **vLLM repository.** [vLLM: high-throughput and memory-efficient inference and serving engine](https://github.com/vllm-project/vllm).
 - **SGLang repository.** [SGLang: a fast serving framework for large language models](https://github.com/sgl-project/sglang).
 - **TGI repository.** [Text Generation Inference (Hugging Face)](https://github.com/huggingface/text-generation-inference).

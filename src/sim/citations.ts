@@ -288,6 +288,114 @@ export const CITATIONS = {
     kind: "docs",
     url: "https://developers.openai.com/api/reference/typescript/resources/chat/subresources/completions/methods/create"
   },
+  andes2024: {
+    short: "Liu et al., 2024 (Andes)",
+    title: "Andes: Defining and Enhancing Quality-of-Experience in LLM-Based Text Streaming Services",
+    kind: "paper",
+    url: "https://arxiv.org/abs/2404.16283"
+  },
+  etalon2024: {
+    short: "Agrawal et al., 2024 (Etalon)",
+    title: "Etalon: Holistic Performance Evaluation Framework for LLM Inference Systems",
+    kind: "paper",
+    url: "https://arxiv.org/abs/2407.07000"
+  },
+  little1961: {
+    short: "Little, 1961",
+    title: "A Proof for the Queuing Formula: L = λW",
+    kind: "paper",
+    url: "https://doi.org/10.1287/opre.9.3.383"
+  },
+  shazeer2019: {
+    short: "Shazeer, 2019",
+    title: "Fast Transformer Decoding: One Write-Head is All You Need (multi-query attention)",
+    kind: "paper",
+    url: "https://arxiv.org/abs/1911.02150"
+  },
+  ainslie2023: {
+    short: "Ainslie et al., EMNLP 2023",
+    title: "GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints",
+    kind: "paper",
+    url: "https://arxiv.org/abs/2305.13245"
+  },
+  pope2022: {
+    short: "Pope et al., 2022",
+    title: "Efficiently Scaling Transformer Inference",
+    kind: "paper",
+    url: "https://arxiv.org/abs/2211.05102"
+  },
+  chen2023: {
+    short: "Chen et al., 2023",
+    title: "Accelerating Large Language Model Decoding with Speculative Sampling",
+    kind: "paper",
+    url: "https://arxiv.org/abs/2302.01318"
+  },
+  dean2013: {
+    short: "Dean and Barroso, CACM 2013",
+    title: "The Tail at Scale",
+    kind: "paper",
+    url: "https://doi.org/10.1145/2408776.2408794"
+  },
+  sennrich2016: {
+    short: "Sennrich et al., ACL 2016",
+    title: "Neural Machine Translation of Rare Words with Subword Units (byte-pair encoding)",
+    kind: "paper",
+    url: "https://arxiv.org/abs/1508.07909"
+  },
+  kudo2018: {
+    short: "Kudo and Richardson, 2018",
+    title: "SentencePiece: A simple and language independent subword tokenizer and detokenizer",
+    kind: "paper",
+    url: "https://arxiv.org/abs/1808.06226"
+  },
+  hfChatTemplates: {
+    short: "Hugging Face docs, chat templates",
+    title: "Hugging Face Transformers: chat templates (message list to the model's token format)",
+    kind: "docs",
+    url: "https://huggingface.co/docs/transformers/chat_templating"
+  },
+  fielding2000: {
+    short: "Fielding, 2000, REST",
+    title: "Architectural Styles and the Design of Network-based Software Architectures, chapter 5: Representational State Transfer (the stateless constraint)",
+    kind: "docs",
+    url: "https://ics.uci.edu/~fielding/pubs/dissertation/rest_arch_style.htm"
+  },
+  fowlerEventSourcing: {
+    short: "Fowler, Event Sourcing",
+    title: "Martin Fowler: Event Sourcing (an append-only log as the record, state derived from it)",
+    kind: "docs",
+    url: "https://martinfowler.com/eaaDev/EventSourcing.html"
+  },
+  grpcDeadlines: {
+    short: "gRPC docs, deadlines",
+    title: "gRPC: deadlines (a deadline is set by the caller and propagated down the call chain)",
+    kind: "docs",
+    url: "https://grpc.io/docs/guides/deadlines/"
+  },
+  fu2024: {
+    short: "Fu et al., OSDI 2024 (ServerlessLLM)",
+    title: "ServerlessLLM: Low-Latency Serverless Inference for Large Language Models",
+    kind: "paper",
+    url: "https://arxiv.org/abs/2401.14351"
+  },
+  sseSpec: {
+    short: "WHATWG, server-sent events",
+    title: "HTML Living Standard: server-sent events (the stream format chat-completions APIs use)",
+    kind: "docs",
+    url: "https://html.spec.whatwg.org/multipage/server-sent-events.html"
+  },
+  reddi2019: {
+    short: "Reddi et al., ISCA 2020 (MLPerf Inference)",
+    title: "MLPerf Inference Benchmark",
+    kind: "paper",
+    url: "https://arxiv.org/abs/1911.02549"
+  },
+  srivatsa2024: {
+    short: "Srivatsa et al., 2024 (Preble)",
+    title: "Preble: Efficient Distributed Prompt Scheduling for LLM Serving",
+    kind: "paper",
+    url: "https://arxiv.org/abs/2407.00023"
+  },
   envoyAiGatewayRateLimit: {
     short: "Envoy AI Gateway docs, usage-based rate limiting",
     title: "Envoy AI Gateway: usage-based rate limiting (limits counted in tokens)",
@@ -301,7 +409,7 @@ export const CITATIONS = {
     url: "https://github.com/llm-d/llm-d-kv-cache"
   },
   vllmOpenAiServer: {
-    short: "vLLM docs, OpenAI-compatible server",
+    short: "vLLM docs, chat-completions server",
     title: "vLLM: OpenAI-compatible server (chat completions, chat template, streaming)",
     kind: "docs",
     url: "https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html"

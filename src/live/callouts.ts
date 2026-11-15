@@ -4,7 +4,7 @@
  * to, which variant to use, and the values to fill in. `title`, `body` and `detail` of a Callout
  * are already-filled markdown, rendered with <Rich>.
  */
-import { stepText } from "../content/index.js";
+import { diveConcepts, stepText, type DiveConcept } from "../content/index.js";
 import { fmtGB, fmtInt, fmtMs } from "./format.js";
 import type { Scene, Target } from "./render.js";
 import { POD_QUEUE_SLACK, SCORER_WEIGHTS, TIER_AFFINITY, prefixAwareTerms, type SimEvent, type World } from "../sim/index.js";
@@ -28,6 +28,8 @@ export interface Callout {
   body: string;
   /** markdown; a second paragraph, shown in step-through mode */
   detail?: string;
+  /** the theory behind this step: the concepts of its `dive` field, shown as "Dive deeper" in the step-through box */
+  dive: DiveConcept[];
   tone: "info" | "prefill" | "decode" | "dram" | "ssd" | "remote" | "evict";
   /** shown only the first time it happens */
   once?: boolean;
@@ -93,7 +95,7 @@ export type Meta = Pick<Callout, "key" | "target" | "tone"> & Partial<Pick<Callo
 export type Say = Parameters<typeof stepText>;
 
 /** Build a callout: where it goes and when (meta), and which entry of step-through.md fills it. */
-export const make = (content: string, meta: Meta, values?: Say[2], pick?: Say[1]): Callout => ({ ...meta, content, ...stepText(content, pick, values) });
+export const make = (content: string, meta: Meta, values?: Say[2], pick?: Say[1]): Callout => ({ ...meta, content, ...stepText(content, pick, values), dive: diveConcepts(content) });
 
 export function calloutFor(e: SimEvent, w: World): Callout[] {
   const pod = (part: "engine" | "gpu" | "roofline" | "tiers" = "engine"): Target => ({ type: "pod", id: e.podId!, part });
