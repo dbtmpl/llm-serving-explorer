@@ -33,6 +33,9 @@ describe("citation registry", () => {
     // cited in docstrings as related work that is deliberately not modelled
     const relatedWorkOnly: CitationKey[] = ["yu2023", "sun2024", "zheng2023"];
     for (const key of relatedWorkOnly) used.add(key);
+    // named on the website as products or projects, linked from the prose in src/content/
+    const namedInProse: CitationKey[] = ["keda", "vllmRepo", "sglangRepo", "tgiRepo", "tfServing", "dynamoRepo", "openaiRateLimits", "envoyAiGatewayRateLimit", "llmdKvCacheIndexer", "vllmOpenAiServer"];
+    for (const key of namedInProse) used.add(key);
     expect(Object.keys(CITATIONS).filter((key) => !used.has(key))).toEqual([]);
   });
 });

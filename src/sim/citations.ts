@@ -234,6 +234,66 @@ export const CITATIONS = {
     kind: "docs",
     url: "https://docs.nvidia.com/dynamo/latest/"
   },
+  keda: {
+    short: "KEDA docs",
+    title: "KEDA: Kubernetes event-driven autoscaling",
+    kind: "docs",
+    url: "https://keda.sh/"
+  },
+  openaiRateLimits: {
+    short: "OpenAI docs, rate limits",
+    title: "OpenAI API: rate limits (requests per minute and tokens per minute)",
+    kind: "docs",
+    url: "https://platform.openai.com/docs/guides/rate-limits"
+  },
+  envoyAiGatewayRateLimit: {
+    short: "Envoy AI Gateway docs, usage-based rate limiting",
+    title: "Envoy AI Gateway: usage-based rate limiting (limits counted in tokens)",
+    kind: "docs",
+    url: "https://aigateway.envoyproxy.io/docs/capabilities/traffic/usage-based-ratelimiting"
+  },
+  llmdKvCacheIndexer: {
+    short: "llm-d KV-cache indexer",
+    title: "llm-d KV-cache: indexer that maps a prompt's KV-block keys to the pods holding them",
+    kind: "source",
+    url: "https://github.com/llm-d/llm-d-kv-cache"
+  },
+  vllmOpenAiServer: {
+    short: "vLLM docs, OpenAI-compatible server",
+    title: "vLLM: OpenAI-compatible server (chat completions, chat template, streaming)",
+    kind: "docs",
+    url: "https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html"
+  },
+  vllmRepo: {
+    short: "vLLM repository",
+    title: "vLLM: high-throughput and memory-efficient inference and serving engine",
+    kind: "source",
+    url: "https://github.com/vllm-project/vllm"
+  },
+  sglangRepo: {
+    short: "SGLang repository",
+    title: "SGLang: a fast serving framework for large language models",
+    kind: "source",
+    url: "https://github.com/sgl-project/sglang"
+  },
+  tgiRepo: {
+    short: "TGI repository",
+    title: "Text Generation Inference (Hugging Face)",
+    kind: "source",
+    url: "https://github.com/huggingface/text-generation-inference"
+  },
+  tfServing: {
+    short: "TF Serving repository",
+    title: "TensorFlow Serving",
+    kind: "source",
+    url: "https://github.com/tensorflow/serving"
+  },
+  dynamoRepo: {
+    short: "NVIDIA Dynamo repository",
+    title: "NVIDIA Dynamo: datacenter-scale distributed inference serving framework",
+    kind: "source",
+    url: "https://github.com/ai-dynamo/dynamo"
+  },
   llama31Card: {
     short: "Meta, Llama 3.1 8B model card",
     title: "meta-llama/Llama-3.1-8B-Instruct (architecture in config.json)",

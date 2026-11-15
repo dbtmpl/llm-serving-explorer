@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useReducer, useRef, useState, type ReactNode } from "react";
 import { STEP_KINDS, calloutFor, type Callout } from "./callouts.js";
+import { GATE_TIMEOUT_S, end, newScript, stepsFor, type Script } from "./walkthrough.js";
 import { TOUR, TourArt } from "./Tutorial.js";
 import { Inspector } from "./Inspector.js";
+import { Rich } from "./Rich.js";
+import { architectureText, panelFields, panelText } from "../content/index.js";
 import { fmtInt, fmtMs } from "./format.js";
-import { C, Scene, type Target } from "./render.js";
-import { ARCHITECTURES, DEFAULT_ARCH, DEFAULT_PARAMS, GPUS, MODELS, advance, costPerMTok, createWorld, kvFill, livePods, median, setParam, spawnBurst, tokensPerSecond, type Params, type World } from "../sim/index.js";
+import { C, Scene, TONE, type Free, type Target } from "./render.js";
+import { ARCHITECTURES, DEFAULT_ARCH, DEFAULT_PARAMS, GPUS, MODELS, advance, costPerMTok, createWorld, evictIdleNow, kvFill, livePods, median, setParam, spawnBurst, tokensPerSecond, type Params, type World } from "../sim/index.js";
 import "./live.css";
 
+const EMPTY_TEXT = panelFields("empty", { title: "title", text: "text", hint: "hint" });
 const SPEEDS = [0.02, 0.05, 0.1, 0.25, 0.5, 1];
 const CALLOUT_TTL = 9;
 
@@ -14,6 +18,56 @@ interface Shown extends Callout {
   id: number;
   born: number;
 }
+
+/** Everything needed to show a step again: the world, the picture and the step-through bookkeeping. */
+interface Snap {
+  world: World;
+  scene: ReturnType<Scene["snapshot"]>;
+  queue: Callout[];
+  focus: number | null;
+  focusDone: boolean;
+  script: Script;
+}
+/** One step of the step-through; `snap` is null when it was not stored (very large world, or too old). */
+interface StepRec {
+  shown: Shown;
+  snap: Snap | null;
+}
+/** Snapshots kept (the oldest are dropped; Back to one of those shows its text only). */
+const MAX_SNAPS = 60;
+/** Worlds with more sessions than this are not cloned: too slow and too big to keep 60 of. */
+const MAX_SNAP_SESSIONS = 2000;
+
+interface StepBook {
+  queue: Callout[];
+  focus: number | null;
+  focusDone: boolean;
+  script: Script;
+  hist: StepRec[];
+  hi: number;
+  dirty: boolean;
+}
+
+function takeSnap(world: World, scene: Scene, st: StepBook): Snap | null {
+  if (world.sessions.size > MAX_SNAP_SESSIONS) return null;
+  try {
+    return { world: structuredClone(world), scene: scene.snapshot(), queue: [...st.queue], focus: st.focus, focusDone: st.focusDone, script: structuredClone(st.script) };
+  } catch {
+    return null;
+  }
+}
+
+/** Record a step the box has just started to hold (the world has no undelivered events at this point). */
+function pushStep(st: StepBook, shown: Shown, world: World, scene: Scene): void {
+  st.hist.push({ shown, snap: takeSnap(world, scene, st) });
+  st.hi = st.hist.length - 1;
+  st.dirty = false;
+  const old = st.hist[st.hist.length - 1 - MAX_SNAPS];
+  if (old) old.snap = null;
+}
+
+/** [index of the step shown, number of steps, whether the graph could not be rewound to it] */
+const posOf = (st: StepBook): [number, number, boolean] => [st.hi, st.hist.length, st.hi < st.hist.length - 1 && !st.hist[st.hi]?.snap];
 
 interface Preset {
   id: string;
@@ -25,10 +79,10 @@ interface Preset {
 }
 
 const PRESETS: Preset[] = [
-  { id: "evict", label: "Idle sessions → eviction", hint: "40 sessions with 10k-token prompts on one pod. Finished sessions stay cached until HBM fills, then move to DRAM, to SSD, and out. gpu_memory_utilization is lowered to 0.5 so the pool fills sooner.", params: { promptTokens: 10000, outputTokens: 60, maxPods: 1, gpuMemUtil: 0.5, dramGB: 4, ssdGB: 8, returnProb: 0.6, thinkTimeS: 5, scaleDownIdleS: 120 }, speed: 0.25, burst: [40, 8] },
-  { id: "preempt", label: "Outputs outgrow the pool → preemption", hint: "12 prompts fit in a small KV pool (gpu_memory_utilization 0.3), but their long outputs keep growing. With nothing idle to evict, the newest sequence gives its blocks back and recomputes.", params: { promptTokens: 4000, outputTokens: 1500, maxPods: 1, gpuMemUtil: 0.3, returnProb: 0 }, speed: 0.5, burst: [12, 0] },
-  { id: "70b", label: "70B on 4 × H100", hint: "Tensor parallelism is bought for memory: four GPUs each hold a quarter of the weights and a slice of every KV block.", params: { model: "llama-3-70b", tp: 4, maxPods: 4 }, speed: 0.1, burst: [20, 0] },
-  { id: "churn", label: "Conversations with churn", hint: "100 sessions that keep replying, plus two new sessions every second while others go idle. Follow-up turns are short prefills on cached history; new sessions are long ones. Watch the two kinds of work share each step.", params: { arrivalRate: 2, returnProb: 0.8, thinkTimeS: 3, maxTurns: 8, maxPods: 12 }, speed: 0.25, burst: [100, 2] }
+  { id: "evict", label: "Idle sessions → eviction", hint: panelText("scenario.evict"), params: { promptTokens: 10000, outputTokens: 60, maxPods: 1, gpuMemUtil: 0.5, dramGB: 4, ssdGB: 8, returnProb: 0.6, thinkTimeS: 5, scaleDownIdleS: 120 }, speed: 0.25, burst: [40, 8] },
+  { id: "preempt", label: "Outputs outgrow the pool → preemption", hint: panelText("scenario.preempt"), params: { promptTokens: 4000, outputTokens: 1500, maxPods: 1, gpuMemUtil: 0.3, returnProb: 0 }, speed: 0.5, burst: [12, 0] },
+  { id: "70b", label: "70B on 4 × H100", hint: panelText("scenario.70b"), params: { model: "llama-3-70b", tp: 4, maxPods: 4 }, speed: 0.1, burst: [20, 0] },
+  { id: "churn", label: "Conversations with churn", hint: panelText("scenario.churn"), params: { arrivalRate: 2, returnProb: 0.8, thinkTimeS: 3, maxTurns: 8, maxPods: 12 }, speed: 0.25, burst: [100, 2] }
 ];
 
 function Slider({ label, value, min, max, step, fmt, onChange, id }: { label: string; value: number; min: number; max: number; step: number; fmt?: (v: number) => string; onChange: (v: number) => void; id?: string }) {
@@ -58,6 +112,12 @@ function Choice<T extends string | number | boolean>({ label, value, options, on
   );
 }
 
+/** Whether a queued step may be held now: it has no condition, the condition holds, or it has waited too long. */
+function gateOpen(c: Callout, w: World, scene: Scene): boolean {
+  if (!c.until || c.until(w, scene)) return true;
+  return !!c.queuedAt && (w.t - c.queuedAt.t > GATE_TIMEOUT_S || scene.vt - c.queuedAt.vt > GATE_TIMEOUT_S);
+}
+
 const Group = ({ title, children, open }: { title: string; children: ReactNode; open?: boolean }) => (
   <details className="lv-group" open={open}>
     <summary>{title}</summary>
@@ -80,14 +140,13 @@ export function LiveView() {
   const [focus, setFocus] = useState<number | null>(null);
   const [tour, setTour] = useState<number | null>(null);
   const [arch, setArch] = useState(DEFAULT_ARCH);
-  const [histPos, setHistPos] = useState<[number, number]>([0, 0]);
+  const [histPos, setHistPos] = useState<[number, number, boolean]>([0, 0, false]);
   const [, refresh] = useReducer((x: number) => x + 1, 0);
-  const live = useRef({ playing, speed, explain, callouts, seen: new Set<string>(), lastShown: new Map<string, number>(), nextId: 1, stepMode: false, held: null as Shown | null, focus: null as number | null, focusDone: false, queue: [] as Callout[], tour: null as number | null, hist: [] as Shown[], hi: -1 });
+  const live = useRef({ playing, speed, explain, callouts, seen: new Set<string>(), lastShown: new Map<string, number>(), nextId: 1, stepMode: false, held: null as Shown | null, focus: null as number | null, focusDone: false, script: newScript(), freeze: false, queue: [] as Callout[], tour: null as number | null, hist: [] as StepRec[], hi: -1, dirty: false });
   live.current.tour = tour;
   const heldEl = useRef<HTMLDivElement>(null);
   const tourEl = useRef<HTMLDivElement>(null);
-  const tourDot = useRef<HTMLDivElement>(null);
-  const tourLine = useRef<SVGLineElement>(null);
+  const ringEl = useRef<HTMLDivElement>(null);
   live.current.playing = playing;
   live.current.speed = speed;
   live.current.explain = explain;
@@ -107,6 +166,78 @@ export function LiveView() {
     let last = performance.now();
     let lastRefresh = 0;
     (window as unknown as { __live: unknown }).__live = { world: () => worldRef.current, scene };
+    /**
+     * Guided stretch (tutorial card or held step-through box): dock the card, work out the screen area
+     * it leaves free and ask the scene to frame and highlight what the step is about. Wide screens put
+     * the tutorial card at the left and the step box at the bottom, between the menus; narrow screens
+     * put both above the transport bar. Does nothing, and costs nothing, when no guided mode is on.
+     */
+    const guideScene = (scene: Scene, st: typeof live.current, cw: number, ch: number) => {
+      const tourStep = st.tour !== null ? TOUR[st.tour]! : null;
+      const dock = tourStep ? tourEl.current : st.held ? heldEl.current : null;
+      if (!dock) {
+        scene.reserve = { l: 0, t: 0, r: 0, b: 0 };
+        scene.setGuide(null);
+        scene.highlight = null;
+        return;
+      }
+      const narrow = cw < 900;
+      const free: Free = { l: 16, t: narrow ? 68 : 80, r: cw - 16, b: ch - (narrow ? 78 : 90) };
+      const reserve = { l: 0, t: 0, r: 0, b: 0 };
+      const bh = dock.offsetHeight;
+      let x: number;
+      let y: number;
+      if (tourStep && !narrow) {
+        x = 16;
+        y = Math.max(free.t, (ch - bh) / 2);
+        free.l = x + dock.offsetWidth + 24;
+        reserve.l = dock.offsetWidth + 24;
+      } else {
+        if (narrow) {
+          dock.style.width = "";
+          x = (cw - dock.offsetWidth) / 2;
+        } else {
+          // the step box sits between the menus, so it never hides them
+          const lr = leftRef.current && !leftRef.current.hidden ? leftRef.current.getBoundingClientRect().right + 12 : 16;
+          const rl = rightRef.current && !rightRef.current.hidden ? rightRef.current.getBoundingClientRect().left - 12 : cw - 16;
+          const bw = Math.max(300, Math.min(520, rl - lr));
+          dock.style.width = `${bw}px`;
+          x = rl - lr < 300 ? lr : lr + (rl - lr - bw) / 2;
+          free.l = lr;
+          free.r = rl;
+        }
+        y = free.b - dock.offsetHeight;
+        free.b = y - 12;
+        reserve.b = dock.offsetHeight + 12;
+      }
+      dock.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+      const target: Target | undefined = tourStep ? (tourStep.target && !("el" in tourStep.target) ? tourStep.target : undefined) : (st.held!.focus ?? st.held!.target);
+      scene.reserve = reserve;
+      scene.setGuide(target ? { target, free, key: tourStep ? `tour:${st.tour}` : `step:${st.held!.id}` } : null);
+      scene.highlight = target ? { target, tone: tourStep ? TONE.info : TONE[st.held!.tone] } : null;
+    };
+
+    /** The tutorial steps that point at a menu or the transport bar outline that element instead of part of the graph. */
+    const placeRing = (ring: HTMLDivElement | null, target: (typeof TOUR)[number]["target"]) => {
+      if (!ring) return;
+      const el = target && "el" in target ? document.querySelector<HTMLElement>(`[data-tour="${target.el}"]`) : null;
+      let r: { l: number; t: number; r: number; b: number } | null = null;
+      if (el) {
+        // a menu column is as tall as the screen; outline the panels it holds
+        const kids = el.classList.contains("lv-col") ? [...el.children] : [el];
+        for (const k of kids) {
+          const b = k.getBoundingClientRect();
+          if (b.width === 0) continue;
+          r = r ? { l: Math.min(r.l, b.left), t: Math.min(r.t, b.top), r: Math.max(r.r, b.right), b: Math.max(r.b, b.bottom) } : { l: b.left, t: b.top, r: b.right, b: b.bottom };
+        }
+      }
+      ring.style.opacity = r ? "1" : "0";
+      if (!r) return;
+      ring.style.width = `${r.r - r.l + 12}px`;
+      ring.style.height = `${r.b - r.t + 12}px`;
+      ring.style.transform = `translate(${Math.round(r.l - 6)}px, ${Math.round(r.t - 6)}px)`;
+    };
+
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
       const world = worldRef.current;
@@ -130,37 +261,55 @@ export function LiveView() {
         const leftTop = leftRef.current?.firstElementChild?.getBoundingClientRect().top;
         scene.panels = { lw: l.w, lh: l.h, rw: r.w, rh: r.h, bottom: cw < 900 && leftTop ? ch - leftTop + 12 : 96 };
       }
-      const running = st.playing && !st.held;
+      // Step-through: a step may wait for the picture (`until`). Meanwhile the clock runs, or, for a
+      // step that must not let the world move on, only the animation does. A held step may keep the
+      // animation playing (`animate`) while the clock stays stopped.
+      const head = st.stepMode && !st.held ? st.queue[0] : undefined;
+      const waiting = !!head?.until && !gateOpen(head, world, scene);
+      const frozen = st.freeze || (waiting && !!head!.hold);
+      const running = st.playing && !st.held && !frozen;
+      const animating = st.playing && (!st.held || !!st.held.animate);
       if (running) advance(world, dt * st.speed);
       const events = world.events.splice(0);
       scene.focusSid = st.stepMode ? st.focus : null;
-      const tourTarget = st.tour !== null ? TOUR[st.tour]!.target : undefined;
-      scene.topPad = tourEl.current && tourTarget && !("el" in tourTarget) ? tourEl.current.offsetHeight + 28 : 0;
-      scene.update(world, events, dt, running, cw, ch);
+      guideScene(scene, st, cw, ch);
+      scene.update(world, events, dt, animating, cw, ch);
       scene.draw(ctx, world, dpr);
 
       // step-through: follow one session and stop the clock at each thing that happens to it
       if (st.stepMode) {
-        for (const e of events) {
+        const queueSteps = (e: (typeof events)[number]) => {
+          for (const c of stepsFor(e, world, st.script)) {
+            st.queue.push({ ...c, queuedAt: { t: world.t, vt: scene.vt } });
+            if (c.last) st.focusDone = true;
+          }
+        };
+        const later: typeof events = [];
+        for (const raw of events) {
+          // one engine step reports the sessions it served in a list; the walkthrough follows one of them
+          const e = raw.kind === "step.tokens" && st.focus !== null && (raw.sids as number[]).includes(st.focus) ? { ...raw, sid: st.focus } : raw;
           if (st.focus === null && e.kind === "req.new") {
             st.focus = e.sid!;
+            st.script = newScript();
             setFocus(st.focus);
           }
           const req = st.focus !== null ? world.reqs.get(world.sessions.get(st.focus)?.reqId ?? -1) : undefined;
-          const waitingForPod = req && (req.stage === "queued" || req.stage === "toGateway" || req.stage === "tokenize" || req.stage === "send");
-          const mine = e.sid === st.focus && STEP_KINDS.has(e.kind);
-          const fleet = waitingForPod && (e.kind === "pod.loading" || e.kind === "pod.ready" || e.kind === "scale.up");
+          const mine = STEP_KINDS.has(e.kind) && e.sid === st.focus;
+          const fleet = !!req && (e.kind === "pod.loading" || e.kind === "pod.ready" || e.kind === "scale.up" || e.kind === "pod.failed");
           if (!mine && !fleet) continue;
-          const c = calloutFor(e, world)[0];
-          if (c) st.queue.push(c);
-          if (mine && (e.kind === "session.idle" || e.kind === "req.failed")) st.focusDone = true;
+          // the engine saves the turn and notes that the session is idle just before it reports the request done; the walkthrough tells it the other way round
+          if (mine && (e.kind === "store.append" || e.kind === "session.idle")) later.push(e);
+          else queueSteps(e);
         }
-        if (!st.held && st.queue.length) {
-          st.held = { ...st.queue.shift()!, id: st.nextId++, born: world.t };
-          st.hist.push(st.held);
-          st.hi = st.hist.length - 1;
+        for (const e of later) queueSteps(e);
+        if (st.freeze && (events.length || st.held)) st.freeze = false;
+        const next = !st.held ? st.queue[0] : undefined;
+        if (next && gateOpen(next, world, scene)) {
+          st.queue.shift();
+          st.held = { ...next, id: st.nextId++, born: world.t };
+          pushStep(st, st.held, world, scene);
           setHeld(st.held);
-          setHistPos([st.hi, st.hist.length]);
+          setHistPos(posOf(st));
         }
       }
 
@@ -209,60 +358,7 @@ export function LiveView() {
         const x = Math.max(minX, Math.min(maxX, s.x));
         el.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px) translate(-50%, ${below ? "0" : "-100%"})`;
       }
-      const place = (el: HTMLElement | null, t: Target | undefined, fallbackY: number) => {
-        if (!el) return null;
-        const a = t ? scene.anchor(world, t) : null;
-        const hw = el.offsetWidth / 2 + 8;
-        if (!a) {
-          el.style.transform = `translate(${Math.round(cw / 2)}px, ${Math.round(fallbackY)}px) translate(-50%, -50%)`;
-          return null;
-        }
-        const s = scene.toScreen(a);
-        const below = t!.type === "tokenizer" || t!.type === "stream";
-        const x = Math.max(hw, Math.min(cw - hw, s.x));
-        const y = below ? Math.min(s.y + 14, ch - el.offsetHeight - 90) : Math.max(s.y - 14, el.offsetHeight + 84);
-        el.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px) translate(-50%, ${below ? "0" : "-100%"})`;
-        return s;
-      };
-      if (st.held) place(heldEl.current, st.held.target, ch - 220);
-      if (st.tour !== null) {
-        const step = TOUR[st.tour]!;
-        let t = step.target;
-        const dot = tourDot.current;
-        if (t && "el" in t) {
-          const r = document.querySelector(`[data-tour="${t.el}"]`)?.getBoundingClientRect();
-          const el = tourEl.current;
-          if (el && r) {
-            const x = t.el === "right" ? r.left - el.offsetWidth / 2 - 18 : r.left + r.width / 2;
-            const y = t.el === "right" ? 88 + el.offsetHeight / 2 : r.top - el.offsetHeight / 2 - 16;
-            el.style.transform = `translate(${Math.round(Math.max(el.offsetWidth / 2 + 8, x))}px, ${Math.round(y)}px) translate(-50%, -50%)`;
-          }
-          if (dot) dot.style.opacity = "0";
-          if (tourLine.current) tourLine.current.style.opacity = "0";
-        } else {
-          if (t?.type === "session" && t.id < 0) t = { type: "session", id: world.sessions.keys().next().value ?? 0 };
-          if (t?.type === "pod" && t.id < 0) t = { ...t, id: (world.pods.find((x) => x.state === "ready") ?? world.pods[0])?.id ?? 0 };
-          // the card sits under the metrics strip, clear of the graph; a line and a dot point at the component
-          const el = tourEl.current;
-          const a = t ? scene.anchorPart(world, t) : null;
-          const s = a ? scene.toScreen(a) : null;
-          if (el) el.style.transform = t ? `translate(${Math.round(cw / 2)}px, 88px) translate(-50%, 0)` : `translate(${Math.round(cw / 2)}px, ${Math.round(ch / 2)}px) translate(-50%, -50%)`;
-          const line = tourLine.current;
-          if (dot) {
-            dot.style.opacity = s ? "1" : "0";
-            if (s) dot.style.transform = `translate(${Math.round(s.x)}px, ${Math.round(s.y)}px) translate(-50%, -50%)`;
-          }
-          if (line && el) {
-            line.style.opacity = s ? "1" : "0";
-            if (s) {
-              line.setAttribute("x1", String(cw / 2));
-              line.setAttribute("y1", String(88 + el.offsetHeight));
-              line.setAttribute("x2", String(s.x));
-              line.setAttribute("y2", String(s.y));
-            }
-          }
-        }
-      }
+      if (st.tour !== null) placeRing(ringEl.current, TOUR[st.tour]!.target);
       if (now - lastRefresh > 200) {
         lastRefresh = now;
         refresh();
@@ -290,7 +386,7 @@ export function LiveView() {
       const dy = e.clientY - drag.y;
       if (!drag.moved && Math.hypot(dx, dy) < 4) return;
       drag.moved = true;
-      scene.auto = false;
+      scene.takeOver();
       scene.cam.x -= dx / scene.cam.s;
       scene.cam.y -= dy / scene.cam.s;
       drag.x = e.clientX;
@@ -307,7 +403,7 @@ export function LiveView() {
     const wheel = (e: WheelEvent) => {
       e.preventDefault();
       const before = scene.toWorld(e.offsetX, e.offsetY);
-      scene.auto = false;
+      scene.takeOver();
       scene.cam.s = Math.max(0.1, Math.min(3, scene.cam.s * Math.exp(-e.deltaY * 0.0015)));
       const after = scene.toWorld(e.offsetX, e.offsetY);
       scene.cam.x += before.x - after.x;
@@ -325,10 +421,30 @@ export function LiveView() {
     };
   }, []);
 
-  const set = useCallback(<K extends keyof Params>(key: K, value: Params[K]) => {
-    setParam(worldRef.current, key, value);
-    refresh();
+  /**
+   * Called before the visitor alters the world (a parameter, a burst of requests, an architecture).
+   * If a rewound step is showing, the steps after it describe a future that no longer happens, so
+   * they are discarded and the simulation continues live from here. If the latest step is showing,
+   * its stored snapshot is now out of date; it is taken again before the visitor leaves the step.
+   */
+  const touchWorld = useCallback(() => {
+    const st = live.current;
+    if (!st.stepMode || !st.held) return;
+    if (st.hi < st.hist.length - 1) {
+      st.hist.length = st.hi + 1;
+      setHistPos(posOf(st));
+    }
+    st.dirty = true;
   }, []);
+
+  const set = useCallback(
+    <K extends keyof Params>(key: K, value: Params[K]) => {
+      touchWorld();
+      setParam(worldRef.current, key, value);
+      refresh();
+    },
+    [touchWorld]
+  );
 
   const reset = useCallback((params: Partial<Params> = {}) => {
     worldRef.current = createWorld({ ...DEFAULT_PARAMS, ...params });
@@ -346,8 +462,11 @@ export function LiveView() {
     st.held = null;
     st.focus = null;
     st.focusDone = false;
+    st.script = newScript();
+    st.freeze = false;
     st.hist = [];
     st.hi = -1;
+    st.dirty = false;
     setHeld(null);
     setFocus(null);
     refresh();
@@ -359,6 +478,8 @@ export function LiveView() {
     st.queue = [];
     st.held = null;
     st.focusDone = false;
+    st.script = newScript();
+    st.freeze = false;
     // follow the selected session, else the newest one still waiting on a model call, else the next to arrive
     let f: number | null = selected?.type === "session" ? selected.id : null;
     if (f === null) for (const s of worldRef.current.sessions.values()) if (s.reqId !== null) f = s.id;
@@ -366,6 +487,7 @@ export function LiveView() {
     st.callouts = [];
     st.hist = [];
     st.hi = -1;
+    st.dirty = false;
     setCallouts([]);
     setHeld(null);
     setFocus(st.focus);
@@ -373,34 +495,70 @@ export function LiveView() {
     if (st.stepMode) setPlaying(true);
   };
 
-  // Next walks forward through steps already seen, then lets the clock run to the next event.
-  // Back re-reads earlier steps; the graph itself stays where it is.
+  /** Show step `i` again: put back the world, the picture and the bookkeeping stored with it. */
+  const showStep = (i: number) => {
+    const st = live.current;
+    const rec = st.hist[i]!;
+    st.hi = i;
+    if (rec.snap) {
+      worldRef.current = structuredClone(rec.snap.world);
+      sceneRef.current.restore(rec.snap.scene);
+      st.queue = [...rec.snap.queue];
+      st.focus = rec.snap.focus;
+      st.focusDone = rec.snap.focusDone;
+      st.script = structuredClone(rec.snap.script);
+      st.freeze = false;
+      setFocus(st.focus);
+    }
+    st.held = rec.shown;
+    setHeld(st.held);
+    setHistPos(posOf(st));
+    refresh();
+  };
+  /** The latest step's snapshot is stale if the visitor changed the world while it was showing. */
+  const refreshLatest = () => {
+    const st = live.current;
+    const rec = st.hist[st.hist.length - 1];
+    if (st.dirty && rec && st.hi === st.hist.length - 1) rec.snap = takeSnap(worldRef.current, sceneRef.current, st);
+    st.dirty = false;
+  };
+
+  // Back and Next move between stored steps by restoring their snapshots, so the graph shows
+  // exactly the situation of that step. Next from the latest step runs the clock to the next event.
   const nextStep = () => {
     const st = live.current;
     if (st.hi < st.hist.length - 1) {
-      st.held = st.hist[++st.hi]!;
-    } else {
-      const next = st.queue.shift();
-      st.held = next ? { ...next, id: st.nextId++, born: worldRef.current.t } : null;
-      if (st.held) {
-        st.hist.push(st.held);
-        st.hi = st.hist.length - 1;
-      }
-      if (!st.held && st.focusDone) {
-        st.focus = null;
-        st.focusDone = false;
-        setFocus(null);
-      }
+      showStep(st.hi + 1);
+      return;
+    }
+    refreshLatest();
+    const leaving = st.held;
+    if (leaving?.evict) {
+      // the walkthrough's forced eviction: the simulation's own tier code moves the session's KV; the events it emits become the next steps
+      if (evictIdleNow(worldRef.current, leaving.evict.sid, leaving.evict.podId)) {
+        st.script.forcing = true;
+        st.freeze = true;
+      } else st.queue.push(end(leaving.evict.sid, "body-evicted"));
+    }
+    // a step that waits for the picture is held by the frame loop once it is ready
+    const head = st.queue[0];
+    const next = head && gateOpen(head, worldRef.current, sceneRef.current) ? st.queue.shift() : undefined;
+    st.held = next ? { ...next, id: st.nextId++, born: worldRef.current.t } : null;
+    if (st.held) pushStep(st, st.held, worldRef.current, sceneRef.current);
+    else if (st.focusDone && !head && !st.freeze) {
+      st.focus = null;
+      st.focusDone = false;
+      st.script = newScript();
+      setFocus(null);
     }
     setHeld(st.held);
-    setHistPos([st.hi, st.hist.length]);
+    setHistPos(posOf(st));
   };
   const prevStep = () => {
     const st = live.current;
     if (st.hi <= 0) return;
-    st.held = st.hist[--st.hi]!;
-    setHeld(st.held);
-    setHistPos([st.hi, st.hist.length]);
+    refreshLatest();
+    showStep(st.hi - 1);
   };
 
   const trace = () => {
@@ -410,6 +568,7 @@ export function LiveView() {
 
   const applyArch = (id: string) => {
     const a = ARCHITECTURES.find((x) => x.id === id)!;
+    touchWorld();
     setArch(id);
     for (const [k, v] of Object.entries(a.params)) setParam(worldRef.current, k as keyof Params, v as never);
     refresh();
@@ -443,6 +602,7 @@ export function LiveView() {
   }, []);
 
   const send = (n: number) => {
+    touchWorld();
     spawnBurst(worldRef.current, n);
     setPlaying(true);
   };
@@ -459,6 +619,13 @@ export function LiveView() {
     sceneRef.current.selected = t;
     setSelected(t);
   };
+
+  // The tutorial hides the menus except on the step that is about them; on a narrow screen the
+  // step-through box takes the place of the left menu, which is a sheet at the bottom there.
+  const tourTarget = tour !== null ? TOUR[tour]!.target : undefined;
+  const narrow = window.innerWidth < 900;
+  const showLeft = panels && tour === null && !(stepMode && narrow);
+  const showRight = tour !== null ? !!tourTarget && "el" in tourTarget && tourTarget.el === "right" : panels;
 
   const live_ = livePods(w);
   const hit = w.m.promptTokens ? w.m.cachedTokens / w.m.promptTokens : 0;
@@ -481,15 +648,19 @@ export function LiveView() {
 
       {empty && tour === null && (
         <div className="lv-empty">
-          <h1>How an LLM serves a request</h1>
-          <p>The stack starts empty. Send a request and watch it build: text, tokens, a route, a pod, weights, KV cache, a stream of output tokens.</p>
+          <h1>{EMPTY_TEXT.title}</h1>
+          <p>
+            <Rich inline text={EMPTY_TEXT.text} />
+          </p>
           <button className="lv-primary" data-testid="send-first" onClick={() => send(1)}>
             Send one request
           </button>
           <button className="lv-secondary" data-testid="trace-first" onClick={trace}>
             Trace one request, step by step
           </button>
-          <small>The trace stops the clock at each stage and explains it until you press Next.</small>
+          <small>
+            <Rich inline text={EMPTY_TEXT.hint} />
+          </small>
         </div>
       )}
 
@@ -505,20 +676,37 @@ export function LiveView() {
             }}
             onClick={() => select(c.target)}
           >
-            <b>{c.title}</b>
-            <span>{c.body}</span>
+            <b>
+              <Rich inline text={c.title} />
+            </b>
+            <span>
+              <Rich inline text={c.body} />
+            </span>
           </div>
         ))}
       </div>
 
       {held && (
         <div className={`lv-callout lv-step tone-${held.tone}`} ref={heldEl} data-testid="step-box">
-          <em>
-            Step {histPos[0] + 1} of {histPos[1]} · {focus !== null ? `session ${focus}` : "fleet"} · {histPos[0] < histPos[1] - 1 ? `earlier step, at ${held.born.toFixed(2)} s` : `clock stopped at ${w.t.toFixed(2)} s`}
+          {held.at && (
+            <strong className="lv-step-at" data-testid="step-at">
+              <Rich inline text={held.at} />
+            </strong>
+          )}
+          <em data-testid="step-where">
+            {panelFields("step.header", { text: [focus !== null ? "text-session" : "text-fleet", histPos[2] && "no-rewind"] }, { n: histPos[0] + 1, total: histPos[1], time: held.born.toFixed(2), ...(focus !== null ? { sid: focus } : {}) }).text}
           </em>
-          <b>{held.title}</b>
-          <span>{held.body}</span>
-          {held.detail && <span>{held.detail}</span>}
+          <b>
+            <Rich inline text={held.title} />
+          </b>
+          <span>
+            <Rich inline text={held.body} />
+          </span>
+          {held.detail && (
+            <span>
+              <Rich inline text={held.detail} />
+            </span>
+          )}
           <div className="lv-step-actions">
             <button className="lv-ghost" onClick={toggleStep}>
               exit
@@ -527,7 +715,7 @@ export function LiveView() {
               ◂ Back
             </button>
             <button className="lv-next" data-testid="step-next" onClick={nextStep}>
-              Next ▸
+              {held.last ? "Follow another session ▸" : "Next ▸"}
             </button>
           </div>
         </div>
@@ -535,14 +723,13 @@ export function LiveView() {
 
       {tour !== null && (
         <>
-          <svg className="lv-tour-line">
-            <line ref={tourLine} />
-          </svg>
-          <div className="lv-tour-dot" ref={tourDot} />
+          <div className="lv-ring" ref={ringEl} />
           <div className="lv-tour" ref={tourEl} data-testid="tour">
             <TourArt id={TOUR[tour]!.id} key={TOUR[tour]!.id} />
-            <b>{TOUR[tour]!.title}</b>
-            <p>{TOUR[tour]!.text}</p>
+            <b>
+              <Rich inline text={TOUR[tour]!.title} />
+            </b>
+            <Rich text={TOUR[tour]!.text} />
             <div className="lv-step-actions">
               <span>
                 {tour + 1} / {TOUR.length}
@@ -573,7 +760,7 @@ export function LiveView() {
         ))}
       </div>
 
-      <div className="lv-col lv-left" ref={leftRef} hidden={!panels}>
+      <div className="lv-col lv-left" ref={leftRef} hidden={!showLeft}>
         <section className="lv-panel">
           <header>
             <h2>Serving architecture</h2>
@@ -586,14 +773,17 @@ export function LiveView() {
             ))}
           </select>
           {(() => {
-            const a = ARCHITECTURES.find((x) => x.id === arch)!;
+            const a = architectureText(arch);
             return (
               <details className="lv-arch" open>
                 <summary>What this step adds</summary>
                 <p className="lv-note">
-                  <b>{a.name}.</b> {a.adds}
+                  <b>
+                    <Rich inline text={a.name} />.
+                  </b>{" "}
+                  <Rich inline text={a.adds} />
                 </p>
-                <p className="lv-note lv-src">{a.source}</p>
+                <Rich text={a.source} className="lv-note lv-src" />
               </details>
             );
           })()}
@@ -616,7 +806,7 @@ export function LiveView() {
                 {ps.label}
               </button>
             ))}
-            {activePreset && <p className="lv-note">{activePreset.hint}</p>}
+            {activePreset && <Rich text={activePreset.hint} className="lv-note" />}
           </Group>
           <Group title="Session behaviour">
             <Slider id="prompt-tokens" label="first prompt, mean length" value={p.promptTokens} min={200} max={64000} step={200} fmt={(v) => `${fmtInt(v)} tok`} onChange={(v) => set("promptTokens", v)} />
@@ -626,10 +816,7 @@ export function LiveView() {
             <Slider label="sessions that reply again after a turn" value={p.returnProb} min={0} max={1} step={0.05} fmt={(v) => `${(v * 100).toFixed(0)}%`} onChange={(v) => set("returnProb", v)} />
             <Slider label="turns before a session ends" value={p.maxTurns} min={1} max={40} step={1} onChange={(v) => set("maxTurns", v)} />
             <Slider label="new sessions per second" value={p.arrivalRate} min={0} max={50} step={0.5} onChange={(v) => set("arrivalRate", v)} />
-            <p className="lv-note">
-              After each answer {(p.returnProb * 100).toFixed(0)}% of sessions reply again about {p.thinkTimeS} s later; the other {((1 - p.returnProb) * 100).toFixed(0)}% go idle and leave their KV cache behind. Lengths vary ±40% around the mean. Times are
-              simulated seconds.
-            </p>
+            <Rich text={panelText("sessions.note", { returnPct: (p.returnProb * 100).toFixed(0), thinkTime: p.thinkTimeS, leavePct: ((1 - p.returnProb) * 100).toFixed(0) })} className="lv-note" />
           </Group>
         </section>
         {selected && (
@@ -641,7 +828,7 @@ export function LiveView() {
         )}
       </div>
 
-      <div className="lv-col lv-right" ref={rightRef} hidden={!panels} data-tour="right">
+      <div className="lv-col lv-right" ref={rightRef} hidden={!showRight} data-tour="right">
         <section className="lv-panel">
           <header>
             <h2>Infrastructure</h2>
@@ -653,7 +840,7 @@ export function LiveView() {
             <Choice label="GPU" value={p.gpu} options={Object.values(GPUS).map((g) => [g.id, g.label.replace(" SXM", "")])} onChange={(v) => set("gpu", v)} />
             <Choice label="GPUs per pod (tensor parallel)" value={p.tp} options={[[1, "1"], [2, "2"], [4, "4"], [8, "8"]]} onChange={(v) => set("tp", v)} />
             <Slider label="gpu_memory_utilization" value={p.gpuMemUtil} min={0.3} max={0.98} step={0.01} fmt={(v) => v.toFixed(2)} onChange={(v) => set("gpuMemUtil", v)} />
-            <p className="lv-note">These size the weights and the KV pool at start-up, so changing one restarts every pod. vLLM's gpu_memory_utilization was 0.9 by default for years; current releases default to 1.0 on CUDA and measure what is free.</p>
+            <Rich text={panelText("model.note")} className="lv-note" />
           </Group>
           <Group title="Engine">
             <Slider id="max-num-seqs" label="max_num_seqs (batch slots)" value={p.maxNumSeqs} min={1} max={64} step={1} onChange={(v) => set("maxNumSeqs", v)} />
@@ -666,10 +853,13 @@ export function LiveView() {
             {p.specDecode && <Slider label="acceptance rate α" value={p.specAccept} min={0.3} max={0.95} step={0.01} fmt={(v) => v.toFixed(2)} onChange={(v) => set("specAccept", v)} />}
             {p.specDecode && <Slider label="draft cost c (draft run ÷ target run)" value={p.specCost} min={0.01} max={0.3} step={0.01} fmt={(v) => v.toFixed(2)} onChange={(v) => set("specCost", v)} />}
             {p.specDecode && (
-              <p className="lv-note">
-                Expected {((1 - p.specAccept ** (p.specK + 1)) / (1 - p.specAccept)).toFixed(2)} tokens per step and a {((1 - p.specAccept ** (p.specK + 1)) / ((1 - p.specAccept) * (p.specK * p.specCost + 1))).toFixed(2)}× speed-up (Leviathan et al. 2023,
-                eq. 1 and theorem 3.8). The paper measured α 0.53 to 0.89 and c 0.02 to 0.11, at batch 1.
-              </p>
+              <Rich
+                text={panelText("spec.note", {
+                  tokensPerStep: ((1 - p.specAccept ** (p.specK + 1)) / (1 - p.specAccept)).toFixed(2),
+                  speedup: ((1 - p.specAccept ** (p.specK + 1)) / ((1 - p.specAccept) * (p.specK * p.specCost + 1))).toFixed(2)
+                })}
+                className="lv-note"
+              />
             )}
             <Choice label="prefix caching" value={p.prefixCaching} options={[[true, "on"], [false, "off"]]} onChange={(v) => set("prefixCaching", v)} />
             <Choice label="CPU / GPU overlap" value={p.overlap} options={[[false, "host + GPU"], [true, "max(host, GPU)"]]} onChange={(v) => set("overlap", v)} />
@@ -685,7 +875,7 @@ export function LiveView() {
             <Slider label="max pods" value={p.maxPods} min={1} max={100} step={1} onChange={(v) => set("maxPods", v)} />
             <Slider label="cold start" value={p.coldStartS} min={0.5} max={60} step={0.5} fmt={(v) => `${v} s`} onChange={(v) => set("coldStartS", v)} />
             <Slider label="scale down after idle" value={p.scaleDownIdleS} min={2} max={120} step={1} fmt={(v) => `${v} s`} onChange={(v) => set("scaleDownIdleS", v)} />
-            <p className="lv-note">Real cold starts take tens of seconds to minutes; the default is short so the animation keeps moving.</p>
+            <Rich text={panelText("scaling.note")} className="lv-note" />
           </Group>
           <Group title="Memory tiers">
             <Slider label="host DRAM for KV" value={p.dramGB} min={0} max={256} step={4} fmt={(v) => (v ? `${v} GB` : "off")} onChange={(v) => set("dramGB", v)} />
@@ -694,7 +884,8 @@ export function LiveView() {
             <Slider label="DRAM ↔ HBM copy rate" value={p.dramGBs} min={5} max={64} step={1} fmt={(v) => `${v} GB/s`} onChange={(v) => set("dramGBs", v)} />
             <Slider label="SSD read rate" value={p.ssdGBs} min={0.5} max={14} step={0.5} fmt={(v) => `${v} GB/s`} onChange={(v) => set("ssdGBs", v)} />
             <Slider label="remote pool link" value={p.remoteGbps} min={10} max={400} step={2} fmt={(v) => `${v} Gbps`} onChange={(v) => set("remoteGbps", v)} />
-            <p className="lv-note">Measured: host memory to GPU 11 to 49 GB/s depending on copy size (64 is the PCIe 5 ceiling); SSD 1.6 to 12 GB/s; LMCache studies 32 to 128 Gbps networks.</p>            <p className="lv-note">Idle sessions fall HBM → DRAM → SSD → remote pool, whole sessions at a time, least recently used first. Below that only the text in the conversation store remains.</p>
+            <Rich text={panelText("tiers.measured")} className="lv-note" />
+            <Rich text={panelText("tiers.flow")} className="lv-note" />
           </Group>
           <Group title="Efficiency and price">
             <Slider label="MBU (bandwidth achieved)" value={p.mbu} min={0.1} max={1} step={0.01} fmt={(v) => v.toFixed(2)} onChange={(v) => set("mbu", v)} />
@@ -724,7 +915,7 @@ export function LiveView() {
                   {l}
                 </div>
               ))}
-              <p className="lv-note">Each session has its own hue. Click any node to dive in; drag to pan, scroll to zoom.</p>
+              <Rich text={panelText("legend.note")} className="lv-note" />
             </div>
           </Group>
         </section>
@@ -762,9 +953,7 @@ export function LiveView() {
         </button>
         <button
           className="lv-ghost"
-          onClick={() => {
-            sceneRef.current.auto = true;
-          }}
+          onClick={() => sceneRef.current.fitNow()}
         >
           fit
         </button>

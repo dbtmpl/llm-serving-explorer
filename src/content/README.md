@@ -1,0 +1,58 @@
+# Site text
+
+Every piece of explanatory text on the website lives in a markdown file here, so it can be reviewed in one place. Code only chooses an entry, fills its `{placeholders}` and renders it. Short control labels (slider names, button captions, table headers, canvas node labels) stay in the code.
+
+| File | What it holds | Used by |
+|---|---|---|
+| [`step-through.md`](step-through.md) | Floating callouts in "explain" mode and the held box in step-through mode | `src/live/callouts.ts` |
+| [`tutorial.md`](tutorial.md) | The guided tour cards | `src/live/Tutorial.tsx` |
+| [`inspector.md`](inspector.md) | The notes in the "dive in" panel | `src/live/Inspector.tsx` |
+| [`panels.md`](panels.md) | Empty-state card, scenario hints, notes in the menus, legend note | `src/live/LiveView.tsx` |
+| [`architectures.md`](architectures.md) | Name, what it adds and sources of each serving architecture | `src/live/LiveView.tsx`, by architecture id |
+
+## Entry format
+
+Each file starts with an `# H1` title and one paragraph saying where on the site its texts appear. Then one entry per text:
+
+```
+## `entry.id` Human headline
+_Where:_ one sentence saying where and when this text is shown on the site.
+
+### title
+Routed to pod-{podId}
+
+### body
+One or more paragraphs.
+
+### detail
+Shown only in step-through mode.
+```
+
+- The heading is the id in backticks, then a headline for the reviewer. Ids are unique within a file.
+- `_Where:_` is required.
+- Fields are `###` subsections with a lower-case name. The names depend on the file (`title`/`body`/`detail`/`at` for callouts, where `at` says where in the system the step happens and only step-through shows it, `title`/`text` for the tour, `text` for single notes, `name`/`adds`/`source` for architectures).
+- Where the code picks between variants or adds an optional sentence (plurals, the three routing policies, the disaggregation sentence), each variant is its own field with a clear name (`title-one`, `title-many`, `how-round-robin`, `cap`). The code names the fields it wants; chosen fields are joined with a space.
+- Paragraphs are separated by a blank line.
+
+## Placeholders
+
+`{name}` is filled by the code (`name` starts with a letter, then letters and digits). Numbers are formatted by the code (`fmtInt`, `fmtMs`, `fmtGB`), never in the text. A placeholder without a value, or a value that no chosen field uses, throws, so a mistake fails loudly in the tests instead of rendering `{name}`.
+
+## Inline markup
+
+| Write | Renders as |
+|---|---|
+| `**bold**` | bold |
+| `` `code` `` | code |
+| `[text](https://example.org)` | a link (https only) |
+| `[@key]` | a link whose text is the citation's `short` and whose href is its `url` in `src/sim/citations.ts` |
+| `[custom text][@key]` | the same link with your own text |
+
+Every paper, project, repository, documentation page or datasheet named in the text is linked this way. If the source is not in `CITATIONS` yet, add it there first (see the rules in [`src/sim/README.md`](../sim/README.md)); an unknown `@key` throws. Links open in a new tab. Never cite or mention internal sources.
+
+## Adding or changing text
+
+1. Edit or add the entry in the markdown file. Keep the headline and `_Where:_` line accurate.
+2. In code, use the helper for the file: `stepText` (callouts, through `make(...)` in `src/live/callouts.ts`), `inspectorText` / `<Note id=...>` (Inspector), `panelText` / `panelFields` (panels), `tourText` (the tour, ids listed in `TARGETS` in `Tutorial.tsx`), `architectureText` (by architecture id). All are exported from `src/content/index.ts`.
+3. Render the result with `<Rich text={...} />` from `src/live/Rich.tsx` (`inline` for titles and text inside an element of your own).
+4. `pnpm test` checks that every entry is used by code, every id used by code exists, every `[@key]` resolves and every link is https.

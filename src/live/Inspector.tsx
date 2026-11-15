@@ -1,7 +1,9 @@
 /** "Dive in" panel: the selected component explained with its live numbers. */
 import type { ReactNode } from "react";
 import { BLOCK_TOKENS, attnFlops, decodeCurve, flopsPerToken, kvBytesPerToken, livePods, maxBatch, recomputeRatio, replicaSpec, ridge, seqLoad, tierBw, tierCapBlocks, weightBytes, type Pod, type World } from "../sim/index.js";
+import { inspectorText } from "../content/index.js";
 import { fmtGB, fmtInt, fmtMs } from "./format.js";
+import { Rich } from "./Rich.js";
 import { C, PROMPTS, pieces, sessionColor, sessionStatus, type Target } from "./render.js";
 
 const Row = ({ k, v }: { k: ReactNode; v: ReactNode }) => (
@@ -10,7 +12,8 @@ const Row = ({ k, v }: { k: ReactNode; v: ReactNode }) => (
     <b>{v}</b>
   </div>
 );
-const Note = ({ children }: { children: ReactNode }) => <p className="lv-note">{children}</p>;
+/** A note from src/content/inspector.md: `id` of the entry, `values` for its placeholders, `extra` optional fields. */
+const Note = ({ id, values, extra }: { id: string; values?: Record<string, string | number>; extra?: readonly string[] }) => <Rich text={inspectorText(id, values, extra)} className="lv-note" />;
 const sci = (x: number) => (x >= 1e15 ? `${(x / 1e15).toFixed(2)} PFLOP` : x >= 1e12 ? `${(x / 1e12).toFixed(1)} TFLOP` : `${(x / 1e9).toFixed(1)} GFLOP`);
 
 function Stack({ parts }: { parts: { label: string; value: number; color: string; text: string }[] }) {
@@ -154,7 +157,7 @@ function BlockAnatomy({ pod }: { pod: Pod }) {
 
 function SessionView({ w, id }: { w: World; id: number }) {
   const s = w.sessions.get(id);
-  if (!s) return <Note>This session has been pruned.</Note>;
+  if (!s) return <Note id="session.pruned" />;
   const r = s.reqId != null ? w.reqs.get(s.reqId) : undefined;
   const spec = replicaSpec(w.params);
   const mkv = kvBytesPerToken(spec.model);
@@ -179,10 +182,7 @@ function SessionView({ w, id }: { w: World; id: number }) {
       <Row k="KV cache held" v={`${fmtGB(ctx * mkv, 2)} (${fmtInt(ctx)} tok)`} />
       {s.lastTtft > 0 && <Row k="last TTFT / TPOT" v={`${fmtMs(s.lastTtft)} / ${fmtMs(s.lastTpot)}`} />}
       {r && <Row k="without a KV cache" v={`≈ ${fmtInt(recomputeRatio(r.lIn, r.lOut))}× the arithmetic`} />}
-      <Note>
-        Token i cannot be computed before token i−1, so a call is a chain of dependent steps. The cache keeps {(mkv / 1024).toFixed(0)} KiB per token for the life of the request and turns a quadratic loop into a linear one. The output length limit
-        (max_tokens) is the only bound on how much memory a request can take.
-      </Note>
+      <Note id="session.note" values={{ kib: (mkv / 1024).toFixed(0) }} />
     </>
   );
 }
@@ -207,11 +207,7 @@ function TokenizerView({ w }: { w: World }) {
       <Row k="prefill of that prompt" v={sci(full)} />
       <Row k="of which attention" v={`${(share * 100).toFixed(1)}%`} />
       <Row k="prefill floor on this replica" v={fmtMs(full / (spec.tp * spec.gpu.peak * w.params.mfu))} />
-      <Note>
-        Hop 1: the gateway authenticates the caller, applies rate limits counted in tokens, and attaches a request id and a deadline. Hop 2: the prompt assembler reads the history from the conversation store and builds system prompt + history + new
-        message; their order decides what the prefix cache can reuse. The engine's front end on the replica applies the chat template and tokenises on the host CPU. From here on the unit of work is the token. Prefill cost is 2N per token plus an attention term that grows with the square of the prompt, which
-        equals 2N at {fmtInt((2 * spec.model.N) / attnFlops(spec.model, 1))} tokens of context for this model.
-      </Note>
+      <Note id="tokenizer.note" values={{ crossover: fmtInt((2 * spec.model.N) / attnFlops(spec.model, 1)) }} />
     </>
   );
 }
@@ -252,11 +248,7 @@ function GatewayView({ w }: { w: World }) {
           </tbody>
         </table>
       )}
-      <Note>
-        A request is pinned to its replica from admission until it finishes, because its state lives in that replica's memory. The prefix-aware score here follows llm-d's recommended profile (prefix-cache match weighted 3, KV-cache utilisation 2, queue 2); how much a
-        copy in DRAM, SSD or the remote pool counts is this model's own choice. Prefix-aware routing scores each pod by how much of the session's cache it holds (HBM counts most, then DRAM, then SSD) plus
-        its free capacity. Round-robin ignores both, so returning sessions land on cold pods and prefill again.
-      </Note>
+      <Note id="gateway.note" />
     </>
   );
 }
@@ -287,11 +279,7 @@ function PodView({ w, pod, part }: { w: World; pod: Pod; part: string }) {
         <BlockAnatomy pod={pod} />
         <Row k="KV per token" v={`${(mkv / 1024).toFixed(0)} KiB`} />
         <Row k="one block (16 tokens)" v={`${((BLOCK_TOKENS * mkv) / 2 ** 20).toFixed(1)} MiB`} />
-        <Note>
-          The KV pool is what is left after the other three. It is split into fixed blocks that need not be contiguous; a per-sequence block table maps logical to physical blocks, so a sequence holds what it uses and waste is confined to its last
-          block. Each coloured cell in the graph stands for {fmtInt(b.poolBlocks / 200)} blocks; pale cells are cached but idle.
-          {pod.spec.tp > 1 ? ` With tensor parallelism every GPU holds a slice of every sequence's KV heads, so the ${pod.spec.tp} grids fill together.` : ""}
-        </Note>
+        <Note id="pod.gpu.note" values={{ cellBlocks: fmtInt(b.poolBlocks / 200), ...(pod.spec.tp > 1 ? { tp: pod.spec.tp } : {}) }} extra={pod.spec.tp > 1 ? ["tensor-parallel"] : []} />
       </>
     );
   }
@@ -313,10 +301,7 @@ function PodView({ w, pod, part }: { w: World; pod: Pod; part: string }) {
         <Throughput pod={pod} w={w} L={meanL} />
         <Row k="asymptote X∞" v={`${fmtInt(c.xInf)} tok/s`} />
         <Row k="half-saturation batch" v={c.bHalf.toFixed(1)} />
-        <Note>
-          A step cannot run faster than its arithmetic allows or than its data can arrive. Decode reads {fmtGB(weightBytes(m, pod.spec.precision), 0)} of weights to make one token per sequence, so it sits left of the ridge at any batch: throughput is
-          set by bandwidth and context length, not FLOPs. Prefill does thousands of FLOPs per byte and runs at the flat roof.
-        </Note>
+        <Note id="pod.roofline.note" values={{ weights: fmtGB(weightBytes(m, pod.spec.precision), 0) }} />
       </>
     );
   }
@@ -356,13 +341,7 @@ function PodView({ w, pod, part }: { w: World; pod: Pod; part: string }) {
         <Row k={`a ${fmtInt(typical)}-token sequence`} v={fmtGB(bytes, 2)} />
         <Row k="reload from DRAM / SSD" v={`${fmtMs(bytes / tierBw(p).dram)} / ${fmtMs(bytes / tierBw(p).ssd)}`} />
         <Row k="recompute by prefill" v={fmtMs(seqLoad(m, 0, typical).flops / (pod.spec.tp * pod.spec.gpu.peak * p.mfu))} />
-        <Note>
-          When a new block is needed and HBM is full, the least recently used idle sequence leaves first: to DRAM, which pushes its own oldest down to SSD, which drops its oldest. The cache is derived state, so a drop loses nothing but time. If no idle
-          sequence is left, a running one is preempted and recomputed. Below SSD a shared remote pool can take the overflow, and below that only the conversation's text remains. Loading back is adaptive: it is used only when the copy is faster than a
-          fresh prefill, which favours long contexts and large models. NVIDIA Dynamo names these tiers G1 (GPU memory), G2 (host memory), G3 (local or pooled SSD) and G4 (remote storage). vLLM recomputes a preempted sequence, and since release 0.11 can
-          offload idle prefix blocks through its OffloadingConnector (host memory, optional filesystem tier) or through LMCache, Mooncake or Dynamo's block manager. Those systems copy blocks down asynchronously while the request runs, overlap loads with
-          compute layer by layer, and prefetch at routing time; this model moves a session only when room is needed and leaves the rest out. The copy rates are sliders under Memory tiers; their defaults sit inside measured ranges (host memory over PCIe: about 11 to 49 GB/s; SSD: 1.6 to 12 GB/s; network: 32 to 128 Gbps). 
-        </Note>
+        <Note id="pod.tiers.note" />
       </>
     );
   }
@@ -401,11 +380,7 @@ function PodView({ w, pod, part }: { w: World; pod: Pod; part: string }) {
           </div>
         ))}
       </div>
-      <Note>
-        The engine is one loop that advances every admitted request by one step, sharing each forward pass. Decodes go first (one token each); the rest of the token budget is filled with prefill chunks, which bounds how long a big prompt can stall
-everyone else. A request is admitted when the KV it needs under the admission rule fits: its next chunk (vLLM, which then preempts the newest sequence if the pool runs out), its whole prompt, or prompt plus max_tokens (never preempts, admits
-        far fewer). Everything but the forward pass is host code on the critical path of every token: every sequence's TPOT is the step time.
-      </Note>
+      <Note id="pod.engine.note" />
     </>
   );
 }
@@ -433,10 +408,7 @@ export function Inspector({ w, target, onClose }: { w: World; target: Target; on
           <Row k="tokens of text" v={fmtInt(w.store.tokens)} />
           <Row k="as text (≈ 4 bytes per token)" v={fmtGB(w.store.tokens * 4, 3)} />
           <Row k="same tokens as KV cache" v={fmtGB(w.store.tokens * kvBytesPerToken(replicaSpec(w.params).model), 1)} />
-          <Note>
-            Each model call is stateless, so the product keeps the conversation: an append-only log of turns, replayed in full on every call. It is the system of record. The KV cache in HBM, DRAM, SSD or a remote pool is derived from it and is valid only
-            for the exact token sequence and model version it was computed with. Losing a KV tier costs a prefill and nothing else; editing or truncating stored history invalidates every cached prefix after the edit.
-          </Note>
+          <Note id="store.note" />
         </>
       )}
       {target.type === "remote" && (
@@ -444,19 +416,13 @@ export function Inspector({ w, target, onClose }: { w: World; target: Target; on
           <Row k="sequences held" v={w.remote.size} />
           <Row k="used / size" v={`${fmtGB(w.remoteBytes)} / ${w.params.remoteGB} GB`} />
           <Row k="link" v={`${w.params.remoteGbps} Gbps`} />
-          <Note>
-            A KV pool on other machines' DRAM and SSD, reachable from every pod over the network (Mooncake, SGLang HiCache's third level and LMCache's remote stores work this way). It is the only tier that survives a pod being scaled down and the only
-            one a different pod can load from. Loading is adaptive: over a 32 to 128 Gbps link it beats a prefill only for long contexts or large models, so short sessions are recomputed instead.
-          </Note>
+          <Note id="remote.note" />
         </>
       )}
       {target.type === "stream" && (
-        <Note>
-          Hop 6. Every engine step produces one token for each decoding sequence. The token is detokenised on the host, checked against stop conditions, and sent to the client as a streaming event. A person reads about 5 tokens per second, so tokens
-          delivered faster than that build a buffer; what a reader feels is the wait for the first token and any stall longer than that buffer.
-        </Note>
+        <Note id="stream.note" />
       )}
-      {target.type === "pod" && !pod && <Note>This pod has been terminated.</Note>}
+      {target.type === "pod" && !pod && <Note id="pod.terminated" />}
       {target.type === "pod" &&
         pod &&
         (["engine", "gpu", "roofline", "tiers"] as const).map((part) => (

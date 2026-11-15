@@ -6,6 +6,9 @@
 - **Gateway:** The front end that assembles the prompt (history plus the new message) and turns it into tokens.
 - **Router:** The component that picks a pod for each request. Modelled on llm-d's endpoint picker (EPP), which scores pods on prefix-cache affinity, queue depth and KV utilisation.
 - **Pod:** One running copy of the inference engine with its GPUs. Pods are created, load weights, become ready, drain and terminate.
+- **Sequence:** One request as the engine sees it while it runs: the prompt plus the answer generated so far. vLLM's name.
+- **Batch slot:** One of the `max_num_seqs` places in a pod's running batch, drawn as a bar. A request holds one from admission until its last token.
+- **Ridge:** The arithmetic intensity at which a GPU's peak FLOP/s and memory bandwidth limits meet (peak FLOP/s ÷ bandwidth). Left of it a step is memory-bound, right of it compute-bound.
 - **Engine step:** One forward pass over the current batch. Every running sequence advances by one decode token or one prefill chunk.
 - **Continuous batching:** Iteration-level scheduling in which requests join and leave the running batch at every engine step, instead of waiting for a whole batch to finish.
 - **`max_num_seqs`:** The most sequences a pod runs in one step (vLLM's name for the batch-slot limit).

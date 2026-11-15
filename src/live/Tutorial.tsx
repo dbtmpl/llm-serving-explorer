@@ -1,11 +1,14 @@
 /** Guided tour: one card per component, each with a looping preview of what its animation looks like. */
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties } from "react";
+import { tourText } from "../content/index.js";
 import { C, type Target } from "./render.js";
 
 export interface TourStep {
   id: string;
+  /** markdown (inline), from src/content/tutorial.md */
   title: string;
-  text: ReactNode;
+  /** markdown, from src/content/tutorial.md */
+  text: string;
   /** a node of the graph, or a floating panel (`data-tour` attribute) */
   target?: Target | { el: string };
 }
@@ -235,18 +238,21 @@ export function TourArt({ id }: { id: string }) {
   );
 }
 
-export const TOUR: TourStep[] = [
-  { id: "welcome", title: "One live graph of an LLM serving stack", text: "It starts empty and grows as requests travel through it, in slow motion. A small demo is running behind this tour. Each step points at one component and shows what its animation means." },
-  { id: "session", title: "Sessions", target: { type: "session", id: -1 }, text: "Each dot or card is one conversation, with its own colour everywhere in the graph. Bright means it is waiting on a model call, lighter means the user is typing a follow-up, pale means it went idle. The small page leaving it is the prompt, still text. The ring fills as its answer streams in." },
-  { id: "assemble", title: "Gateway and prompt assembly", target: { type: "tokenizer" }, text: "Hops 1 and 2. The gateway authenticates the call and builds the prompt: system prompt, history, new message. The text lights up piece by piece as it is counted in tokens, and the bar shows how much is history and how much is new." },
-  { id: "store", title: "Conversation store", target: { type: "store" }, text: "The text of every turn, appended as a log. Grey dots going down are history being read back for a new turn; grey dots arriving are a finished turn being saved. It is the source of truth: every KV cache below is a copy that can be rebuilt from it." },
-  { id: "router", title: "Router", target: { type: "gateway" }, text: "Hop 3. Small trains of squares are tokenised prompts on their way to a pod. The router picks the pod by policy, by default the one that already holds the session's KV cache unless it is too busy. Squares stacked above it are requests waiting for a free pod." },
-  { id: "weights", title: "A pod and its GPUs", target: { type: "pod", id: -1, part: "gpu" }, text: "A pod is one replica of the model on one or more GPUs. Each GPU box is its memory: the dark block fills while weights load, then comes a thin strip of activations, the grid of KV blocks, and hatched headroom that is never used." },
-  { id: "slots", title: "The running batch", target: { type: "pod", id: -1, part: "engine" }, text: "One slot per sequence the engine may run at once. A slot fills orange while the prompt is prefilled (compute-heavy, once), then blue as the answer is decoded one token per engine step. The top stripe is the session's colour." },
-  { id: "grid", title: "KV cache blocks", target: { type: "pod", id: -1, part: "gpu" }, text: "Every token of context leaves keys and values behind, stored in blocks of 16 tokens. Cells light up in the session's colour wherever there is room: blocks are paged, not contiguous. When a turn finishes its cells turn pale: still cached for a follow-up, and free to evict." },
-  { id: "roofline", title: "Forward pass and arithmetic intensity", target: { type: "pod", id: -1, part: "roofline" }, text: "The strip sweeps once per engine step, through every layer. The dot below shows FLOPs per byte moved in that step. Left of the ridge the step waits on memory bandwidth (decode, blue); right of it on compute (prefill, orange). A prefill joining the batch throws the dot right and slows every stream." },
-  { id: "stream", title: "Output tokens", target: { type: "stream" }, text: "The blue dots flowing from the pods back to the sessions are generated tokens, streamed as they are produced: one per sequence per engine step." },
-  { id: "tiers", title: "Where idle KV cache goes", target: { type: "pod", id: -1, part: "tiers" }, text: "When HBM is full, the least recently used idle session leaves: to host DRAM (green), then local SSD (violet), then a remote pool shared by all pods (yellow). A red outline marks blocks being evicted. If no tier has room the KV is dropped and rebuilt from the stored text when the user returns. Loading back is only used when it is faster than recomputing." },
-  { id: "menus", title: "Change anything while it runs", target: { el: "right" }, text: "Model, GPU, engine, routing, autoscaling and memory tiers can all be changed mid-flight. On the left: step through seven serving architectures from static batching to today's stack, send 1 to 10,000 sessions at once, start a scenario, or set how sessions behave. Click any node in the graph to dive into its numbers." },
-  { id: "step", title: "Slow motion and step-through", target: { el: "transport" }, text: "Pick the speed here. Turn on step-through to follow a single session: the clock stops at each thing that happens to it, with a longer explanation, until you press Next. The tutorial button brings this tour back." }
+/** Where each step points. The wording of every step is in src/content/tutorial.md, in this order. */
+const TARGETS: { id: string; target?: TourStep["target"] }[] = [
+  { id: "welcome" },
+  { id: "session", target: { type: "session", id: -1 } },
+  { id: "assemble", target: { type: "tokenizer" } },
+  { id: "store", target: { type: "store" } },
+  { id: "router", target: { type: "gateway" } },
+  { id: "weights", target: { type: "pod", id: -1, part: "gpu" } },
+  { id: "slots", target: { type: "pod", id: -1, part: "engine" } },
+  { id: "grid", target: { type: "pod", id: -1, part: "gpu" } },
+  { id: "roofline", target: { type: "pod", id: -1, part: "roofline" } },
+  { id: "stream", target: { type: "stream" } },
+  { id: "tiers", target: { type: "pod", id: -1, part: "tiers" } },
+  { id: "menus", target: { el: "right" } },
+  { id: "step", target: { el: "transport" } }
 ];
+
+export const TOUR: TourStep[] = TARGETS.map((t) => ({ ...t, ...tourText(t.id) }));
