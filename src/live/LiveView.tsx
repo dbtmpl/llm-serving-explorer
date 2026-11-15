@@ -790,6 +790,23 @@ export function LiveView() {
               <Rich text={held.body} />
               {held.detail && <Rich text={held.detail} />}
             </div>
+            {held.dive.length > 0 && (
+              <section className="lv-dive" data-testid="dive" aria-label="Dive deeper">
+                <h4>Dive deeper</h4>
+                {held.dive.map((d) => (
+                  // keyed by step: the items are closed again whenever the step changes
+                  <details key={`${held.id}:${d.id}`} className="lv-dive-item" data-testid="dive-item">
+                    <summary>
+                      <Rich inline text={d.title} />
+                    </summary>
+                    <div className="lv-dive-body">
+                      <Rich text={d.body} />
+                      {d.formula && <Rich text={d.formula} />}
+                    </div>
+                  </details>
+                ))}
+              </section>
+            )}
           </div>
           <div className="lv-step-actions">
             <button className="lv-ghost" onClick={toggleStep}>

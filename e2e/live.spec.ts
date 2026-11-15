@@ -240,6 +240,62 @@ test.describe("live graph view", () => {
     await expect(page.getByTestId("inspector")).toContainText("pod-");
   });
 
+  test("each step of the step-through has a Dive deeper section whose items open in the box without pushing Back and Next away", async ({ page }) => {
+    await page.goto("/");
+    await page.getByTestId("step-toggle").click();
+    await page.getByTestId("send-10").click();
+    await page.getByTestId("speed-1").click();
+    const box = page.getByTestId("step-box");
+    await expect(box).toContainText("A user sends a message");
+    const items = page.getByTestId("dive-item");
+    await expect(page.getByTestId("dive").locator("h4")).toHaveText("Dive deeper");
+    expect(await items.count()).toBeGreaterThanOrEqual(2);
+    // closed by default
+    expect(await items.evaluateAll((els) => els.some((e) => (e as HTMLDetailsElement).open))).toBe(false);
+    await items.first().locator("summary").click();
+    await expect(items.first()).toHaveJSProperty("open", true);
+    await expect(items.first().locator(".lv-dive-body")).toBeVisible();
+    // the buttons stay on screen and the box stays inside the window
+    const inside = async () => {
+      const vp = page.viewportSize()!;
+      for (const id of ["step-next", "step-back"]) {
+        const b = await page.getByTestId(id).boundingBox();
+        expect(b, id).not.toBeNull();
+        expect(b!.y + b!.height, id).toBeLessThanOrEqual(vp.height);
+        expect(b!.y, id).toBeGreaterThanOrEqual(0);
+      }
+      const bb = await box.boundingBox();
+      expect(bb!.y).toBeGreaterThanOrEqual(0);
+    };
+    await inside();
+    // open them all: the text scrolls inside the box
+    for (let i = 1; i < (await items.count()); i++) await items.nth(i).locator("summary").click();
+    await inside();
+    const scroll = page.getByTestId("step-scroll");
+    expect(await scroll.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+    // a new step starts with every item closed again
+    await page.getByTestId("step-next").click();
+    await expect(box).toBeVisible();
+    await expect.poll(() => items.evaluateAll((els) => els.some((e) => (e as HTMLDetailsElement).open))).toBe(false);
+  });
+
+  test("the Dive deeper section also fits on a phone-sized screen", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 780 });
+    await page.goto("/");
+    await page.getByTestId("trace-first").click();
+    await expect(page.getByTestId("step-box")).toContainText("A user sends a message");
+    const items = page.getByTestId("dive-item");
+    for (let i = 0; i < (await items.count()); i++) await items.nth(i).locator("summary").click();
+    for (const id of ["step-next", "step-back"]) {
+      const b = (await page.getByTestId(id).boundingBox())!;
+      expect(b.y + b.height).toBeLessThanOrEqual(780);
+      expect(b.x + b.width).toBeLessThanOrEqual(390);
+    }
+    const bb = (await page.getByTestId("step-box").boundingBox())!;
+    expect(bb.y).toBeGreaterThanOrEqual(0);
+    expect(bb.y + bb.height).toBeLessThanOrEqual(780);
+  });
+
   /** Follow one request to the end of the walkthrough, returning every step title. */
   async function walkToEnd(page: Page, opts: { until?: RegExp } = {}): Promise<string[]> {
     const box = page.getByTestId("step-box");
