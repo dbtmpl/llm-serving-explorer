@@ -1,0 +1,75 @@
+name: BLIS upstream drift
+
+# Build BLIS at the head of its default branch (not the commit in conformance/blis.lock), regenerate the
+# references, refit, and show what changed and which checks no longer hold. It is allowed to fail: it exists
+# to see drift before the pin is bumped (see "Bumping the pin" in conformance/README.md), and a failure
+# here is information, not a broken build.
+on:
+  schedule:
+    - cron: "41 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: blis-upstream
+  cancel-in-progress: true
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch inference-sim at its default branch
+        run: |
+          set -euo pipefail
+          git clone --quiet https://github.com/inference-sim/inference-sim.git "$RUNNER_TEMP/inference-sim"
+          echo "BLIS_SRC=$RUNNER_TEMP/inference-sim" >> "$GITHUB_ENV"
+          echo "Upstream head: $(git -C "$RUNNER_TEMP/inference-sim" rev-parse HEAD); pinned: $(grep -E '^[0-9a-f]{40}$' conformance/blis.lock | head -n 1)"
+          echo "GO_VERSION=$(jq -r .toolchain "$RUNNER_TEMP/inference-sim/stack.json" | sed 's/^go//')" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+
+      - name: Build BLIS
+        run: |
+          set -euo pipefail
+          cd "$BLIS_SRC"
+          go build -o "$RUNNER_TEMP/blis" main.go
+          echo "BLIS_BIN=$RUNNER_TEMP/blis" >> "$GITHUB_ENV"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Regenerate the references with upstream BLIS
+        run: BLIS_UPSTREAM=1 pnpm conformance:reference
+
+      - name: Show what changed in the references
+        if: always()
+        run: |
+          git status --short -- conformance/reference
+          git --no-pager diff --stat -- conformance/reference
+
+      - name: Refit the timing parameters
+        run: pnpm conformance:calibrate
+
+      - name: Show what changed in the fit
+        if: always()
+        run: git --no-pager diff -- conformance/calibration
+
+      - name: Which checks no longer hold
+        run: pnpm test:conformance

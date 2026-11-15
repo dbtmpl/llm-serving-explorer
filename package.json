@@ -16,7 +16,8 @@
     "conformance:reference": "tsx conformance/scripts/reference.ts",
     "conformance:report": "tsx conformance/scripts/report.ts",
     "conformance:calibrate": "tsx conformance/scripts/calibrate.ts",
-    "docs:sync": "UPDATE_DOCS=1 vitest run src/sim/__tests__/registry.test.ts"
+    "conformance:summary": "tsx conformance/scripts/summary.ts",
+    "docs:sync": "UPDATE_DOCS=1 vitest run src/sim/__tests__/registry.test.ts conformance/__tests__/docs.test.ts"
   },
   "dependencies": {
     "react": "^19.0.0",

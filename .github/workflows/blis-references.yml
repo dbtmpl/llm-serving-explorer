@@ -16,6 +16,9 @@ on:
       - conformance/translate/**
       - conformance/run/**
       - conformance/scripts/**
+      - conformance/calibration/**
+      - conformance/summary.json
+      - src/sim/**
       - .github/workflows/blis-references.yml
   pull_request:
     paths:
@@ -24,6 +27,9 @@ on:
       - conformance/translate/**
       - conformance/run/**
       - conformance/scripts/**
+      - conformance/calibration/**
+      - conformance/summary.json
+      - src/sim/**
       - .github/workflows/blis-references.yml
 
 permissions:
@@ -84,6 +90,24 @@ jobs:
             git status --short -- conformance/reference
             git --no-pager diff -- conformance/reference
             echo "::error::BLIS at the pinned commit no longer produces the committed references. Review the difference, update the scenarios' known_difference records if it is real, and commit the regenerated files."
+            exit 1
+          fi
+
+      - name: Refit the timing parameters and fail if they differ from the committed fit
+        run: |
+          pnpm conformance:calibrate
+          if [ -n "$(git status --porcelain -- conformance/calibration)" ]; then
+            git --no-pager diff -- conformance/calibration
+            echo "::error::The references no longer give the committed fit (conformance/calibration/fitted.json). Review the difference and commit the refit."
+            exit 1
+          fi
+
+      - name: Rebuild the parity summary and fail if it differs from the committed one
+        run: |
+          pnpm conformance:summary
+          if [ -n "$(git status --porcelain -- conformance/summary.json)" ]; then
+            git --no-pager diff -- conformance/summary.json
+            echo "::error::conformance/summary.json is out of date for the regenerated references."
             exit 1
           fi
 

@@ -21,6 +21,7 @@ import { runTypescriptArms } from "../run/typescript.js";
 import { DEFAULT_PARAMS } from "../../src/sim/index.js";
 import { calibrateAll } from "../calibration/calibrate.js";
 import { loadFitted, pairKey } from "../calibration/fitted.js";
+import { SUMMARY_FILE, buildSummary } from "../summary.js";
 import { REFERENCE_DIR, loadScenario, scenarioIds, usesCalibration } from "../scenario.js";
 import { scenarioInputHash } from "../translate/toBlis.js";
 
@@ -102,4 +103,18 @@ describe("calibration", () => {
   it("does not use a calibration scenario as a held-out check", () => {
     for (const id of scenarioIds()) if (loadScenario(id).role === "calibration") expect(loadScenario(id).checks).toEqual([]);
   });
+});
+
+describe("parity summary", () => {
+  it("conformance/summary.json is what the scenarios, references and registry give (run pnpm conformance:summary)", () => {
+    expect(buildSummary()).toEqual(JSON.parse(readFileSync(SUMMARY_FILE, "utf8")));
+  }, 60_000);
+  it("counts a known difference as a difference and an unverifiable approach as no agreement at all", () => {
+    const s = buildSummary();
+    expect(s.headline.agree + s.headline.knownDifferences).toBe(s.headline.total);
+    expect(s.headline.knownDifferences).toBe(s.knownDifferences.length);
+    expect(s.approaches.verified + s.approaches.notVerifiable).toBe(s.approaches.total);
+    // every check belongs to a scenario; none belongs to an approach that cannot be verified
+    expect(s.headline.total).toBe(s.checks.total);
+  }, 60_000);
 });

@@ -301,8 +301,7 @@
         "kvTransferMeanS": null,
         "specTokensPerStep": null,
         "prefillPoolRequests": null,
-        "peakReplicas": null,
-        "finalReplicas": null
+        "peakReplicas": 4
       }
     },
     "prefix-aware": {
@@ -597,8 +596,7 @@
         "kvTransferMeanS": null,
         "specTokensPerStep": null,
         "prefillPoolRequests": null,
-        "peakReplicas": null,
-        "finalReplicas": null
+        "peakReplicas": 4
       }
     }
   }
