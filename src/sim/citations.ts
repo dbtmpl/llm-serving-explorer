@@ -202,7 +202,7 @@ export const CITATIONS = {
     short: "TensorRT-LLM docs",
     title: "TensorRT-LLM: scheduler policies (GuaranteedNoEvict)",
     kind: "docs",
-    url: "https://nvidia.github.io/TensorRT-LLM/"
+    url: "https://github.com/NVIDIA/TensorRT-LLM/blob/main/cpp/include/tensorrt_llm/executor/types.h"
   },
   llmdScheduling: {
     short: "llm-d docs, router scheduling",
