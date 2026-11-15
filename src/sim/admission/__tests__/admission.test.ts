@@ -16,6 +16,16 @@ describe("admission rules", () => {
     expect(rule.outputReservation(request())).toBe(150);
     expect(rule.allocatesPrefillPerChunk).toBe(true);
   });
+  it("on-demand lets a waiting request in only if its whole sequence fits, though it allocates one chunk (vLLM scheduler_reserve_full_isl)", () => {
+    const rule = admissionRule("on-demand");
+    expect(rule.tokensToFit(request())).toBe(20000); // 1,250 blocks, against 512 allocated on admission
+    // a preempted request's input sequence is its prompt plus what it had generated
+    expect(rule.tokensToFit(request({ promptTokens: 16000, generatedTokens: 12800 }))).toBe(28800);
+    for (const id of ["on-demand", "prompt", "reserve"] as const) {
+      const r = admissionRule(id);
+      expect(r.tokensToFit(request())).toBeGreaterThanOrEqual(r.tokensToSecure(request()));
+    }
+  });
   it("whole-prompt secures the full prompt and grows outputs on demand", () => {
     const rule = admissionRule("prompt");
     expect(rule.tokensToSecure(request())).toBe(20000);
@@ -32,20 +42,31 @@ describe("admission rules", () => {
 });
 
 describe("admission in the engine", () => {
-  it("on-demand allocation preempts and thrashes under overload; reserving to completion never preempts", () => {
+  it("on-demand allocation preempts under overload without thrashing; reserving to completion never preempts", () => {
     const base = { promptTokens: 36000, outputTokens: 3000, maxPods: 1, maxNumSeqs: 16, returnProb: 0 };
     const onDemand = world({ ...base, admission: "on-demand" });
     spawnBurst(onDemand, 16);
     run(onDemand, 2500, () => onDemand.m.completed + onDemand.m.failed === 16);
     expect(onDemand.m.completed).toBe(16);
-    expect(onDemand.m.preemptions).toBeGreaterThan(10);
+    // 16 sequences of 39,000 tokens need 2,438 blocks each, about 39,000 in all against a pool of 27,928: some are
+    // preempted, but each waits until its whole context fits (it used to be 100 to 150 times)
+    expect(onDemand.m.preemptions).toBeGreaterThanOrEqual(1);
+    expect(onDemand.m.preemptions).toBeLessThanOrEqual(16);
 
     const reserve = world({ ...base, admission: "reserve" });
     spawnBurst(reserve, 16);
     run(reserve, 2500, () => reserve.m.completed + reserve.m.failed === 16);
     expect(reserve.m.completed).toBe(16);
     expect(reserve.m.preemptions).toBe(0);
-    expect(reserve.t).toBeLessThan(onDemand.t);
+  });
+  it("a preempted request waits until its whole context fits instead of being preempted again on its first chunk", () => {
+    // two sequences of 32,000 tokens each in a pool of about 3,600 blocks (57,600 tokens): the newest is
+    // preempted once and re-admitted only after the other finishes
+    const w = world({ promptTokens: 16000, outputTokens: 16000, maxPods: 1, maxNumSeqs: 12, gpuMemUtil: 0.3, returnProb: 0 });
+    spawnBurst(w, 2);
+    run(w, 600, () => w.m.completed + w.m.failed === 2);
+    expect(w.m.completed).toBe(2);
+    expect(w.m.preemptions).toBe(1);
   });
   it("a request whose context can never fit the pool is failed, not queued forever", () => {
     // 70B on two H100s keeps about 7.9 GB of KV, 24,000 tokens at 327,680 bytes each

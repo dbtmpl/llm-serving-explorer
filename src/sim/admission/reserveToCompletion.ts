@@ -22,5 +22,6 @@ export const reserveToCompletion: AdmissionRule = {
   fidelity: "structural",
   outputReservation: (r) => Math.max(r.outputTokens, r.maxTokensCap),
   tokensToSecure: (r) => r.promptTokens + Math.max(r.outputTokens, r.maxTokensCap),
+  tokensToFit: (r) => r.promptTokens + Math.max(r.outputTokens, r.maxTokensCap),
   allocatesPrefillPerChunk: false
 };

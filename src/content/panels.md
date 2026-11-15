@@ -24,7 +24,7 @@ _Where:_ Left menu, Requests panel, group "Scenarios", under the buttons once th
 _Where:_ Left menu, group "Scenarios", under the buttons once the "Outputs outgrow the pool → preemption" scenario is selected.
 
 ### text
-12 prompts fit in a small KV pool (gpu_memory_utilization 0.3), but their long outputs keep growing. With nothing idle to evict, the newest sequence gives its blocks back and recomputes.
+12 prompts fit in a small KV pool (gpu_memory_utilization 0.3), but their long outputs keep growing. With nothing idle to evict, the newest sequence gives its blocks back and recomputes; it waits until its whole context fits again.
 
 ## `scenario.70b` 70B on 4 x H100
 _Where:_ Left menu, group "Scenarios", under the buttons once the "70B on 4 × H100" scenario is selected.

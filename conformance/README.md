@@ -64,15 +64,14 @@ Numbers are the TypeScript model's, then BLIS's.
 | routing-least-loaded | pod choice; requests per pod | agrees | |
 | routing-prefix-aware | conversation stays on its replica; pod choice | agrees | |
 | routing-prefix-aware | cached prefix tokens | agrees | |
-| preemption-overflow | preemption count | known difference | 799 / 1 |
+| preemption-overflow | preemption count | agrees | 1 / 1 |
 | preemption-overflow | both requests complete | agrees | |
 | queue-deadline-shedding | which requests are shed | agrees | requests 9 to 14 shed in both |
 
-The differences, in short (the scenario files carry the full reasons):
+The first comparison also found two differences that the model was changed to remove: vLLM caches `prompt + output - 1` tokens after a turn (the last sampled token is never fed to the model), and vLLM 0.32 lets a waiting request in only when its whole input sequence fits in the free blocks (`scheduler_reserve_full_isl`), which stops a preempted request from being re-admitted on its first chunk and preempted again. The remaining differences, in short (the scenario files carry the full reasons):
 
 - **KV block budget.** Both size the pool as vLLM does: `ceil(driver-reported memory x utilisation)` less weights, activation peak and a CUDA-graph estimate. A first comparison found the TypeScript model 6 to 8 percent short, because it used the datasheet memory (80 GB for an H100; the driver reports 85.03 GB) and left out the graphs; both are now in the model. What remains, 2 and 30 blocks, is the activation estimate (BLIS takes 11 or 5 hidden-state rows per token from NVIDIA's memory model, the TypeScript model sums the buffers) and rounding of the weights.
 - **Round robin.** The llm-d router has no strict rotation: BLIS's `round-robin` configuration picks at random among tied replicas. The TypeScript policy models Envoy.
-- **Full-prompt admission gate.** vLLM 0.32 admits a waiting request only if its whole prompt fits (`scheduler_reserve_full_isl`, default on). The TypeScript model admits on the first chunk and, in a constructed overflow, preempts the same request over a thousand times where vLLM waits.
 
 Scenarios where the queue-deadline check agrees rely on one translation assumption, stated in `translate/toBlis.ts`: llm-d's flow control only holds requests when a saturation detector says the pool is full, and BLIS configures none by default, so the translator gives the router a `concurrency-detector` limit equal to the TypeScript router's own (`max_num_seqs + POD_QUEUE_SLACK` requests in flight per replica). The check shows that, given the same gate, the two shed the same requests; it does not show that the gate itself is the one llm-d deployments use.
 

@@ -137,7 +137,12 @@ export function admit(w: World, pod: Pod, r: Req): boolean {
     cachedTokens: cached,
     tokenBudget: p.tokenBudget
   });
-  if (!growTo(w, pod, e, secure, r, false)) {
+  // vLLM's full-sequence gate: the whole input sequence must fit beside what the other running sequences hold
+  const fit = rule.tokensToFit({ promptTokens: r.lIn, generatedTokens: r.out, outputTokens: r.lOut, maxTokensCap: p.maxTokensCap, cachedTokens: cached, tokenBudget: p.tokenBudget });
+  let heldByOthers = 0;
+  for (const o of pod.entries.values()) if (o !== e && o.tier === "hbm" && o.active) heldByOthers += o.blocks;
+  const fits = blocksFor(fit) + heldByOthers <= pod.budget.poolBlocks;
+  if (!fits || !growTo(w, pod, e, secure, r, false)) {
     if (e.blocks === 0) pod.entries.delete(r.sid);
     else e.tokens = Math.min(e.tokens, context);
     return false;

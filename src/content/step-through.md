@@ -333,7 +333,7 @@ On the pod, in the engine
 Back in a slot
 
 ### body-preempted
-The request takes a slot again and reads its {prompt} prompt tokens afresh, because its saved work was given up.
+Its whole context fits again, so the request takes a slot and reads its {prompt} prompt tokens afresh, because its saved work was given up.
 
 ### body-handoff
 The request takes a slot on this decode pod. Its prompt's KV arrived over the network, so only decoding is left.
@@ -714,10 +714,10 @@ On the pod, in the engine
 Preempted
 
 ### body
-The KV pool is full and nothing idle is left to evict. Session {sid} gives its blocks back and re-prefills {lost} tokens later.
+The KV pool is full and nothing idle is left to evict. Session {sid} gives its blocks back. It waits until all {lost} tokens of its context fit again, then re-prefills them.
 
 ### detail
-All of a sequence's blocks go, newest admission first. The tokens already streamed are kept as text, so the user sees a stall, not a restart [@vllmOptimization].
+All of a sequence's blocks go, newest admission first. A waiting request, preempted or new, is let in only when its whole sequence fits in the free blocks, so a preempted one does not come straight back to be preempted again [@vllmScheduler]. The tokens already streamed are kept as text, so the user sees a stall, not a restart [@vllmOptimization].
 
 ## `req.failed` Request rejected
 _Where:_ Beside the pod or the router that rejected a request, for example because it waited past its deadline.

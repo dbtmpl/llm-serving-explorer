@@ -31,6 +31,11 @@ export interface AdmissionRule extends ApproachMeta {
   /** Tokens of KV that must be allocated before the request joins the batch. */
   tokensToSecure(r: AdmissionRequest): number;
   /**
+   * Tokens of KV that must fit in the blocks no other running sequence holds before the request may start,
+   * even though only `tokensToSecure` of them are allocated at once. Never less than `tokensToSecure`.
+   */
+  tokensToFit(r: AdmissionRequest): number;
+  /**
    * Whether a prompt's blocks are allocated chunk by chunk while it is prefilled. If so a running
    * prefill can find the pool empty and must be able to yield.
    */
