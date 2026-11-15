@@ -4,7 +4,7 @@
  * Per-request rows keyed by (session, round), plus the few numbers that belong to a whole run. Times
  * are carried for the record and for later phases; phase 1 compares none of them.
  */
-import type { Scalar } from "./scenario.js";
+import type { Metric, Scalar } from "./scenario.js";
 
 export type Fate = "completed" | "shed" | "unservable" | "timed_out" | "other";
 
@@ -36,7 +36,27 @@ export interface Reduced {
   preemptions: number;
   /** Per replica: requests it received, indexed by replica. */
   requestsPerPod: number[];
+  /** Run-level numbers a simulator reports beyond the rows; null where it reports none. */
+  aggregates: Aggregates;
 }
+
+export interface Aggregates {
+  /** Share of prompt tokens served from the GPU prefix cache. */
+  prefixHitRate: number | null;
+  /** Share of prompt tokens served from host memory. */
+  cpuTierHitRate: number | null;
+  /** Mean seconds of a prefill-to-decode KV hand-over. */
+  kvTransferMeanS: number | null;
+  /** Tokens one sequence gains per decode step under speculative decoding. */
+  specTokensPerStep: number | null;
+  /** Requests sent through the prefill pool. */
+  prefillPoolRequests: number | null;
+  /** Most replicas serving at one time, and how many at the end. */
+  peakReplicas: number | null;
+  finalReplicas: number | null;
+}
+
+export const NO_AGGREGATES: Aggregates = { prefixHitRate: null, cpuTierHitRate: null, kvTransferMeanS: null, specTokensPerStep: null, prefillPoolRequests: null, peakReplicas: null, finalReplicas: null };
 
 export interface BlisProvenance {
   /** Commit of inference-sim named by `conformance/blis.lock`. */
@@ -53,10 +73,11 @@ export interface BlisProvenance {
 /** What is committed under `conformance/reference/`. */
 export interface Reference {
   scenario: string;
-  /** Hash of the BLIS input the translators produced; a mismatch means the scenario changed since. */
+  /** Hash of the BLIS input the translators produced for every arm; a mismatch means the scenario changed since. */
   inputHash: string;
   blis: BlisProvenance;
-  record: Reduced;
+  /** The reduced BLIS record of each arm of the scenario. */
+  records: Record<string, Reduced>;
 }
 
 export const requestKey = (r: { session: number; round: number }): string => `s${r.session}/r${r.round}`;
@@ -113,8 +134,74 @@ export function quantityOf(r: Reduced, name: string): Record<string, Scalar> {
     case "request_fate":
       for (const row of r.requests) out[requestKey(row)] = row.fate;
       break;
+    case "prefill_pool_requests":
+      out.value = r.aggregates.prefillPoolRequests;
+      break;
     default:
       throw new Error(`unknown quantity ${name}`);
   }
   return out;
+}
+
+const mean = (xs: number[]): number | null => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+
+/** Linear-interpolated percentile (numpy's default), as BLIS reports its own. */
+export function percentile(xs: number[], p: number): number | null {
+  if (!xs.length) return null;
+  const v = xs.slice().sort((a, b) => a - b);
+  const at = (p / 100) * (v.length - 1);
+  const lo = Math.floor(at);
+  const hi = Math.ceil(at);
+  return v[lo]! + (v[hi]! - v[lo]!) * (at - lo);
+}
+
+/**
+ * A timing or rate of a whole run, computed from the rows so both simulators are measured the same
+ * way: time to first token and end to end are from arrival; time per output token is
+ * `(last - first) / (output - 1)` per request, averaged; throughput is generated tokens over the
+ * time from the first arrival to the last completion.
+ */
+export function metricOf(r: Reduced, metric: Metric): number | null {
+  const done = r.requests.filter((x) => x.fate === "completed" && x.firstTokenS !== null && x.lastTokenS !== null);
+  const ttft = done.map((x) => x.firstTokenS! - x.arrivalS);
+  switch (metric) {
+    case "ttft_mean_s":
+      return mean(ttft);
+    case "ttft_p50_s":
+      return percentile(ttft, 50);
+    case "ttft_p99_s":
+      return percentile(ttft, 99);
+    case "tpot_mean_s":
+      return mean(done.filter((x) => x.outputTokens > 1).map((x) => (x.lastTokenS! - x.firstTokenS!) / (x.outputTokens - 1)));
+    case "e2e_mean_s":
+      return mean(done.map((x) => x.lastTokenS! - x.arrivalS));
+    case "e2e_p50_s":
+      return percentile(
+        done.map((x) => x.lastTokenS! - x.arrivalS),
+        50
+      );
+    case "throughput_tokens_per_s": {
+      if (!done.length) return null;
+      const span = Math.max(...done.map((x) => x.lastTokenS!)) - Math.min(...r.requests.map((x) => x.arrivalS));
+      return done.reduce((a, x) => a + x.outputTokens, 0) / span;
+    }
+    case "followup_ttft_mean_s":
+      return mean(done.filter((x) => x.round > 0).map((x) => x.firstTokenS! - x.arrivalS));
+    case "completed":
+      return done.length;
+    case "preemptions":
+      return r.preemptions;
+    case "kv_transfer_mean_s":
+      return r.aggregates.kvTransferMeanS;
+    case "spec_tokens_per_step":
+      return r.aggregates.specTokensPerStep;
+    case "prefix_hit_rate":
+      return r.aggregates.prefixHitRate;
+    case "cpu_tier_hit_rate":
+      return r.aggregates.cpuTierHitRate;
+    case "peak_replicas":
+      return r.aggregates.peakReplicas;
+    case "final_replicas":
+      return r.aggregates.finalReplicas;
+  }
 }

@@ -8,41 +8,52 @@
     "engineVersion": "0.32.0",
     "routerModule": "github.com/llm-d/llm-d-router v1.0.0-blis.4"
   },
-  "record": {
-    "simulator": "blis",
-    "scenario": "preemption-overflow",
-    "kvBlocksPerReplica": 3599,
-    "requests": [
-      {
-        "session": 1,
-        "round": 0,
-        "inputTokens": 16000,
-        "outputTokens": 16000,
-        "cachedTokens": 0,
-        "pod": 0,
-        "arrivalS": 1,
-        "firstTokenS": 1.473683,
-        "lastTokenS": 191.067135,
-        "fate": "completed",
-        "preemptions": null
-      },
-      {
-        "session": 2,
-        "round": 0,
-        "inputTokens": 16000,
-        "outputTokens": 16000,
-        "cachedTokens": 0,
-        "pod": 0,
-        "arrivalS": 1.5,
-        "firstTokenS": 1.986376,
-        "lastTokenS": 227.058001,
-        "fate": "completed",
-        "preemptions": null
+  "records": {
+    "main": {
+      "simulator": "blis",
+      "scenario": "preemption-overflow",
+      "kvBlocksPerReplica": 3599,
+      "requests": [
+        {
+          "session": 1,
+          "round": 0,
+          "inputTokens": 16000,
+          "outputTokens": 16000,
+          "cachedTokens": 0,
+          "pod": 0,
+          "arrivalS": 1,
+          "firstTokenS": 1.473683,
+          "lastTokenS": 191.067135,
+          "fate": "completed",
+          "preemptions": null
+        },
+        {
+          "session": 2,
+          "round": 0,
+          "inputTokens": 16000,
+          "outputTokens": 16000,
+          "cachedTokens": 0,
+          "pod": 0,
+          "arrivalS": 1.5,
+          "firstTokenS": 1.986376,
+          "lastTokenS": 227.058001,
+          "fate": "completed",
+          "preemptions": null
+        }
+      ],
+      "preemptions": 1,
+      "requestsPerPod": [
+        2
+      ],
+      "aggregates": {
+        "prefixHitRate": 0,
+        "cpuTierHitRate": 0,
+        "kvTransferMeanS": null,
+        "specTokensPerStep": null,
+        "prefillPoolRequests": null,
+        "peakReplicas": null,
+        "finalReplicas": null
       }
-    ],
-    "preemptions": 1,
-    "requestsPerPod": [
-      2
-    ]
+    }
   }
 }

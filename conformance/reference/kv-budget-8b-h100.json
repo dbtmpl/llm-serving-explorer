@@ -8,28 +8,39 @@
     "engineVersion": "0.32.0",
     "routerModule": "github.com/llm-d/llm-d-router v1.0.0-blis.4"
   },
-  "record": {
-    "simulator": "blis",
-    "scenario": "kv-budget-8b-h100",
-    "kvBlocksPerReplica": 27926,
-    "requests": [
-      {
-        "session": 1,
-        "round": 0,
-        "inputTokens": 200,
-        "outputTokens": 20,
-        "cachedTokens": 0,
-        "pod": 0,
-        "arrivalS": 1,
-        "firstTokenS": 1.054499,
-        "lastTokenS": 1.235896,
-        "fate": "completed",
-        "preemptions": null
+  "records": {
+    "main": {
+      "simulator": "blis",
+      "scenario": "kv-budget-8b-h100",
+      "kvBlocksPerReplica": 27926,
+      "requests": [
+        {
+          "session": 1,
+          "round": 0,
+          "inputTokens": 200,
+          "outputTokens": 20,
+          "cachedTokens": 0,
+          "pod": 0,
+          "arrivalS": 1,
+          "firstTokenS": 1.054499,
+          "lastTokenS": 1.235896,
+          "fate": "completed",
+          "preemptions": null
+        }
+      ],
+      "preemptions": 0,
+      "requestsPerPod": [
+        1
+      ],
+      "aggregates": {
+        "prefixHitRate": 0,
+        "cpuTierHitRate": 0,
+        "kvTransferMeanS": null,
+        "specTokensPerStep": null,
+        "prefillPoolRequests": null,
+        "peakReplicas": null,
+        "finalReplicas": null
       }
-    ],
-    "preemptions": 0,
-    "requestsPerPod": [
-      1
-    ]
+    }
   }
 }

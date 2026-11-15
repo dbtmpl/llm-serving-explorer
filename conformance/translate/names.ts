@@ -20,7 +20,8 @@ export const MODEL_NAMES: Record<string, NameMap> = {
 
 export const GPU_NAMES: Record<string, NameMap> = {
   h100: { typescript: "h100", blis: "h100" },
-  h200: { typescript: "h200", blis: "h200" }
+  h200: { typescript: "h200", blis: "h200" },
+  b200: { typescript: "b200", blis: "b200" }
 };
 
 export function modelNames(neutral: string): NameMap {

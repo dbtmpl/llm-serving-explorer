@@ -6,6 +6,18 @@
  * the request lists stay readable. (JSON has no comments; a TypeScript module would be code, not
  * data, and could not be handed to a reviewer who does not read TypeScript.) The only cost is one
  * dev dependency, `yaml`.
+ *
+ * Three kinds of check, strictest first:
+ *
+ * - `exact`: integers and decisions that must be equal.
+ * - `calibrated`: a timing or rate that must agree within a relative tolerance, after the
+ *   TypeScript model's free timing parameters have been fitted to BLIS on other scenarios
+ *   (`conformance/calibration/`). The TypeScript run of a scenario with a calibrated check uses
+ *   the fitted values.
+ * - `directional`: the same intervention (one arm of the scenario against another) moves the same
+ *   metric in the same direction by a similar factor in both simulators.
+ *
+ * A scenario with `arms` runs once per arm, each arm being the scenario with a few fields replaced.
  */
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
@@ -18,6 +30,9 @@ export const REFERENCE_DIR = path.join(CONFORMANCE_DIR, "reference");
 
 /** KV block size in tokens. Both simulators use vLLM's default; the scenario states it so a mismatch fails loudly. */
 export const BLOCK_TOKENS = 16;
+
+/** The name of the only arm of a scenario that declares none. */
+export const MAIN_ARM = "main";
 
 export type RoutingPolicyName = "round-robin" | "least-loaded" | "prefix-aware";
 
@@ -40,15 +55,39 @@ interface SessionSpec {
   turns: [number, number][];
 }
 
-/** Quantities a check may compare. Each is a record of named scalars, so a difference names where it is. */
-export type Quantity =
+/** Quantities an exact check may compare. Each is a record of named scalars, so a difference names where it is. */
+export type ExactQuantity =
   | "kv_blocks_per_replica"
   | "prefix_cached_tokens"
   | "routed_pod"
   | "requests_per_pod"
   | "session_pod_changes"
   | "preemptions"
-  | "request_fate";
+  | "request_fate"
+  | "prefill_pool_requests";
+
+/** Timings and rates a calibrated or directional check may use (see `record.ts`, `metricOf`). */
+export const METRICS = [
+  "ttft_mean_s",
+  "ttft_p50_s",
+  "ttft_p99_s",
+  "tpot_mean_s",
+  "e2e_mean_s",
+  "e2e_p50_s",
+  "throughput_tokens_per_s",
+  "kv_transfer_mean_s",
+  "spec_tokens_per_step",
+  "followup_ttft_mean_s",
+  "prefix_hit_rate",
+  "cpu_tier_hit_rate",
+  "preemptions",
+  "peak_replicas",
+  "final_replicas",
+  "completed"
+] as const;
+export type Metric = (typeof METRICS)[number];
+
+export type Scalar = number | string | boolean | null;
 
 export interface KnownDifference {
   /** What each simulator does and why they differ: a finding, not a shrug. */
@@ -57,22 +96,81 @@ export interface KnownDifference {
   differences: Record<string, { typescript: Scalar; blis: Scalar }>;
 }
 
-export type Scalar = number | string | boolean | null;
-
-export interface Check {
+interface CheckBase {
   id: string;
   /** What the check shows, in one sentence. */
   claim: string;
-  kind: "exact";
-  quantity: Quantity;
-  /** One line: why this quantity has to be equal and not merely close. */
+  /** One line: why this standard (equal, this relative tolerance, this factor band) is the right one. Written before the first run. */
   tolerance: string;
   knownDifference?: KnownDifference;
 }
 
-export interface Scenario {
-  id: string;
-  title: string;
+export interface ExactCheck extends CheckBase {
+  kind: "exact";
+  quantity: ExactQuantity;
+}
+
+export interface CalibratedCheck extends CheckBase {
+  kind: "calibrated";
+  metric: Metric;
+  /** Largest allowed |typescript − blis| / blis. */
+  relTol: number;
+  /** Arm to compare; defaults to the only one. */
+  arm: string;
+}
+
+export interface DirectionalCheck extends CheckBase {
+  kind: "directional";
+  metric: Metric;
+  /** The arm the intervention is measured from, and the arm it is applied in. */
+  baseline: string;
+  intervention: string;
+  /** How the change is measured: `to / from` or `to − from`. */
+  effect: "ratio" | "difference";
+  /** Expected direction of the change, in both simulators. */
+  direction: "increase" | "decrease";
+  /** The two simulators' effects (typescript / blis) must lie in this band. */
+  band: [number, number];
+}
+
+export type Check = ExactCheck | CalibratedCheck | DirectionalCheck;
+
+/** Speculative decoding: K draft tokens per step, accepting `acceptanceLength` tokens per step on average (BLIS's own parameter). */
+export interface SpeculativeSpec {
+  k: number;
+  /** Mean tokens produced per verification step, counting the bonus token; in [1, k + 1]. */
+  acceptanceLength: number;
+}
+
+/** A prefill pool and a decode pool, and the routing threshold below which a prompt is prefilled on its decode replica. */
+export interface DisaggSpec {
+  prefillReplicas: number;
+  decodeReplicas: number;
+  /** Uncached prompt tokens above which a request goes through the prefill pool. */
+  thresholdTokens: number;
+}
+
+/** Host DRAM per replica for KV that no longer fits in GPU memory. */
+export interface OffloadSpec {
+  /** Gigabytes (1e9 bytes) per replica. */
+  cpuGB: number;
+}
+
+/** Request-driven scaling between `minReplicas` and `maxReplicas`. The two simulators' rules differ by design. */
+export interface AutoscaleSpec {
+  minReplicas: number;
+  maxReplicas: number;
+}
+
+/** A constant-rate open-loop stream of identical single-turn requests, used where BLIS's `run` (not `replay`) is needed. */
+export interface StreamSpec {
+  ratePerS: number;
+  count: number;
+  promptTokens: number;
+  outputTokens: number;
+}
+
+export interface Deployment {
   /** Neutral names, mapped to each simulator's catalogue in `translate/names.ts`. */
   model: string;
   gpu: string;
@@ -90,6 +188,21 @@ export interface Scenario {
   /** Seconds a request may wait at the router before it is shed (0 = never). */
   queueDeadlineS: number;
   requests: ScenarioRequest[];
+  speculative?: SpeculativeSpec;
+  disagg?: DisaggSpec;
+  offload?: OffloadSpec;
+  autoscale?: AutoscaleSpec;
+  /** Set for a stream-driven scenario; `requests` is then the expansion of the stream. */
+  stream?: StreamSpec;
+}
+
+export interface Scenario {
+  id: string;
+  title: string;
+  /** `calibration`: the TypeScript model's timing parameters are fitted to this scenario's BLIS run. */
+  role: "check" | "calibration";
+  /** The deployments to run; one named `main` unless the scenario declares `arms`. */
+  arms: Record<string, Deployment>;
   checks: Check[];
 }
 
@@ -112,7 +225,7 @@ const obj = (file: string, v: unknown, what: string): Record<string, unknown> =>
   return v as Record<string, unknown>;
 };
 
-const QUANTITIES: readonly Quantity[] = ["kv_blocks_per_replica", "prefix_cached_tokens", "routed_pod", "requests_per_pod", "session_pod_changes", "preemptions", "request_fate"];
+const EXACT: readonly ExactQuantity[] = ["kv_blocks_per_replica", "prefix_cached_tokens", "routed_pod", "requests_per_pod", "session_pod_changes", "preemptions", "request_fate", "prefill_pool_requests"];
 
 function expand(file: string, raw: Record<string, unknown>): ScenarioRequest[] {
   const out: ScenarioRequest[] = [];
@@ -131,41 +244,27 @@ function expand(file: string, raw: Record<string, unknown>): ScenarioRequest[] {
   return out.sort((a, b) => a.at - b.at || a.session - b.session || a.round - b.round);
 }
 
-/** Read and validate one scenario file. */
-export function parseScenario(file: string, text: string): Scenario {
-  const raw = obj(file, parse(text), "the scenario");
+/** The requests of a stream: single-turn, one every 1 / rate seconds, the first at 1 / rate (as BLIS's constant arrival process places them). */
+export function expandStream(s: StreamSpec): ScenarioRequest[] {
+  return Array.from({ length: s.count }, (_, i) => ({ at: Math.round(((i + 1) / s.ratePerS) * 1e6) / 1e6, session: i + 1, round: 0, newTokens: s.promptTokens, outputTokens: s.outputTokens }));
+}
+
+/** Merge `over` into `base`, mapping merging recursively and everything else replacing. */
+function merge(base: Record<string, unknown>, over: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...base };
+  for (const [k, v] of Object.entries(over)) {
+    const b = out[k];
+    out[k] = typeof v === "object" && v !== null && !Array.isArray(v) && typeof b === "object" && b !== null && !Array.isArray(b) ? merge(b as Record<string, unknown>, v as Record<string, unknown>) : v;
+  }
+  return out;
+}
+
+function deployment(file: string, raw: Record<string, unknown>): Deployment {
   const engine = obj(file, raw.engine, `"engine"`);
-  const id = str(file, raw, "id");
-  if (path.basename(file, ".yaml") !== id) fail(file, `"id" (${id}) must equal the file name`);
   if (engine.block_size !== BLOCK_TOKENS) fail(file, `engine.block_size must be ${BLOCK_TOKENS}: the TypeScript model fixes it`);
   const routing = str(file, raw, "routing") as RoutingPolicyName;
   if (!["round-robin", "least-loaded", "prefix-aware"].includes(routing)) fail(file, `unknown routing "${routing}"`);
-  const checksRaw = raw.checks;
-  if (!Array.isArray(checksRaw) || !checksRaw.length) fail(file, `"checks" must be a non-empty list`);
-  const checks = (checksRaw as unknown[]).map((c): Check => {
-    const o = obj(file, c, "a check");
-    const quantity = str(file, o, "quantity") as Quantity;
-    if (!QUANTITIES.includes(quantity)) fail(file, `unknown quantity "${quantity}"`);
-    if (o.kind !== "exact") fail(file, `check ${String(o.id)}: only kind "exact" exists in this phase`);
-    const check: Check = { id: str(file, o, "id"), claim: str(file, o, "claim"), kind: "exact", quantity, tolerance: str(file, o, "tolerance") };
-    if (o.known_difference !== undefined) {
-      const k = obj(file, o.known_difference, "known_difference");
-      const reason = str(file, k, "reason");
-      if (reason.length < 80) fail(file, `check ${check.id}: a known_difference needs a concrete reason (what each simulator does and why they differ)`);
-      const diffs = obj(file, k.differences, "known_difference.differences");
-      const differences: KnownDifference["differences"] = {};
-      for (const [key, v] of Object.entries(diffs)) {
-        const d = obj(file, v, `difference ${key}`);
-        differences[key] = { typescript: d.typescript as Scalar, blis: d.blis as Scalar };
-      }
-      if (!Object.keys(differences).length) fail(file, `check ${check.id}: known_difference lists no differences`);
-      check.knownDifference = { reason, differences };
-    }
-    return check;
-  });
-  return {
-    id,
-    title: str(file, raw, "title"),
+  const d: Deployment = {
     model: str(file, raw, "model"),
     gpu: str(file, raw, "gpu"),
     engine: {
@@ -179,9 +278,99 @@ export function parseScenario(file: string, text: string): Scenario {
     replicas: num(file, raw, "replicas"),
     routing,
     queueDeadlineS: raw.queue_deadline_s === undefined ? 0 : num(file, raw, "queue_deadline_s"),
-    requests: expand(file, raw),
-    checks
+    requests: []
   };
+  if (raw.stream !== undefined) {
+    const s = obj(file, raw.stream, `"stream"`);
+    d.stream = { ratePerS: num(file, s, "rate_per_s"), count: num(file, s, "count"), promptTokens: num(file, s, "prompt_tokens"), outputTokens: num(file, s, "output_tokens") };
+    d.requests = expandStream(d.stream);
+  } else d.requests = expand(file, raw);
+  if (raw.speculative !== undefined) {
+    const s = obj(file, raw.speculative, `"speculative"`);
+    const spec = { k: num(file, s, "k"), acceptanceLength: num(file, s, "acceptance_length") };
+    if (spec.acceptanceLength < 1 || spec.acceptanceLength > spec.k + 1) fail(file, `speculative.acceptance_length must be in [1, k + 1]`);
+    d.speculative = spec;
+  }
+  if (raw.disagg !== undefined) {
+    const s = obj(file, raw.disagg, `"disagg"`);
+    d.disagg = { prefillReplicas: num(file, s, "prefill_replicas"), decodeReplicas: num(file, s, "decode_replicas"), thresholdTokens: num(file, s, "threshold_tokens") };
+    if (d.disagg.prefillReplicas + d.disagg.decodeReplicas !== d.replicas) fail(file, `disagg replicas must add up to "replicas"`);
+  }
+  if (raw.offload !== undefined) d.offload = { cpuGB: num(file, obj(file, raw.offload, `"offload"`), "cpu_gb") };
+  if (raw.autoscale !== undefined) {
+    const s = obj(file, raw.autoscale, `"autoscale"`);
+    d.autoscale = { minReplicas: num(file, s, "min_replicas"), maxReplicas: num(file, s, "max_replicas") };
+  }
+  return d;
+}
+
+function check(file: string, c: unknown, arms: string[]): Check {
+  const o = obj(file, c, "a check");
+  const base: CheckBase = { id: str(file, o, "id"), claim: str(file, o, "claim"), tolerance: str(file, o, "tolerance") };
+  if (o.known_difference !== undefined) {
+    const k = obj(file, o.known_difference, "known_difference");
+    const reason = str(file, k, "reason");
+    if (reason.length < 80) fail(file, `check ${base.id}: a known_difference needs a concrete reason (what each simulator does and why they differ)`);
+    const diffs = obj(file, k.differences, "known_difference.differences");
+    const differences: KnownDifference["differences"] = {};
+    for (const [key, v] of Object.entries(diffs)) {
+      const d = obj(file, v, `difference ${key}`);
+      differences[key] = { typescript: d.typescript as Scalar, blis: d.blis as Scalar };
+    }
+    if (!Object.keys(differences).length) fail(file, `check ${base.id}: known_difference lists no differences`);
+    base.knownDifference = { reason, differences };
+  }
+  const metric = (): Metric => {
+    const m = str(file, o, "metric") as Metric;
+    if (!METRICS.includes(m)) fail(file, `check ${base.id}: unknown metric "${m}"`);
+    return m;
+  };
+  const arm = (key: string, fallback?: string): string => {
+    const a = o[key] === undefined && fallback ? fallback : str(file, o, key);
+    if (!arms.includes(a)) fail(file, `check ${base.id}: unknown arm "${a}" (arms: ${arms.join(", ")})`);
+    return a;
+  };
+  switch (o.kind) {
+    case "exact": {
+      const quantity = str(file, o, "quantity") as ExactQuantity;
+      if (!EXACT.includes(quantity)) fail(file, `unknown quantity "${quantity}"`);
+      return { ...base, kind: "exact", quantity };
+    }
+    case "calibrated": {
+      const relTol = num(file, o, "rel_tol");
+      if (!(relTol > 0 && relTol < 1)) fail(file, `check ${base.id}: rel_tol must be in (0, 1)`);
+      return { ...base, kind: "calibrated", metric: metric(), relTol, arm: arm("arm", arms[0]) };
+    }
+    case "directional": {
+      const band = o.band;
+      if (!Array.isArray(band) || band.length !== 2 || !(typeof band[0] === "number" && typeof band[1] === "number" && band[0] > 0 && band[0] < band[1])) fail(file, `check ${base.id}: band must be [low, high] with 0 < low < high`);
+      if (o.effect !== "ratio" && o.effect !== "difference") fail(file, `check ${base.id}: effect must be "ratio" or "difference"`);
+      if (o.direction !== "increase" && o.direction !== "decrease") fail(file, `check ${base.id}: direction must be "increase" or "decrease"`);
+      return { ...base, kind: "directional", metric: metric(), baseline: arm("baseline"), intervention: arm("intervention"), effect: o.effect as "ratio" | "difference", direction: o.direction as "increase" | "decrease", band: band as [number, number] };
+    }
+    default:
+      return fail(file, `check ${base.id}: kind must be "exact", "calibrated" or "directional"`);
+  }
+}
+
+/** Read and validate one scenario file. */
+export function parseScenario(file: string, text: string): Scenario {
+  const raw = obj(file, parse(text), "the scenario");
+  const id = str(file, raw, "id");
+  if (path.basename(file, ".yaml") !== id) fail(file, `"id" (${id}) must equal the file name`);
+  const role = raw.role === undefined ? "check" : raw.role;
+  if (role !== "check" && role !== "calibration") fail(file, `role must be "check" or "calibration"`);
+  const { arms: armsRaw, checks: checksRaw, id: _id, title: _title, role: _role, ...baseRaw } = raw;
+  const arms: Record<string, Deployment> = {};
+  if (armsRaw === undefined) arms[MAIN_ARM] = deployment(file, baseRaw);
+  else
+    for (const [name, over] of Object.entries(obj(file, armsRaw, `"arms"`)))
+      arms[name] = deployment(file, merge(baseRaw, over === null ? {} : obj(file, over, `arm ${name}`)));
+  if (!Array.isArray(checksRaw)) fail(file, `"checks" must be a list`);
+  const checks = (checksRaw as unknown[]).map((c) => check(file, c, Object.keys(arms)));
+  if (role === "check" && !checks.length) fail(file, `a scenario with role "check" needs at least one check`);
+  if (role === "calibration" && checks.length) fail(file, `a calibration scenario states no checks: it is the data the fit uses`);
+  return { id, title: str(file, raw, "title"), role: role as Scenario["role"], arms, checks };
 }
 
 export function loadScenario(id: string): Scenario {
@@ -196,3 +385,9 @@ export function scenarioIds(): string[] {
     .map((f) => path.basename(f, ".yaml"))
     .sort();
 }
+
+/** The arm a scenario without `arms` has. */
+export const mainArm = (s: Scenario): Deployment => s.arms[MAIN_ARM] ?? fail(s.id, `the scenario has arms; name one`);
+
+/** True when the TypeScript run must use the fitted timing parameters: a timing check is only meaningful after the fit. */
+export const usesCalibration = (s: Scenario): boolean => s.checks.some((c) => c.kind === "calibrated" || c.kind === "directional");

@@ -7,7 +7,9 @@
  *
  * Each check either passes as stated or has a `known_difference`, in which case the test asserts the
  * observed difference is EXACTLY the recorded one: it cannot vanish (the model was fixed: update the
- * record) or grow (a new divergence) without this suite noticing.
+ * record) or grow (a new divergence) without this suite noticing. An exact check is equal; a
+ * calibrated check is within its relative tolerance after the fit; a directional check has the same
+ * direction and a similar effect in both simulators.
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
@@ -15,9 +17,9 @@ import { describe, expect, it } from "vitest";
 import { evaluate } from "../compare.js";
 import type { Reduced, Reference } from "../record.js";
 import { lockedCommit } from "../run/blis.js";
-import { runTypescript } from "../run/typescript.js";
+import { runTypescriptArms } from "../run/typescript.js";
 import { REFERENCE_DIR, loadScenario, scenarioIds } from "../scenario.js";
-import { toBlis } from "../translate/toBlis.js";
+import { scenarioInputHash } from "../translate/toBlis.js";
 
 const HASH = /^[0-9a-f]{64}$/;
 
@@ -47,30 +49,32 @@ for (const id of scenarioIds()) {
     it("has a reference made from the current scenario, by the pinned BLIS", () => {
       expect(existsSync(file), `no reference: run pnpm conformance:reference`).toBe(true);
       const ref = JSON.parse(readFileSync(file, "utf8")) as Reference;
-      expect(ref.inputHash, "the scenario changed after its reference was generated; run pnpm conformance:reference").toBe(toBlis(scenario).inputHash);
+      expect(ref.inputHash, "the scenario changed after its reference was generated; run pnpm conformance:reference").toBe(scenarioInputHash(scenario));
       expect(ref.blis.commit, "reference made by another BLIS commit than conformance/blis.lock; regenerate").toBe(lockedCommit());
       expect(ref.blis.catalogHash).toMatch(HASH);
       expect(ref.blis.registryHash).toMatch(HASH);
-      expect(ref.record.simulator).toBe("blis");
-      expect(ref.record.scenario).toBe(id);
+      expect(Object.keys(ref.records).sort()).toEqual(Object.keys(scenario.arms).sort());
+      for (const [arm, rec] of Object.entries(ref.records)) {
+        expect(rec.simulator).toBe("blis");
+        expect(rec.scenario, arm).toBe(id);
+      }
     });
 
-    const ts: { run?: Reduced } = {};
-    const typescript = (): Reduced => (ts.run ??= runTypescript(scenario).reduced);
+    const ts: { runs?: Record<string, Reduced> } = {};
+    const typescript = (): Record<string, Reduced> => (ts.runs ??= runTypescriptArms(scenario));
 
     it("runs to completion in the TypeScript model with every request accounted for", () => {
-      const reduced = typescript();
-      expect(reduced.requests).toHaveLength(scenario.requests.length);
+      for (const [arm, reduced] of Object.entries(typescript())) expect(reduced.requests, arm).toHaveLength(scenario.arms[arm]!.requests.length);
     });
 
     for (const check of scenario.checks) {
-      it(`${check.id}: ${check.knownDifference ? "differs exactly as recorded" : "agrees"}`, () => {
+      it(`${check.id} (${check.kind}): ${check.knownDifference ? "differs exactly as recorded" : "holds"}`, () => {
         const ref = JSON.parse(readFileSync(file, "utf8")) as Reference;
-        const outcome = evaluate(check, typescript(), ref.record);
+        const outcome = evaluate(check, typescript(), ref.records);
         if (check.knownDifference) {
           expect(outcome.differences, `${check.id}: the observed difference is not the recorded known_difference`).toEqual(check.knownDifference.differences);
         } else {
-          expect(outcome.differences, `${check.id}: ${check.claim}`).toEqual({});
+          expect(outcome.differences, `${check.id}: ${check.claim} (${JSON.stringify({ typescript: outcome.typescript, blis: outcome.blis, ...outcome.detail })})`).toEqual({});
         }
       });
     }

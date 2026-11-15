@@ -11,7 +11,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { lockedCommit, runBlis } from "../run/blis.js";
 import { CONFORMANCE_DIR, REFERENCE_DIR, loadScenario, scenarioIds } from "../scenario.js";
-import { EPP_FILES } from "../translate/toBlis.js";
+import { ALL_EPP_FILES } from "../translate/toBlis.js";
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -34,7 +34,7 @@ if (src) {
 }
 
 // the router configurations the translators ship must be the ones this binary's llm-d router ships
-for (const file of new Set(Object.values(EPP_FILES))) {
+for (const file of ALL_EPP_FILES) {
   const shipped = execFileSync(binary, ["router-configs", "--file", file], { encoding: "utf8" });
   const ours = readFileSync(path.join(CONFORMANCE_DIR, "translate", "epp", file), "utf8");
   if (shipped !== ours) die(`conformance/translate/epp/${file} differs from the file this BLIS ships (blis router-configs --file ${file}); copy the new one and re-run`);
