@@ -47,7 +47,8 @@ export const closedLoopSessions: ApproachMeta = {
   name: "Closed-loop multi-turn sessions",
   summary: "Users wait for an answer, think, then re-send the whole conversation plus a new message.",
   citations: ["schroeder2006", "gao2024"],
-  fidelity: "simplified"
+  fidelity: "simplified",
+  verification: { notVerifiable: "BLIS replays traces and generates open-loop streams; it has no counterpart to the closed-loop sessions (users who wait, think and return) that the site generates, so the scenarios feed both simulators a trace instead." }
 };
 
 export const WORKLOAD: Concept = {

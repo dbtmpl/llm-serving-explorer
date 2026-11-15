@@ -31,6 +31,7 @@ export const deadlineShedding: SheddingPolicy = {
   summary: "Reject requests that have waited at the router longer than a time-to-live.",
   citations: ["llmdFlowControl"],
   fidelity: "simplified",
+  verification: ["queue-deadline-shedding"],
   shouldShed: (waitedSeconds, deadlineSeconds) => deadlineSeconds > 0 && waitedSeconds > deadlineSeconds
 };
 

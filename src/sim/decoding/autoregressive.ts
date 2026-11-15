@@ -1,4 +1,5 @@
 import type { DecodeStrategy } from "./index.js";
+import { TIMING } from "../verification.js";
 
 /**
  * Autoregressive decoding: one forward pass of the model yields one token per sequence
@@ -10,6 +11,7 @@ export const autoregressive: DecodeStrategy = {
   summary: "One token per sequence per step.",
   citations: ["vaswani2017"],
   fidelity: "exact",
+  verification: [...TIMING],
   tokensThisStep: () => 1,
   positionsEvaluated: () => 1,
   overheadFactor: () => 0

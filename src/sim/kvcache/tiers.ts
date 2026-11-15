@@ -28,7 +28,8 @@ export const tieredCache: ApproachMeta = {
   name: "HBM → DRAM → SSD → shared pool",
   summary: "Idle sessions move down a memory hierarchy instead of being dropped, and are loaded back on return.",
   citations: ["gao2024", "qin2024", "lmcache2025", "llmdKvOffloader", "dynamoKvbm"],
-  fidelity: "structural"
+  fidelity: "structural",
+  verification: ["tiers-offload"]
 };
 
 /** The eviction order used in every tier. */

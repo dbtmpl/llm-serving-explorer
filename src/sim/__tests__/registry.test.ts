@@ -6,6 +6,7 @@ import { CONCEPTS } from "../catalog.js";
 import { CITATIONS, type CitationKey } from "../citations.js";
 import { renderApproachTable, renderCitationList, replaceGenerated } from "../docs.js";
 import { ARCHITECTURES } from "../presets/architectures.js";
+import { isVerifiable } from "../verification.js";
 
 const simDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = path.resolve(simDir, "../..");
@@ -60,6 +61,35 @@ describe("approach registry", () => {
   });
   it("every architecture preset cites its sources", () => {
     for (const arch of ARCHITECTURES) expect(arch.citations.length, arch.id).toBeGreaterThan(0);
+  });
+});
+
+/** The conformance scenarios (`conformance/scenarios/*.yaml`), by id. */
+const scenarioFiles = (): string[] =>
+  readdirSync(path.join(repoRoot, "conformance", "scenarios"))
+    .filter((f) => f.endsWith(".yaml"))
+    .map((f) => f.replace(/\.yaml$/, ""));
+
+describe("verification against BLIS", () => {
+  const approaches = CONCEPTS.flatMap((c) => c.approaches.map((a) => ({ name: `${c.module}/${a.id}`, a })));
+  it("every approach names the scenarios that check it, or says why BLIS cannot", () => {
+    for (const { name, a } of approaches) {
+      const v = a.verification;
+      if (isVerifiable(v)) expect(v.length, `${name}: an empty list is neither a scenario nor a reason`).toBeGreaterThan(0);
+      else expect(v.notVerifiable.length, `${name}: the reason is too short to be one`).toBeGreaterThan(40);
+    }
+  });
+  it("every scenario an approach names exists in conformance/scenarios", () => {
+    const ids = new Set(scenarioFiles());
+    for (const { name, a } of approaches) if (isVerifiable(a.verification)) for (const id of a.verification) expect(ids.has(id), `${name} names ${id}, which is not a scenario`).toBe(true);
+  });
+  it("every scenario is named by at least one approach", () => {
+    const named = new Set<string>();
+    for (const { a } of approaches) if (isVerifiable(a.verification)) for (const id of a.verification) named.add(id);
+    expect(scenarioFiles().filter((id) => !named.has(id))).toEqual([]);
+  });
+  it("names no scenario twice in one approach", () => {
+    for (const { name, a } of approaches) if (isVerifiable(a.verification)) expect(new Set(a.verification).size, name).toBe(a.verification.length);
   });
 });
 

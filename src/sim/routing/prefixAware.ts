@@ -53,6 +53,7 @@ export const prefixAware: RoutingPolicy = {
   summary: "Weighted score of cached prefix, KV utilisation and queue depth, as in llm-d.",
   citations: ["llmdScheduling", "gatewayInferenceExtension"],
   fidelity: "structural",
+  verification: ["routing-prefix-aware", "routing-prefix-vs-round-robin", "prefix-cache", "pd-disaggregation"],
   score: (c) => {
     const affinity = c.cacheLocation ? TIER_AFFINITY[c.cacheLocation] : 0;
     return (

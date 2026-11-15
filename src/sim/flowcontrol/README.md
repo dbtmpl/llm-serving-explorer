@@ -5,9 +5,9 @@ What happens to requests the fleet cannot serve in time.
 ## Supported approaches
 
 <!-- generated:approaches:start -->
-| Concept | Approach | What it does | Fidelity | Sources |
-|---|---|---|---|---|
-| Flow control | Deadline shedding | Reject requests that have waited at the router longer than a time-to-live. | Simplified | [llm-d docs, flow control](https://github.com/llm-d/llm-d/blob/main/docs/architecture/router/flow-control.md) |
+| Concept | Approach | What it does | Fidelity | Verified against BLIS | Sources |
+|---|---|---|---|---|---|
+| Flow control | Deadline shedding | Reject requests that have waited at the router longer than a time-to-live. | Simplified | Yes: `queue-deadline-shedding` | [llm-d docs, flow control](https://github.com/llm-d/llm-d/blob/main/docs/architecture/router/flow-control.md) |
 <!-- generated:approaches:end -->
 
 Fidelity: **Exact** reproduces a published formula or rule and is tested against it. **Structural** follows the source's mechanism with our own constants, exposed as parameters. **Simplified** is a stand-in whose docstring says what is left out.

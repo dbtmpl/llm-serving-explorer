@@ -27,6 +27,7 @@ export const leastRecentlyUsed: EvictionPolicy = {
   summary: "Evict the idle session that was used longest ago.",
   citations: ["gao2024", "vllmPrefixCaching"],
   fidelity: "simplified",
+  verification: ["eviction-pressure", "tiers-offload"],
   pickVictim: <T extends { lastUsed: number }>(candidates: Iterable<T>): T | null => {
     let victim: T | null = null;
     for (const c of candidates) if (!victim || c.lastUsed < victim.lastUsed) victim = c;

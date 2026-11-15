@@ -15,6 +15,7 @@ export const leastLoaded: RoutingPolicy = {
   summary: "Send to the pod with the fewest requests in flight.",
   citations: ["envoyLoadBalancing"],
   fidelity: "simplified",
+  verification: ["routing-least-loaded"],
   score: (c) => -c.load,
   pick: pickHighest
 };

@@ -40,6 +40,7 @@ export const targetConcurrency: Autoscaler = {
   summary: "Run enough pods that each carries at most its target number of requests.",
   citations: ["knativeAutoscaling", "llmdAutoscaling"],
   fidelity: "simplified",
+  verification: ["autoscale-overload"],
   desiredPods: (s) => Math.max(s.minPods, Math.min(s.maxPods, Math.ceil(s.inFlight / Math.max(1, s.targetPerPod))))
 };
 

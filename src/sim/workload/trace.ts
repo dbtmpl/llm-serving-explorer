@@ -46,7 +46,8 @@ export const traceReplay: ApproachMeta = {
   name: "Trace replay",
   summary: "Requests are injected at recorded times with recorded lengths, so a run can be repeated or compared exactly.",
   citations: ["schroeder2006", "gao2024"],
-  fidelity: "simplified"
+  fidelity: "simplified",
+  verification: { notVerifiable: "It is how both simulators are given the same requests, not a mechanism BLIS models: every scenario uses it, and the conformance machinery fails when the two row sets differ, but there is nothing in BLIS to compare it with." }
 };
 
 /** Reject a malformed trace with a message naming the request, rather than simulating nonsense. */

@@ -34,6 +34,7 @@ export const adaptiveReload: ReloadPolicy = {
   summary: "Load KV from a lower tier only when copying is faster than prefilling again.",
   citations: ["lmcache2025", "liu2023"],
   fidelity: "simplified",
+  verification: { notVerifiable: "BLIS reloads whenever its host-memory tier holds the prefix; it has no decision between copying and recomputing to compare. The scenario that exercises the tier (tiers-offload) is a check of the tiers, not of this rule." },
   shouldLoad: (loadSeconds, recomputeSeconds) => loadSeconds <= recomputeSeconds
 };
 

@@ -4,6 +4,7 @@
  */
 import type { Concept, Fidelity } from "./approach.js";
 import { CITATIONS, citeMarkdown, type CitationKey } from "./citations.js";
+import { isVerifiable, type Verification } from "./verification.js";
 
 const FIDELITY_LABEL: Record<Fidelity, string> = {
   exact: "Exact",
@@ -13,13 +14,19 @@ const FIDELITY_LABEL: Record<Fidelity, string> = {
 
 const escapeCell = (text: string): string => text.replace(/\|/g, "\\|");
 
+/** The "Verified against BLIS" cell: the scenarios that check the approach (named when there are few), or that none can. */
+export function verificationCell(v: Verification): string {
+  if (!isVerifiable(v)) return "Not verifiable";
+  return v.length <= 3 ? `Yes: ${v.map((id) => `\`${id}\``).join(", ")}` : `Yes: ${v.length} scenarios`;
+}
+
 /** One row per approach. `linkPrefix` is the path from the README to `src/sim/`. */
 export function renderApproachTable(concepts: readonly Concept[], linkPrefix: string | null): string {
-  const rows = ["| Concept | Approach | What it does | Fidelity | Sources |", "|---|---|---|---|---|"];
+  const rows = ["| Concept | Approach | What it does | Fidelity | Verified against BLIS | Sources |", "|---|---|---|---|---|---|"];
   for (const concept of concepts) {
     const title = linkPrefix === null ? concept.title : `[${concept.title}](${linkPrefix}${concept.module}/)`;
     for (const a of concept.approaches) {
-      rows.push(`| ${title} | ${escapeCell(a.name)} | ${escapeCell(a.summary)} | ${FIDELITY_LABEL[a.fidelity]} | ${a.citations.map(citeMarkdown).join("; ")} |`);
+      rows.push(`| ${title} | ${escapeCell(a.name)} | ${escapeCell(a.summary)} | ${FIDELITY_LABEL[a.fidelity]} | ${verificationCell(a.verification)} | ${a.citations.map(citeMarkdown).join("; ")} |`);
     }
   }
   return rows.join("\n");

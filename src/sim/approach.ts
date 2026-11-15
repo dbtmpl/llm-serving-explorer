@@ -7,6 +7,7 @@
  * approaches it supports.
  */
 import type { CitationKey } from "./citations.js";
+import type { Verification } from "./verification.js";
 
 /** How closely an approach follows its source. Shown in the READMEs so readers know what to trust. */
 export type Fidelity =
@@ -27,6 +28,11 @@ export interface ApproachMeta {
   /** At least one source. The first is the primary reference. */
   citations: readonly [CitationKey, ...CitationKey[]];
   fidelity: Fidelity;
+  /**
+   * The conformance scenarios that check this approach against BLIS, or why BLIS cannot (vLLM does
+   * neither, no counterpart in its catalog). Enforced by the registry test; shown in the README tables.
+   */
+  verification: Verification;
 }
 
 export interface Concept<A extends ApproachMeta = ApproachMeta> {

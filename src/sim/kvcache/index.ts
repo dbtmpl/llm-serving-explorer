@@ -17,7 +17,8 @@ export const pagedBlocks: ApproachMeta = {
   name: "Paged KV blocks (PagedAttention)",
   summary: "KV memory is handed out in fixed 16-token blocks as tokens are written, like virtual-memory pages.",
   citations: ["kwon2023"],
-  fidelity: "structural"
+  fidelity: "structural",
+  verification: ["kv-budget-8b-h100", "kv-budget-70b-h200-tp4", "preemption-overflow", "eviction-pressure"]
 };
 
 export const KV_LAYOUT: Concept = {

@@ -5,6 +5,7 @@
  * rule as everything else: each is tied to a source and checked by a unit test.
  */
 import type { ApproachMeta, Concept } from "../approach.js";
+import { TIMING, TIMING_70B_H200 } from "../verification.js";
 
 export * from "./flops.js";
 export * from "./host.js";
@@ -17,7 +18,8 @@ export const rooflineStepTime: ApproachMeta = {
   name: "Roofline step time",
   summary: "A step takes the longer of FLOPs over peak compute and bytes over memory bandwidth.",
   citations: ["williams2009"],
-  fidelity: "exact"
+  fidelity: "exact",
+  verification: [...TIMING]
 };
 
 export const flopCount: ApproachMeta = {
@@ -25,7 +27,8 @@ export const flopCount: ApproachMeta = {
   name: "FLOPs per token",
   summary: "2N per token through the weights, plus an attention term linear in context length.",
   citations: ["kaplan2020", "vaswani2017"],
-  fidelity: "exact"
+  fidelity: "exact",
+  verification: [...TIMING]
 };
 
 export const kvFootprint: ApproachMeta = {
@@ -33,7 +36,8 @@ export const kvFootprint: ApproachMeta = {
   name: "KV bytes per token and memory budget",
   summary: "Two vectors per layer and KV head per token; the KV pool is what weights, activations, CUDA graphs and headroom leave of the memory the driver reports.",
   citations: ["kwon2023", "vllmEngineArgs", "vllmMemoryProfiling", "blisSubstrateMemory"],
-  fidelity: "exact"
+  fidelity: "exact",
+  verification: ["kv-budget-8b-h100", "kv-budget-70b-h200-tp4"]
 };
 
 export const tensorParallelism: ApproachMeta = {
@@ -41,7 +45,8 @@ export const tensorParallelism: ApproachMeta = {
   name: "Tensor parallelism",
   summary: "Weights and KV are split evenly over the GPUs of a pod; compute and bandwidth add up.",
   citations: ["shoeybi2019"],
-  fidelity: "simplified"
+  fidelity: "simplified",
+  verification: ["kv-budget-70b-h200-tp4", ...TIMING_70B_H200]
 };
 
 export const hostOverhead: ApproachMeta = {
@@ -49,7 +54,8 @@ export const hostOverhead: ApproachMeta = {
   name: "Host time per step",
   summary: "A fixed plus per-sequence CPU cost that adds to, or overlaps with, GPU time.",
   citations: ["vllmOptimization"],
-  fidelity: "simplified"
+  fidelity: "simplified",
+  verification: [...TIMING]
 };
 
 export const chunkedPrefill: ApproachMeta = {
@@ -57,7 +63,8 @@ export const chunkedPrefill: ApproachMeta = {
   name: "Chunked prefill under a token budget",
   summary: "A long prompt is prefilled in chunks sharing each step with decodes, bounded by a per-step token budget.",
   citations: ["agrawal2024", "agrawal2023", "vllmScheduler", "vllmSchedulerConfig"],
-  fidelity: "structural"
+  fidelity: "structural",
+  verification: ["timing-8b-h100-burst", "timing-8b-h100-heavy", "preemption-overflow"]
 };
 
 export const COST_MODEL: Concept = {

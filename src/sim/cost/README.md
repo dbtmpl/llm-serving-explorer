@@ -5,13 +5,13 @@ How long an engine step takes and how much memory there is for KV. Closed-form q
 ## Supported approaches
 
 <!-- generated:approaches:start -->
-| Concept | Approach | What it does | Fidelity | Sources |
-|---|---|---|---|---|
-| Cost model | Roofline step time | A step takes the longer of FLOPs over peak compute and bytes over memory bandwidth. | Exact | [Williams et al., CACM 2009](https://doi.org/10.1145/1498765.1498785) |
-| Cost model | FLOPs per token | 2N per token through the weights, plus an attention term linear in context length. | Exact | [Kaplan et al., 2020](https://arxiv.org/abs/2001.08361); [Vaswani et al., NeurIPS 2017](https://arxiv.org/abs/1706.03762) |
-| Cost model | KV bytes per token and memory budget | Two vectors per layer and KV head per token; the KV pool is what weights, activations, CUDA graphs and headroom leave of the memory the driver reports. | Exact | [Kwon et al., SOSP 2023](https://arxiv.org/abs/2309.06180); [vLLM docs, engine arguments](https://docs.vllm.ai/en/latest/configuration/engine_args.html); [vLLM source, worker memory profiling](https://github.com/vllm-project/vllm/blob/main/vllm/v1/worker/gpu_worker.py); [BLIS substrate registry, cost-model-memory](https://github.com/inference-sim/blis-substrate/blob/main/registry/coefficients/cost-model-memory.yaml) |
-| Cost model | Tensor parallelism | Weights and KV are split evenly over the GPUs of a pod; compute and bandwidth add up. | Simplified | [Shoeybi et al., 2019](https://arxiv.org/abs/1909.08053) |
-| Cost model | Host time per step | A fixed plus per-sequence CPU cost that adds to, or overlaps with, GPU time. | Simplified | [vLLM docs, optimization](https://docs.vllm.ai/en/latest/configuration/optimization.html) |
+| Concept | Approach | What it does | Fidelity | Verified against BLIS | Sources |
+|---|---|---|---|---|---|
+| Cost model | Roofline step time | A step takes the longer of FLOPs over peak compute and bytes over memory bandwidth. | Exact | Yes: 20 scenarios | [Williams et al., CACM 2009](https://doi.org/10.1145/1498765.1498785) |
+| Cost model | FLOPs per token | 2N per token through the weights, plus an attention term linear in context length. | Exact | Yes: 20 scenarios | [Kaplan et al., 2020](https://arxiv.org/abs/2001.08361); [Vaswani et al., NeurIPS 2017](https://arxiv.org/abs/1706.03762) |
+| Cost model | KV bytes per token and memory budget | Two vectors per layer and KV head per token; the KV pool is what weights, activations, CUDA graphs and headroom leave of the memory the driver reports. | Exact | Yes: `kv-budget-8b-h100`, `kv-budget-70b-h200-tp4` | [Kwon et al., SOSP 2023](https://arxiv.org/abs/2309.06180); [vLLM docs, engine arguments](https://docs.vllm.ai/en/latest/configuration/engine_args.html); [vLLM source, worker memory profiling](https://github.com/vllm-project/vllm/blob/main/vllm/v1/worker/gpu_worker.py); [BLIS substrate registry, cost-model-memory](https://github.com/inference-sim/blis-substrate/blob/main/registry/coefficients/cost-model-memory.yaml) |
+| Cost model | Tensor parallelism | Weights and KV are split evenly over the GPUs of a pod; compute and bandwidth add up. | Simplified | Yes: 7 scenarios | [Shoeybi et al., 2019](https://arxiv.org/abs/1909.08053) |
+| Cost model | Host time per step | A fixed plus per-sequence CPU cost that adds to, or overlaps with, GPU time. | Simplified | Yes: 20 scenarios | [vLLM docs, optimization](https://docs.vllm.ai/en/latest/configuration/optimization.html) |
 <!-- generated:approaches:end -->
 
 Fidelity: **Exact** reproduces a published formula or rule and is tested against it. **Structural** follows the source's mechanism with our own constants, exposed as parameters. **Simplified** is a stand-in whose docstring says what is left out.

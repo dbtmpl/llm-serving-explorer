@@ -1,4 +1,5 @@
 import type { BatchingMode } from "./index.js";
+import { TIMING } from "../verification.js";
 
 /**
  * Continuous batching (iteration-level scheduling).
@@ -15,6 +16,7 @@ export const continuousBatching: BatchingMode = {
   summary: "Requests join and leave the batch at every engine step.",
   citations: ["yu2022", "vllmScheduler"],
   fidelity: "structural",
+  verification: [...TIMING, "preemption-overflow", "queue-deadline-shedding"],
   admitsInto: () => true,
   admissionHonoursTokenBudget: true
 };
