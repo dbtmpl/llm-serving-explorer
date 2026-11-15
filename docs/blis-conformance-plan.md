@@ -64,8 +64,8 @@ Consistent with ADR 0006: `src/sim/` stays free of anything BLIS-specific except
 | `conformance/calibration/` | Fitted MBU, MFU and host-time values per model and GPU, with the fit residuals |
 | `conformance/blis.lock` | The pinned inference-sim commit. No submodule: CI clones that commit and builds it |
 | `conformance/__tests__/` | Vitest suite comparing TypeScript output with the references |
-| `src/replay/` | Later: adapter that drives the same `Scene` from a BLIS record |
-| `public/replay/<id>.json.gz` | Later: replay files for the site, generated from the pinned BLIS |
+| `src/replay/` | Adapter that drives the same graph from a BLIS replay file |
+| `public/replay/<id>.json` | Replay files for the site, generated from the pinned BLIS |
 
 The registry test gains one rule: every approach names at least one scenario or a reason. `pnpm docs:sync` adds a "verified against BLIS" column to the README tables from that field.
 

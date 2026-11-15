@@ -27,6 +27,27 @@ export function renderHeadline(s: Summary): string {
   ].join("\n");
 }
 
+/** The one figure the root README quotes in prose; a test fails if the README says anything else. */
+export function readmeFigure(s: Summary): string {
+  return `${s.headline.agree} of ${s.headline.total} checks agree (${pct(s.headline.share)})`;
+}
+
+/** The table of the README's parity section. */
+export function renderReadmeParity(s: Summary): string {
+  const k = s.checks.byKind;
+  const row = (name: string, what: string, c: (typeof k)["exact"], agree: number) => `| ${name} | ${what} | ${c.total} | ${agree} | ${c.known_difference ?? 0} |`;
+  return [
+    "| Kind of check | What must hold | Checks | Agree | Known difference |",
+    "|---|---|---|---|---|",
+    row("Exact", "Integers and decisions are equal: KV blocks per replica, cached prefix tokens, the pod chosen, which requests are shed or preempted", k.exact, k.exact.exact ?? 0),
+    row("Calibrated", "A timing or rate is within the tolerance written in the scenario, after the cost model's efficiency factors are fitted to BLIS on separate scenarios", k.calibrated, k.calibrated.within_tolerance ?? 0),
+    row("Directional", "The same intervention moves the same metric the same way by a similar factor (memory tiers, eviction, routing policy, autoscaling)", k.directional, k.directional.directional_agree ?? 0),
+    `| **All** | | **${s.checks.total}** | **${s.headline.agree}** | **${s.headline.knownDifferences}** |`,
+    "",
+    `${s.approaches.verified} of the ${s.approaches.total} approaches in the table above are covered by at least one check; ${s.approaches.notVerifiable} have no counterpart in BLIS and are counted neither way. BLIS commit \`${s.blisCommit.slice(0, 8)}\`; regenerate with \`pnpm conformance:summary && pnpm docs:sync\`.`
+  ].join("\n");
+}
+
 const oneLine = (text: string): string => text.replace(/\s+/g, " ").trim();
 
 export function renderKnownDifferences(): string {
