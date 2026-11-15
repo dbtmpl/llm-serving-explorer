@@ -20,6 +20,7 @@ Fidelity: **Exact** reproduces a published formula or rule and is tested against
 interface AdmissionRule extends ApproachMeta {
   outputReservation(r): number;      // output tokens to budget for when checking the request can ever fit
   tokensToSecure(r): number;         // tokens of KV to allocate before joining the batch
+  tokensToFit(r): number;            // tokens that must fit beside the other running sequences before it may start
   allocatesPrefillPerChunk: boolean; // whether a running prefill can find the pool empty
 }
 ```
@@ -39,5 +40,5 @@ The general rules are in [`../README.md`](../README.md#rules).
 
 ## Not modelled
 
-- Watermarks that keep a share of the pool free.
+- Watermarks that keep a share of the pool free (vLLM's `watermark`, default 0).
 - Output-length prediction to reserve less than `max_tokens`.

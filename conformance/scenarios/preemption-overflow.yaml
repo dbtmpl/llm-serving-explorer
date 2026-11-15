@@ -27,22 +27,6 @@ checks:
     kind: exact
     quantity: preemptions
     tolerance: A count of discrete engine events in a case built to produce exactly one.
-    known_difference:
-      reason: >-
-        Both simulators preempt request 2 (the newest) once when the joint context reaches the pool, and both recompute
-        it. They differ in what happens next. vLLM 0.32 admits a waiting request only if its WHOLE prompt fits in free
-        blocks (scheduler_reserve_full_isl, on by default; BLIS implements it as FullSequenceMustFit), and a preempted
-        request's prompt is its whole context so far, about half the pool. Request 1 still holds the other half, so request 2 waits
-        (BLIS series: one request waiting from t = 150 s to 191 s) until request 1 finishes, and no second preemption
-        happens. The TypeScript model admits on the first chunk only. Request 2 is admitted again at once, prefills
-        in chunks of 8,192 tokens until the pool is full, and the next chunk (or request 1's next block) preempts it
-        again: it is preempted 799 times
-        until request 1 finishes. Each time it loses about 27,000 tokens of work. The pools are close (BLIS 3,599 blocks, the
-        TypeScript model 3,601) but both are well below the 4,000 blocks the two sequences need at their end, so a second
-        overflow is certain in either unless the waiting request is held back. This is a mechanism the TypeScript model
-        lacks (read from its admit() and BLIS's scheduler; not tested by adding the gate), not a count that differs by rounding.
-      differences:
-        value: { typescript: 799, blis: 1 }
   - id: both-complete
     claim: Both requests complete.
     kind: exact

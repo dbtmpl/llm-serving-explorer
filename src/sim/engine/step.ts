@@ -50,8 +50,8 @@ function retireEntry(w: World, pod: Pod, r: Req): void {
  * cached (864 tokens), not 55. A follow-up whose history is those 880 tokens reuses 864 and prefills 16 more
  * plus its new message, where counting the last token would reuse 880.
  *
- * Simplified: the model grows a sequence's blocks one token ahead of vLLM during decode, so the answer's last
- * block can be allocated a step early; this cap only affects what is cached for the next turn.
+ * A decode step allocates for `computed + scheduled` tokens, as vLLM does, so a finished entry already holds
+ * exactly this many; the cap is a guard for the last step.
  */
 export const cachedAfterTurn = (promptTokens: number, outputTokens: number): number => promptTokens + outputTokens - 1;
 
@@ -164,7 +164,9 @@ export function planStep(w: World, pod: Pod): void {
       decoding.tokensThisStep(() => rand(w), settings),
       r.lOut - r.out
     );
-    if (!growTo(w, pod, e, context + n, r, true)) {
+    // The step feeds the last sampled token (its KV is computed now) and n - 1 further ones, so `n` slots beyond the
+    // `context - 1` positions already computed. vLLM allocates for exactly those (allocate_slots: computed + scheduled).
+    if (!growTo(w, pod, e, context - 1 + n, r, true)) {
       preempt(w, pod, r, "KV memory short");
       continue;
     }

@@ -19,5 +19,6 @@ export const wholePrompt: AdmissionRule = {
   fidelity: "structural",
   outputReservation: (r) => r.outputTokens,
   tokensToSecure: (r) => r.promptTokens + r.generatedTokens,
+  tokensToFit: (r) => r.promptTokens + r.generatedTokens,
   allocatesPrefillPerChunk: false
 };
