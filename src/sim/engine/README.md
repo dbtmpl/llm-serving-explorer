@@ -5,9 +5,9 @@ The loop that ties the modules together: admission, the step plan, the fleet, th
 ## Supported approaches
 
 <!-- generated:approaches:start -->
-| Concept | Approach | What it does | Fidelity | Sources |
-|---|---|---|---|---|
-| Step scheduling | Chunked prefill under a token budget | A long prompt is prefilled in chunks sharing each step with decodes, bounded by a per-step token budget. | Structural | [Agrawal et al., OSDI 2024](https://arxiv.org/abs/2403.02310); [Agrawal et al., 2023](https://arxiv.org/abs/2308.16369); [vLLM source, scheduler.py](https://github.com/vllm-project/vllm/blob/main/vllm/v1/core/sched/scheduler.py); [vLLM source, config/scheduler.py](https://github.com/vllm-project/vllm/blob/main/vllm/config/scheduler.py) |
+| Concept | Approach | What it does | Fidelity | Verified against BLIS | Sources |
+|---|---|---|---|---|---|
+| Step scheduling | Chunked prefill under a token budget | A long prompt is prefilled in chunks sharing each step with decodes, bounded by a per-step token budget. | Structural | Yes: `timing-8b-h100-burst`, `timing-8b-h100-heavy`, `preemption-overflow` | [Agrawal et al., OSDI 2024](https://arxiv.org/abs/2403.02310); [Agrawal et al., 2023](https://arxiv.org/abs/2308.16369); [vLLM source, scheduler.py](https://github.com/vllm-project/vllm/blob/main/vllm/v1/core/sched/scheduler.py); [vLLM source, config/scheduler.py](https://github.com/vllm-project/vllm/blob/main/vllm/config/scheduler.py) |
 <!-- generated:approaches:end -->
 
 Fidelity: **Exact** reproduces a published formula or rule and is tested against it. **Structural** follows the source's mechanism with our own constants, exposed as parameters. **Simplified** is a stand-in whose docstring says what is left out.

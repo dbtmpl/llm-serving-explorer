@@ -18,6 +18,7 @@ export const staticBatching: BatchingMode = {
   summary: "A batch runs to completion before the next one is formed.",
   citations: ["crankshaw2017", "tritonBatcher", "yu2022"],
   fidelity: "structural",
+  verification: { notVerifiable: "vLLM does no static batching (it schedules continuously) and BLIS translates vLLM, so there is no counterpart to compare." },
   admitsInto: (running) => running === 0,
   admissionHonoursTokenBudget: false
 };

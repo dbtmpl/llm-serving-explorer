@@ -32,6 +32,7 @@ export const preemptNewest: PreemptionPolicy = {
   summary: "Free the most recently admitted sequence and prefill it again later.",
   citations: ["vllmScheduler", "vllmOptimization", "kwon2023"],
   fidelity: "exact",
+  verification: ["preemption-overflow"],
   pickVictim: <T extends { admitT: number }>(running: Iterable<T>, protect: T): T | null => {
     let victim: T | null = null;
     for (const r of running) if (!victim || r.admitT > victim.admitT) victim = r;

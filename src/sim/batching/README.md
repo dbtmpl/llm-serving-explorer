@@ -5,10 +5,10 @@ When a request may join the batch a pod is running.
 ## Supported approaches
 
 <!-- generated:approaches:start -->
-| Concept | Approach | What it does | Fidelity | Sources |
-|---|---|---|---|---|
-| Batching | Static batching | A batch runs to completion before the next one is formed. | Structural | [Crankshaw et al., NSDI 2017](https://arxiv.org/abs/1612.03079); [NVIDIA Triton docs](https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/user_guide/batcher.html); [Yu et al., OSDI 2022](https://www.usenix.org/conference/osdi22/presentation/yu) |
-| Batching | Continuous batching | Requests join and leave the batch at every engine step. | Structural | [Yu et al., OSDI 2022](https://www.usenix.org/conference/osdi22/presentation/yu); [vLLM source, scheduler.py](https://github.com/vllm-project/vllm/blob/main/vllm/v1/core/sched/scheduler.py) |
+| Concept | Approach | What it does | Fidelity | Verified against BLIS | Sources |
+|---|---|---|---|---|---|
+| Batching | Static batching | A batch runs to completion before the next one is formed. | Structural | Not verifiable | [Crankshaw et al., NSDI 2017](https://arxiv.org/abs/1612.03079); [NVIDIA Triton docs](https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/user_guide/batcher.html); [Yu et al., OSDI 2022](https://www.usenix.org/conference/osdi22/presentation/yu) |
+| Batching | Continuous batching | Requests join and leave the batch at every engine step. | Structural | Yes: 22 scenarios | [Yu et al., OSDI 2022](https://www.usenix.org/conference/osdi22/presentation/yu); [vLLM source, scheduler.py](https://github.com/vllm-project/vllm/blob/main/vllm/v1/core/sched/scheduler.py) |
 <!-- generated:approaches:end -->
 
 Fidelity: **Exact** reproduces a published formula or rule and is tested against it. **Structural** follows the source's mechanism with our own constants, exposed as parameters. **Simplified** is a stand-in whose docstring says what is left out.

@@ -42,6 +42,7 @@ export const onDemand: AdmissionRule = {
   summary: "Allocate blocks for the tokens scheduled this step; grow as the sequence grows.",
   citations: ["kwon2023", "vllmScheduler"],
   fidelity: "structural",
+  verification: ["preemption-overflow", "queue-deadline-shedding"],
   outputReservation: (r) => r.outputTokens,
   tokensToSecure: (r) => {
     const target = r.promptTokens + r.generatedTokens;

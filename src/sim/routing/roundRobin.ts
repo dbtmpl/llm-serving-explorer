@@ -13,6 +13,7 @@ export const roundRobin: RoutingPolicy = {
   summary: "Rotate through pods regardless of load or cache.",
   citations: ["envoyLoadBalancing"],
   fidelity: "exact",
+  verification: ["routing-round-robin", "routing-prefix-vs-round-robin"],
   score: (c) => -c.load,
   pick: (scores, cursor) => ({ index: cursor % scores.length, cursor: cursor + 1 })
 };

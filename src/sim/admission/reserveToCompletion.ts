@@ -20,6 +20,7 @@ export const reserveToCompletion: AdmissionRule = {
   summary: "Reserve prompt plus max_tokens up front; admitted requests are never preempted.",
   citations: ["kwon2023", "tensorrtLlm", "yu2022"],
   fidelity: "structural",
+  verification: { notVerifiable: "vLLM does not reserve KV memory for a request's whole output at admission, and BLIS follows vLLM, so there is no counterpart to compare." },
   outputReservation: (r) => Math.max(r.outputTokens, r.maxTokensCap),
   tokensToSecure: (r) => r.promptTokens + Math.max(r.outputTokens, r.maxTokensCap),
   tokensToFit: (r) => r.promptTokens + Math.max(r.outputTokens, r.maxTokensCap),

@@ -27,6 +27,7 @@ export const speculative: DecodeStrategy = {
   summary: "A draft model proposes several tokens; the target verifies them in one pass.",
   citations: ["leviathan2023"],
   fidelity: "exact",
+  verification: ["spec-decoding", "calib-8b-h100-spec"],
   tokensThisStep: (draw, s) => {
     let n = 1;
     while (n <= s.draftTokens && draw() < s.acceptance) n++;

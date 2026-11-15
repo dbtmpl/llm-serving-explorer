@@ -17,6 +17,7 @@ export const wholePrompt: AdmissionRule = {
   summary: "Allocate blocks for the full prompt at admission; outputs grow on demand.",
   citations: ["kwon2023"],
   fidelity: "structural",
+  verification: { notVerifiable: "vLLM allocates KV memory as tokens are written and BLIS translates vLLM, so neither has a policy that reserves a whole prompt before admitting it; there is no counterpart to compare." },
   outputReservation: (r) => r.outputTokens,
   tokensToSecure: (r) => r.promptTokens + r.generatedTokens,
   tokensToFit: (r) => r.promptTokens + r.generatedTokens,
