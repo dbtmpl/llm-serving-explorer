@@ -38,6 +38,26 @@ const MAX_SNAPS = 60;
 /** Worlds with more sessions than this are not cloned: too slow and too big to keep 60 of. */
 const MAX_SNAP_SESSIONS = 2000;
 
+/**
+ * A rewound step being shown again. Instead of jumping to the world stored with it, the clock runs
+ * again from the previous step's snapshot to the time of this one, so every animation that led to
+ * the step (weights filling, tokens flying, cells appearing) plays from its start. When the world
+ * has reached that time, and the step's own condition holds, the stored snapshot is put back so the
+ * end state is exactly the one that was held the first time.
+ */
+interface Replay {
+  /** index in the history of the step being shown again */
+  to: number;
+  /** simulated time the world must reach */
+  t: number;
+  /** simulated seconds per animation second */
+  rate: number;
+  /** animation seconds spent so far; the replay ends after REPLAY_MAX_S whatever the world does */
+  spent: number;
+}
+/** Longest a replay may take, in animation seconds. */
+const REPLAY_MAX_S = 5;
+
 interface StepBook {
   queue: Callout[];
   focus: number | null;
@@ -142,7 +162,7 @@ export function LiveView() {
   const [arch, setArch] = useState(DEFAULT_ARCH);
   const [histPos, setHistPos] = useState<[number, number, boolean]>([0, 0, false]);
   const [, refresh] = useReducer((x: number) => x + 1, 0);
-  const live = useRef({ playing, speed, explain, callouts, seen: new Set<string>(), lastShown: new Map<string, number>(), nextId: 1, stepMode: false, held: null as Shown | null, focus: null as number | null, focusDone: false, script: newScript(), freeze: false, queue: [] as Callout[], tour: null as number | null, hist: [] as StepRec[], hi: -1, dirty: false });
+  const live = useRef({ playing, speed, explain, callouts, seen: new Set<string>(), lastShown: new Map<string, number>(), nextId: 1, stepMode: false, held: null as Shown | null, focus: null as number | null, focusDone: false, script: newScript(), freeze: false, queue: [] as Callout[], tour: null as number | null, hist: [] as StepRec[], hi: -1, dirty: false, replay: null as Replay | null, finish: () => {} });
   live.current.tour = tour;
   const heldEl = useRef<HTMLDivElement>(null);
   const tourEl = useRef<HTMLDivElement>(null);
@@ -267,9 +287,11 @@ export function LiveView() {
       const head = st.stepMode && !st.held ? st.queue[0] : undefined;
       const waiting = !!head?.until && !gateOpen(head, world, scene);
       const frozen = st.freeze || (waiting && !!head!.hold);
+      const replay = st.replay;
       const running = st.playing && !st.held && !frozen;
-      const animating = st.playing && (!st.held || !!st.held.animate);
+      const animating = st.playing && (!st.held || !!st.held.animate || !!replay);
       if (running) advance(world, dt * st.speed);
+      else if (replay && st.playing && world.t < replay.t) advance(world, Math.min(dt * replay.rate, replay.t - world.t));
       const events = world.events.splice(0);
       scene.focusSid = st.stepMode ? st.focus : null;
       guideScene(scene, st, cw, ch);
@@ -277,7 +299,12 @@ export function LiveView() {
       scene.draw(ctx, world, dpr);
 
       // step-through: follow one session and stop the clock at each thing that happens to it
-      if (st.stepMode) {
+      if (replay) {
+        // a step shown again: the animation leads up to a step that is already in the history
+        replay.spent += dt;
+        const shown = st.hist[replay.to]?.shown;
+        if (!st.playing || replay.spent > REPLAY_MAX_S || (world.t >= replay.t - 1e-6 && (!shown?.until || shown.until(world, scene)))) st.finish();
+      } else if (st.stepMode) {
         const queueSteps = (e: (typeof events)[number]) => {
           for (const c of stepsFor(e, world, st.script)) {
             st.queue.push({ ...c, queuedAt: { t: world.t, vt: scene.vt } });
@@ -306,7 +333,7 @@ export function LiveView() {
         const next = !st.held ? st.queue[0] : undefined;
         if (next && gateOpen(next, world, scene)) {
           st.queue.shift();
-          st.held = { ...next, id: st.nextId++, born: world.t };
+          st.held = { ...next, id: st.nextId++, born: elapsed(world) };
           pushStep(st, st.held, world, scene);
           setHeld(st.held);
           setHistPos(posOf(st));
@@ -429,6 +456,7 @@ export function LiveView() {
    */
   const touchWorld = useCallback(() => {
     const st = live.current;
+    st.finish();
     if (!st.stepMode || !st.held) return;
     if (st.hi < st.hist.length - 1) {
       st.hist.length = st.hi + 1;
@@ -465,6 +493,7 @@ export function LiveView() {
     st.script = newScript();
     st.freeze = false;
     st.hist = [];
+    st.replay = null;
     st.hi = -1;
     st.dirty = false;
     setHeld(null);
@@ -486,6 +515,7 @@ export function LiveView() {
     st.focus = st.stepMode ? f : null;
     st.callouts = [];
     st.hist = [];
+    st.replay = null;
     st.hi = -1;
     st.dirty = false;
     setCallouts([]);
@@ -495,21 +525,51 @@ export function LiveView() {
     if (st.stepMode) setPlaying(true);
   };
 
-  /** Show step `i` again: put back the world, the picture and the bookkeeping stored with it. */
+  /** Put back the world, the picture and the bookkeeping stored with a step. */
+  const restoreSnap = (snap: Snap) => {
+    const st = live.current;
+    worldRef.current = structuredClone(snap.world);
+    sceneRef.current.restore(snap.scene);
+    st.queue = [...snap.queue];
+    st.focus = snap.focus;
+    st.focusDone = snap.focusDone;
+    st.script = structuredClone(snap.script);
+    st.freeze = false;
+    setFocus(st.focus);
+  };
+  /** End a replay: the stored snapshot of the step replaces what the replay produced. */
+  live.current.finish = () => {
+    const st = live.current;
+    const r = st.replay;
+    if (!r) return;
+    st.replay = null;
+    const snap = st.hist[r.to]?.snap;
+    if (snap) restoreSnap(snap);
+    refresh();
+  };
+  /**
+   * Show step `i` again. With the previous step's snapshot at hand the animation of the step plays
+   * again from its start (see Replay); otherwise, or when paused, the stored snapshot is put back.
+   */
   const showStep = (i: number) => {
     const st = live.current;
+    st.replay = null;
     const rec = st.hist[i]!;
+    const from = i > 0 ? st.hist[i - 1]!.snap : null;
     st.hi = i;
-    if (rec.snap) {
-      worldRef.current = structuredClone(rec.snap.world);
-      sceneRef.current.restore(rec.snap.scene);
+    if (rec.snap && from && st.playing && rec.snap.world.t > from.world.t) {
+      restoreSnap(from);
+      // the forced eviction happens when Next is pressed on the step that announces it
+      const evict = st.hist[i - 1]!.shown.evict;
+      if (evict) evictIdleNow(worldRef.current, evict.sid, evict.podId);
+      // the stored snapshot supplies what the step-through itself knows once the replay ends
       st.queue = [...rec.snap.queue];
       st.focus = rec.snap.focus;
       st.focusDone = rec.snap.focusDone;
       st.script = structuredClone(rec.snap.script);
-      st.freeze = false;
-      setFocus(st.focus);
-    }
+      const span = rec.snap.world.t - from.world.t;
+      st.replay = { to: i, t: rec.snap.world.t, rate: Math.max(st.speed, span / (REPLAY_MAX_S - 1)), spent: 0 };
+    } else if (rec.snap) restoreSnap(rec.snap);
     st.held = rec.shown;
     setHeld(st.held);
     setHistPos(posOf(st));
@@ -527,6 +587,7 @@ export function LiveView() {
   // exactly the situation of that step. Next from the latest step runs the clock to the next event.
   const nextStep = () => {
     const st = live.current;
+    st.finish();
     if (st.hi < st.hist.length - 1) {
       showStep(st.hi + 1);
       return;
@@ -543,7 +604,7 @@ export function LiveView() {
     // a step that waits for the picture is held by the frame loop once it is ready
     const head = st.queue[0];
     const next = head && gateOpen(head, worldRef.current, sceneRef.current) ? st.queue.shift() : undefined;
-    st.held = next ? { ...next, id: st.nextId++, born: worldRef.current.t } : null;
+    st.held = next ? { ...next, id: st.nextId++, born: elapsed(worldRef.current) } : null;
     if (st.held) pushStep(st, st.held, worldRef.current, sceneRef.current);
     else if (st.focusDone && !head && !st.freeze) {
       st.focus = null;
@@ -556,6 +617,7 @@ export function LiveView() {
   };
   const prevStep = () => {
     const st = live.current;
+    st.finish();
     if (st.hi <= 0) return;
     refreshLatest();
     showStep(st.hi - 1);
@@ -688,25 +750,23 @@ export function LiveView() {
 
       {held && (
         <div className={`lv-callout lv-step tone-${held.tone}`} ref={heldEl} data-testid="step-box">
+          <div className="lv-step-scroll" data-testid="step-scroll">
           {held.at && (
-            <strong className="lv-step-at" data-testid="step-at">
-              <Rich inline text={held.at} />
-            </strong>
-          )}
-          <em data-testid="step-where">
-            {panelFields("step.header", { text: [focus !== null ? "text-session" : "text-fleet", histPos[2] && "no-rewind"] }, { n: histPos[0] + 1, total: histPos[1], time: held.born.toFixed(2), ...(focus !== null ? { sid: focus } : {}) }).text}
-          </em>
-          <b>
-            <Rich inline text={held.title} />
-          </b>
-          <span>
-            <Rich inline text={held.body} />
-          </span>
-          {held.detail && (
-            <span>
-              <Rich inline text={held.detail} />
-            </span>
-          )}
+              <strong className="lv-step-at" data-testid="step-at">
+                <Rich inline text={held.at} />
+              </strong>
+            )}
+            <em data-testid="step-where">
+              {panelFields("step.header", { text: [focus !== null ? "text-session" : "text-fleet", histPos[2] && "no-rewind"] }, { n: histPos[0] + 1, total: histPos[1], time: held.born.toFixed(2), ...(focus !== null ? { sid: focus } : {}) }).text}
+            </em>
+            <b>
+              <Rich inline text={held.title} />
+            </b>
+            <div className="lv-step-text">
+              <Rich text={held.body} />
+              {held.detail && <Rich text={held.detail} />}
+            </div>
+          </div>
           <div className="lv-step-actions">
             <button className="lv-ghost" onClick={toggleStep}>
               exit

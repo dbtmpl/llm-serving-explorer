@@ -3,13 +3,16 @@ import { expect, test, type Page } from "@playwright/test";
 interface LiveHandle {
   world: () => {
     t: number;
-    pods: { state: string; usedBlocks: number; dramBlocks: number; ssdBlocks: number }[];
+    startedAt: number | null;
+    pods: { state: string; loadProgress: number; usedBlocks: number; dramBlocks: number; ssdBlocks: number }[];
     sessions: Map<number, unknown>;
     reqs: Map<number, unknown>;
     params: { maxNumSeqs: number };
     m: { completed: number; evictions: number; drops: number; tokensOut: number };
   };
 }
+/** [seconds since the first request, tokens out, completed, requests in flight]: what a step's world is compared by. */
+const snapshotOf = (page: Page) => world(page, (w) => [w.t - (w.startedAt ?? w.t), w.m.tokensOut, w.m.completed, w.reqs.size]);
 const world = <T>(page: Page, fn: (w: ReturnType<LiveHandle["world"]>) => T) => page.evaluate(`(${fn.toString()})(window.__live.world())`) as Promise<T>;
 
 interface LiveWin {
@@ -136,7 +139,7 @@ test.describe("live graph view", () => {
     for (let i = 0; i < 24; i++) {
       await expect(box).toBeVisible({ timeout: 20_000 });
       seen.push((await box.locator("b").innerText()).trim());
-      steps.push(await world(page, (w) => [w.t, w.m.tokensOut, w.m.completed, w.reqs.size]));
+      steps.push(await snapshotOf(page));
       if (seen.at(-1) === "The user has the whole reply") break;
       await page.getByTestId("step-next").click();
       await page.waitForTimeout(150);
@@ -147,22 +150,56 @@ test.describe("live graph view", () => {
     expect(seen.at(-1)).toBe("The user has the whole reply");
     // every step says where in the system it happens
     await expect(page.getByTestId("step-at")).toBeVisible();
-    // Back rewinds the graph: the clock and the world are those of the earlier step. Next returns.
+    // Back rewinds the graph: the clock and the world are those of the earlier step (after the
+    // animation that leads up to it has played again). Next returns.
     const at = (i: number) => steps[i]!;
     await page.getByTestId("step-back").click();
     await page.getByTestId("step-back").click();
     await expect(box.locator("b")).toHaveText(seen.at(-3)!);
     await expect(page.getByTestId("step-where")).toContainText(`Step ${seen.length - 2} of ${seen.length}`);
-    expect(await world(page, (w) => [w.t, w.m.tokensOut, w.m.completed, w.reqs.size])).toEqual(at(seen.length - 3));
+    await expect.poll(() => snapshotOf(page), { timeout: 10_000 }).toEqual(at(seen.length - 3));
     await expect(page.getByTestId("step-where")).toContainText(`${at(seen.length - 3)[0]!.toFixed(2)} s`);
     // the clock stays stopped while a rewound step is showing
     await page.waitForTimeout(300);
-    expect(await world(page, (w) => w.t)).toBe(at(seen.length - 3)[0]);
+    expect(await snapshotOf(page)).toEqual(at(seen.length - 3));
     await page.getByTestId("step-next").click();
-    expect(await world(page, (w) => [w.t, w.m.tokensOut, w.m.completed, w.reqs.size])).toEqual(at(seen.length - 2));
+    await expect.poll(() => snapshotOf(page), { timeout: 10_000 }).toEqual(at(seen.length - 2));
     await page.getByTestId("step-next").click();
     await expect(box.locator("b")).toHaveText("The user has the whole reply");
-    expect(await world(page, (w) => [w.t, w.m.tokensOut, w.m.completed, w.reqs.size])).toEqual(at(seen.length - 1));
+    await expect.poll(() => snapshotOf(page), { timeout: 10_000 }).toEqual(at(seen.length - 1));
+  });
+
+  test("Next to a step already seen plays the animation that leads to it again: the weights fill anew", async ({ page }) => {
+    await page.goto("/");
+    await page.getByTestId("step-toggle").click();
+    await page.getByTestId("send-10").click();
+    await page.getByTestId("speed-1").click();
+    const box = page.getByTestId("step-box");
+    // Next until the walkthrough reaches the pod's weights
+    for (let i = 0; i < 12 && (await box.locator("b").innerText()) !== "Weights load into GPU memory"; i++) {
+      await page.getByTestId("step-next").click();
+      await page.waitForTimeout(200);
+    }
+    await expect(box.locator("b")).toHaveText("Weights load into GPU memory", { timeout: 20_000 });
+    const loading = await world(page, (w) => (w.pods[0]?.loadProgress ?? 0));
+    expect(loading).toBeLessThan(0.5);
+    await page.getByTestId("step-next").click();
+    await expect(box.locator("b")).toHaveText("GPU memory is split in four; the KV pool is what remains", { timeout: 20_000 });
+    expect(await world(page, (w) => (w.pods[0]?.loadProgress ?? 0))).toBe(1);
+    await page.getByTestId("step-back").click();
+    await expect(box.locator("b")).toHaveText("Weights load into GPU memory");
+    // Back plays the lead-up to the loading step, which starts with no pod bar filled
+    await expect.poll(() => world(page, (w) => (w.pods[0]?.loadProgress ?? 0)), { timeout: 10_000 }).toBeLessThan(0.5);
+    await page.getByTestId("step-next").click();
+    await expect(box.locator("b")).toHaveText("GPU memory is split in four; the KV pool is what remains");
+    // right after Next the bar is being filled again; it ends full
+    const samples: number[] = [];
+    for (let i = 0; i < 40; i++) {
+      samples.push(await world(page, (w) => (w.pods[0]?.state === "ready" ? 1 : (w.pods[0]?.loadProgress ?? 0))));
+      await page.waitForTimeout(100);
+    }
+    expect(samples.some((v) => v > 0.02 && v < 0.98), `samples ${samples.join(",")}`).toBe(true);
+    expect(samples.at(-1)).toBe(1);
   });
 
   /** Follow one request to the end of the walkthrough, returning every step title. */
