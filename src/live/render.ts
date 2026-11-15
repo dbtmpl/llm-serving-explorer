@@ -50,11 +50,38 @@ export type Target =
   | { type: "store" }
   | { type: "remote" }
   | { type: "stream" }
-  | { type: "pod"; id: number; part: "engine" | "gpu" | "roofline" | "tiers" };
+  | { type: "pod"; id: number; part: "engine" | "gpu" | "roofline" | "tiers" | "all" };
 
 interface P {
   x: number;
   y: number;
+}
+export interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+/** A screen-space rectangle given by its edges, in CSS pixels. */
+export interface Free {
+  l: number;
+  t: number;
+  r: number;
+  b: number;
+}
+/** Colour of the highlight for each tone of a callout. */
+export const TONE: Record<"info" | "prefill" | "decode" | "dram" | "ssd" | "remote" | "evict", string> = { info: C.decode, prefill: C.prefill, decode: C.decode, dram: C.dram, ssd: C.ssd, remote: C.remote, evict: C.evict };
+
+/** How much of the free area's limiting dimension a framed component fills, and the largest zoom used for it. */
+const FRAME_FILL = 0.7;
+const FRAME_MAX_SCALE = 1.8;
+const FRAME_MIN_SCALE = 0.15;
+
+/** A target with an id of -1 means "any": the first session, the first ready pod. */
+export function resolveTarget(w: World, t: Target): Target {
+  if (t.type === "session" && t.id < 0) return { type: "session", id: (w.sessions.keys().next().value as number | undefined) ?? 0 };
+  if (t.type === "pod" && t.id < 0) return { ...t, id: (w.pods.find((x) => x.state === "ready") ?? w.pods[0])?.id ?? 0 };
+  return t;
 }
 interface Particle {
   pts: P[];
@@ -63,6 +90,8 @@ interface Particle {
   color: string;
   size: number;
   fade?: boolean;
+  /** an output token on its way to this session: step-through waits for these before saying the reply has arrived */
+  reply?: number;
 }
 
 const TOK = { x: 70, y: -70, w: 230, h: 140 };
@@ -128,8 +157,19 @@ export class Scene {
   auto = true;
   /** screen-space boxes of the floating panels (top-left and top-right), so the graph can avoid them */
   panels = { lw: 300, lh: 200, rw: 316, rh: 300, bottom: 96 };
-  /** extra room kept free above the graph (the tutorial card sits there) */
-  topPad = 0;
+  /** extra room kept free by the auto-fit, in screen pixels (where a docked card sits) */
+  reserve: Free = { l: 0, t: 0, r: 0, b: 0 };
+  /** a guided step asks the camera to frame this target inside `free` (screen pixels); see setGuide */
+  guide: { target: Target; free: Free; key: string } | null = null;
+  /** the visitor moved the camera by hand during the current step, so framing is paused until the next one */
+  manual = false;
+  /** a guided step asks for this target to be outlined and the rest dimmed */
+  highlight: { target: Target; tone: string } | null = null;
+  /** the highlight as drawn: the resolved target and its (eased) world rectangle; tests read it */
+  lit: { target: Target; rect: Rect; tone: string; a: number } | null = null;
+  /** wall-clock seconds, for the pulse of the highlight (vt stops when the clock does) */
+  rt = 0;
+  private guideKey = "";
   vt = 0;
   selected: Target | null = null;
   private w = 1;
@@ -207,6 +247,116 @@ export class Scene {
     const g = podGeom(pod.spec.tp);
     const dy = t.part === "tiers" ? g.tiersY + 20 : t.part === "roofline" ? g.gaugeY + 17 : t.part === "gpu" ? g.gpus[0]!.y + g.gpus[0]!.h / 2 : g.lanesY + 28;
     return { x: top.x - (t.part === "gpu" ? 0 : PW / 2 - 30), y: top.y + dy };
+  }
+
+  /**
+   * World-space rectangle of a target (null while it is not on the graph yet). For a pod with a
+   * `part` it is that part: the slot lanes, the GPU boxes with the KV grid, the roofline strip and
+   * gauge, or the DRAM and SSD bars. Used to frame and highlight what a step is about.
+   */
+  rectOf(w: World, target: Target): Rect | null {
+    const t = resolveTarget(w, target);
+    switch (t.type) {
+      case "tokenizer":
+        return this.reveal.tokA > 0.05 ? { ...TOK } : null;
+      case "gateway":
+        return this.reveal.gwA > 0.05 ? { ...GW } : null;
+      case "store":
+        return this.storeA > 0.05 ? { ...STORE } : null;
+      case "remote":
+        return this.remote.a > 0.05 ? { x: this.remote.x, y: this.remote.y, w: PW, h: REMOTE_H } : null;
+      case "session": {
+        const p = this.sessPos.get(t.id);
+        if (!p) return null;
+        if (this.cardMode) return { x: p.x - 170, y: p.y - 17, w: 170, h: 34 };
+        const r = this.dotR + 4;
+        return { x: p.x - r, y: p.y - r, w: 2 * r, h: 2 * r };
+      }
+      case "stream": {
+        // output tokens leave the pods, pass under the router and fan back out to the sessions
+        if (this.reveal.gwA <= 0.05) return null;
+        const mid = { x: GW.x + GW.w / 2, y: GW.y + GW.h + 6 };
+        const pts: P[] = [mid, { x: mid.x, y: mid.y + 60 }];
+        for (const p of this.sessPos.values()) {
+          pts.push({ x: p.x + (this.cardMode ? 0 : this.dotR + 3), y: p.y });
+          break;
+        }
+        let n = 0;
+        for (const pod of w.pods) {
+          const r = this.podRect(pod);
+          if (r && pod.state === "ready" && n++ < 2) pts.push({ x: r.x, y: r.y + 70 });
+        }
+        const x0 = Math.min(...pts.map((q) => q.x)) - 30;
+        const x1 = Math.max(...pts.map((q) => q.x)) + 30;
+        const y0 = Math.min(...pts.map((q) => q.y)) - 30;
+        const y1 = Math.max(...pts.map((q) => q.y)) + 30;
+        return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+      }
+      case "pod": {
+        const pod = w.pods.find((x) => x.id === t.id);
+        const r = pod && this.podRect(pod);
+        if (!pod || !r) return null;
+        const g = podGeom(pod.spec.tp);
+        const part = (y0: number, y1: number): Rect => ({ x: r.x + 8, y: r.y + y0, w: PW - 16, h: y1 - y0 });
+        if (t.part === "engine") return part(g.lanesY - 7, g.lanesY + 50);
+        if (t.part === "gpu") return part(g.gpus[0]!.y - 6, g.stripY - 8);
+        if (t.part === "roofline") return part(g.stripY - 8, g.tiersY - 2);
+        if (t.part === "tiers") return part(g.tiersY - 1, g.tiersY + 42);
+        return r;
+      }
+    }
+  }
+
+  /**
+   * Ask the camera to frame `g.target` in the free screen area `g.free` until `g` is null. `key`
+   * names the step: a new key re-arms framing (and the auto-fit) after the visitor moved the camera
+   * by hand. Ending a guided stretch returns to the auto-fit.
+   */
+  setGuide(g: { target: Target; free: Free; key: string } | null): void {
+    if (!g) {
+      if (this.guide) {
+        this.auto = true;
+        this.manual = false;
+      }
+      this.guide = null;
+      this.guideKey = "";
+      return;
+    }
+    if (g.key !== this.guideKey) {
+      this.guideKey = g.key;
+      this.manual = false;
+      this.auto = true;
+    }
+    this.guide = g;
+  }
+
+  /** Whether output tokens of this session are still on their way (to the router or on to the session). */
+  repliesInFlight(sid: number): boolean {
+    return this.parts.some((p) => p.reply === sid && this.vt < p.t0 + p.dur);
+  }
+
+  /** The visitor panned or zoomed: stop framing and auto-fit until the next step. */
+  takeOver(): void {
+    this.auto = false;
+    this.manual = true;
+  }
+
+  /** The "fit" button: back to the auto-fit even in the middle of a guided step. */
+  fitNow(): void {
+    this.auto = true;
+    this.manual = true;
+  }
+
+  /** Everything the picture depends on besides the World, so a rewound step looks as it did. */
+  snapshot() {
+    return structuredClone({ cam: this.cam, vt: this.vt, podPos: this.podPos, sessPos: this.sessPos, cellA: this.cellA, parts: this.parts, reveal: this.reveal, lastTok: this.lastTok, cardMode: this.cardMode, flashes: this.flashes, dotR: this.dotR, remote: this.remote, storeA: this.storeA });
+  }
+
+  /** Put the animation state back. The camera is kept as it is unless `camera` is true (it then eases to the step's framing). */
+  restore(snap: ReturnType<Scene["snapshot"]>, camera = false): void {
+    const { cam, ...rest } = structuredClone(snap);
+    Object.assign(this, rest);
+    if (camera) this.cam = cam;
   }
 
   hit(w: World, sx: number, sy: number): Target | null {
@@ -298,6 +448,23 @@ export class Scene {
     }
   }
 
+  /** Ease the camera so the guided target sits centred in the free area. False if there is nothing to frame. */
+  private frame(w: World, k: number): boolean {
+    const g = this.guide;
+    if (!g || this.manual) return false;
+    const r = this.rectOf(w, g.target);
+    if (!r) return false;
+    const fw = Math.max(80, g.free.r - g.free.l);
+    const fh = Math.max(80, g.free.b - g.free.t);
+    const s = clamp(Math.min((FRAME_FILL * fw) / r.w, (FRAME_FILL * fh) / r.h), FRAME_MIN_SCALE, FRAME_MAX_SCALE);
+    const cx = r.x + r.w / 2 - ((g.free.l + g.free.r) / 2 - this.w / 2) / s;
+    const cy = r.y + r.h / 2 - ((g.free.t + g.free.b) / 2 - this.h / 2) / s;
+    this.cam.s += (s - this.cam.s) * k;
+    this.cam.x += (cx - this.cam.x) * k;
+    this.cam.y += (cy - this.cam.y) * k;
+    return true;
+  }
+
   private fit(w: World, k: number): void {
     if (!this.auto) return;
     let x0 = Infinity;
@@ -322,9 +489,10 @@ export class Scene {
     if (x0 === Infinity) add(-120, -80, 400, 160);
     // two ways to avoid the corner panels: sit between them, or sit below them; take the larger
     const pn = this.panels;
+    const rs = this.reserve;
     const options = [
-      { l: pn.lw + 24, r: pn.rw + 24, t: 84 + this.topPad, b: pn.bottom },
-      { l: 24, r: 24, t: Math.max(84, pn.lh + 20, pn.rh + 20) + this.topPad, b: pn.bottom }
+      { l: pn.lw + 24 + rs.l, r: pn.rw + 24 + rs.r, t: 84 + rs.t, b: pn.bottom + rs.b },
+      { l: 24 + rs.l, r: 24 + rs.r, t: Math.max(84, pn.lh + 20, pn.rh + 20) + rs.t, b: pn.bottom + rs.b }
     ];
     const scaleOf = (o: (typeof options)[number]) => Math.min(Math.max(120, this.w - o.l - o.r) / (x1 - x0 + 60), Math.max(120, this.h - o.t - o.b) / (y1 - y0 + 60));
     const i = scaleOf(options[0]!) >= scaleOf(options[1]!) ? options[0]! : options[1]!;
@@ -337,11 +505,11 @@ export class Scene {
     this.cam.y += (cy - this.cam.y) * kk;
   }
 
-  private spawn(a: P, b: P, color: string, o: { dur?: number; size?: number; bend?: number; delay?: number; fade?: boolean } = {}): void {
+  private spawn(a: P, b: P, color: string, o: { dur?: number; size?: number; bend?: number; delay?: number; fade?: boolean; reply?: number } = {}): void {
     if (this.parts.length > 900) return;
     const pts: P[] = [];
     for (let i = 0; i <= 12; i++) pts.push(bez(a, b, i / 12, o.bend ?? 0));
-    this.parts.push({ pts, t0: this.vt + (o.delay ?? 0), dur: o.dur ?? 1, color, size: o.size ?? 4, fade: o.fade });
+    this.parts.push({ pts, t0: this.vt + (o.delay ?? 0), dur: o.dur ?? 1, color, size: o.size ?? 4, fade: o.fade, reply: o.reply });
   }
 
   private consume(w: World, events: SimEvent[]): void {
@@ -358,8 +526,8 @@ export class Scene {
           const sid = sids[i]!;
           const from = { x: r.x, y: r.y + 70 };
           const mid = { x: GW.x + GW.w / 2, y: GW.y + GW.h + 6 };
-          this.spawn(from, mid, C.decode, { dur: 0.7, size: 3.5, bend: 30, delay: i * 0.02 });
-          if (this.sessPos.has(sid)) this.spawn(mid, this.sessAnchor(sid), C.decode, { dur: 1.0, size: 3.5, bend: 110, delay: 0.7 + i * 0.02 });
+          this.spawn(from, mid, C.decode, { dur: 0.7, size: 3.5, bend: 30, delay: i * 0.02, reply: sid });
+          if (this.sessPos.has(sid)) this.spawn(mid, this.sessAnchor(sid), C.decode, { dur: 1.0, size: 3.5, bend: 110, delay: 0.7 + i * 0.02, reply: sid });
         }
       } else if ((e.kind === "kv.move" || e.kind === "kv.drop" || e.kind === "req.preempted") && pod && r) {
         const cells = (e.cells as number[]) ?? [];
@@ -400,7 +568,9 @@ export class Scene {
     const k = 1 - Math.exp(-dtWall * 7);
     this.layout(w, k);
     this.consume(w, events);
-    this.fit(w, 1 - Math.exp(-dtWall * 4));
+    if (!this.frame(w, 1 - Math.exp(-dtWall * 5))) this.fit(w, 1 - Math.exp(-dtWall * 4));
+    this.rt += dtWall;
+    this.updateLit(w, k);
     const up = (cur: number, on: boolean) => cur + ((on ? 1 : 0) - cur) * k;
     this.reveal.tokA = up(this.reveal.tokA, w.seen.tokenizer);
     this.reveal.gwA = up(this.reveal.gwA, w.seen.gateway);
@@ -416,6 +586,55 @@ export class Scene {
     if (!w.sessions.size && !w.pods.length) this.reveal = { tok: 0, gw: 0, tokA: 0, gwA: 0 };
     this.parts = this.parts.filter((p) => this.vt < p.t0 + p.dur);
     this.flashes = this.flashes.filter((f) => this.vt < f.t0 + 1.2);
+  }
+
+  private updateLit(w: World, k: number): void {
+    const h = this.highlight;
+    const t = h && resolveTarget(w, h.target);
+    const r = t && this.rectOf(w, t);
+    if (!h || !t || !r) {
+      this.lit = null;
+      return;
+    }
+    const l = this.lit;
+    if (!l) this.lit = { target: t, rect: { ...r }, tone: h.tone, a: 0 };
+    else {
+      const e = Math.min(1, k * 1.5);
+      l.target = t;
+      l.tone = h.tone;
+      l.a += (1 - l.a) * e;
+      for (const key of ["x", "y", "w", "h"] as const) l.rect[key] += (r[key] - l.rect[key]) * e;
+    }
+  }
+
+  /** Dim everything but the highlighted rectangle and outline it with a pulsing glow. */
+  private drawLit(ctx: CanvasRenderingContext2D, dpr: number): void {
+    const l = this.lit;
+    if (!l) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const s = this.cam.s;
+    const o = this.toScreen(l.rect);
+    const pad = 7;
+    const bw = Math.max(l.rect.w * s, 40) + 2 * pad;
+    const bh = Math.max(l.rect.h * s, 40) + 2 * pad;
+    const x = o.x + (l.rect.w * s) / 2 - bw / 2;
+    const y = o.y + (l.rect.h * s) / 2 - bh / 2;
+    ctx.fillStyle = `rgba(248,250,252,${0.5 * l.a})`;
+    ctx.beginPath();
+    ctx.rect(0, 0, this.w, this.h);
+    ctx.roundRect(x, y, bw, bh, 14);
+    ctx.fill("evenodd");
+    const pulse = 0.5 + 0.5 * Math.sin(this.rt * 3.4);
+    ctx.save();
+    ctx.globalAlpha = l.a;
+    ctx.shadowColor = l.tone;
+    ctx.shadowBlur = 8 + 16 * pulse;
+    ctx.strokeStyle = l.tone;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.roundRect(x, y, bw, bh, 14);
+    ctx.stroke();
+    ctx.restore();
   }
 
   /* ---------------------------------------------------------------- draw */
@@ -439,6 +658,7 @@ export class Scene {
     this.transit(ctx, w, lod);
     this.particles(ctx);
     ctx.globalAlpha = 1;
+    this.drawLit(ctx, dpr);
   }
 
   private grid(ctx: CanvasRenderingContext2D): void {
