@@ -1,6 +1,6 @@
 /** "Dive in" panel: the selected component explained with its live numbers. */
 import type { ReactNode } from "react";
-import { BLOCK_TOKENS, attnFlops, decodeCurve, flopsPerToken, kvBytesPerToken, livePods, maxBatch, recomputeRatio, replicaSpec, ridge, seqLoad, tierBw, tierCapBlocks, weightBytes, type Pod, type World } from "../sim/index.js";
+import { BLOCK_TOKENS, SCORER_WEIGHTS, attnFlops, decodeCurve, flopsPerToken, kvBytesPerToken, livePods, maxBatch, recomputeRatio, replicaSpec, ridge, seqLoad, tierBw, tierCapBlocks, weightBytes, type Pod, type World } from "../sim/index.js";
 import { inspectorText } from "../content/index.js";
 import { fmtGB, fmtInt, fmtMs } from "./format.js";
 import { Rich } from "./Rich.js";
@@ -13,6 +13,9 @@ const Row = ({ k, v }: { k: ReactNode; v: ReactNode }) => (
   </div>
 );
 /** A note from src/content/inspector.md: `id` of the entry, `values` for its placeholders, `extra` optional fields. */
+/** The weights of the routing score, for the formula in the router note. */
+const scoreWeights = { wCache: SCORER_WEIGHTS.prefixCache, wKv: SCORER_WEIGHTS.kvUtilisation, wQueue: SCORER_WEIGHTS.queue };
+
 const Note = ({ id, values, extra }: { id: string; values?: Record<string, string | number>; extra?: readonly string[] }) => <Rich text={inspectorText(id, values, extra)} className="lv-note" />;
 const sci = (x: number) => (x >= 1e15 ? `${(x / 1e15).toFixed(2)} PFLOP` : x >= 1e12 ? `${(x / 1e12).toFixed(1)} TFLOP` : `${(x / 1e9).toFixed(1)} GFLOP`);
 
@@ -248,7 +251,7 @@ function GatewayView({ w }: { w: World }) {
           </tbody>
         </table>
       )}
-      <Note id="gateway.note" />
+      <Note id="gateway.note" values={scoreWeights} />
     </>
   );
 }

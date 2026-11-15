@@ -3,13 +3,16 @@ import { expect, test, type Page } from "@playwright/test";
 interface LiveHandle {
   world: () => {
     t: number;
-    pods: { state: string; usedBlocks: number; dramBlocks: number; ssdBlocks: number }[];
+    startedAt: number | null;
+    pods: { state: string; loadProgress: number; usedBlocks: number; dramBlocks: number; ssdBlocks: number }[];
     sessions: Map<number, unknown>;
     reqs: Map<number, unknown>;
     params: { maxNumSeqs: number };
     m: { completed: number; evictions: number; drops: number; tokensOut: number };
   };
 }
+/** [seconds since the first request, tokens out, completed, requests in flight]: what a step's world is compared by. */
+const snapshotOf = (page: Page) => world(page, (w) => [w.t - (w.startedAt ?? w.t), w.m.tokensOut, w.m.completed, w.reqs.size]);
 const world = <T>(page: Page, fn: (w: ReturnType<LiveHandle["world"]>) => T) => page.evaluate(`(${fn.toString()})(window.__live.world())`) as Promise<T>;
 
 interface LiveWin {
@@ -136,7 +139,7 @@ test.describe("live graph view", () => {
     for (let i = 0; i < 24; i++) {
       await expect(box).toBeVisible({ timeout: 20_000 });
       seen.push((await box.locator("b").innerText()).trim());
-      steps.push(await world(page, (w) => [w.t, w.m.tokensOut, w.m.completed, w.reqs.size]));
+      steps.push(await snapshotOf(page));
       if (seen.at(-1) === "The user has the whole reply") break;
       await page.getByTestId("step-next").click();
       await page.waitForTimeout(150);
@@ -147,22 +150,147 @@ test.describe("live graph view", () => {
     expect(seen.at(-1)).toBe("The user has the whole reply");
     // every step says where in the system it happens
     await expect(page.getByTestId("step-at")).toBeVisible();
-    // Back rewinds the graph: the clock and the world are those of the earlier step. Next returns.
+    // Back rewinds the graph: the clock and the world are those of the earlier step (after the
+    // animation that leads up to it has played again). Next returns.
     const at = (i: number) => steps[i]!;
     await page.getByTestId("step-back").click();
     await page.getByTestId("step-back").click();
     await expect(box.locator("b")).toHaveText(seen.at(-3)!);
     await expect(page.getByTestId("step-where")).toContainText(`Step ${seen.length - 2} of ${seen.length}`);
-    expect(await world(page, (w) => [w.t, w.m.tokensOut, w.m.completed, w.reqs.size])).toEqual(at(seen.length - 3));
+    await expect.poll(() => snapshotOf(page), { timeout: 10_000 }).toEqual(at(seen.length - 3));
     await expect(page.getByTestId("step-where")).toContainText(`${at(seen.length - 3)[0]!.toFixed(2)} s`);
     // the clock stays stopped while a rewound step is showing
     await page.waitForTimeout(300);
-    expect(await world(page, (w) => w.t)).toBe(at(seen.length - 3)[0]);
+    expect(await snapshotOf(page)).toEqual(at(seen.length - 3));
     await page.getByTestId("step-next").click();
-    expect(await world(page, (w) => [w.t, w.m.tokensOut, w.m.completed, w.reqs.size])).toEqual(at(seen.length - 2));
+    await expect.poll(() => snapshotOf(page), { timeout: 10_000 }).toEqual(at(seen.length - 2));
     await page.getByTestId("step-next").click();
     await expect(box.locator("b")).toHaveText("The user has the whole reply");
-    expect(await world(page, (w) => [w.t, w.m.tokensOut, w.m.completed, w.reqs.size])).toEqual(at(seen.length - 1));
+    await expect.poll(() => snapshotOf(page), { timeout: 10_000 }).toEqual(at(seen.length - 1));
+  });
+
+  test("Next to a step already seen plays the animation that leads to it again: the weights fill anew", async ({ page }) => {
+    await page.goto("/");
+    await page.getByTestId("step-toggle").click();
+    await page.getByTestId("send-10").click();
+    await page.getByTestId("speed-1").click();
+    const box = page.getByTestId("step-box");
+    // Next until the walkthrough reaches the pod's weights
+    for (let i = 0; i < 12 && (await box.locator("b").innerText()) !== "Weights load into GPU memory"; i++) {
+      await page.getByTestId("step-next").click();
+      await page.waitForTimeout(200);
+    }
+    await expect(box.locator("b")).toHaveText("Weights load into GPU memory", { timeout: 20_000 });
+    const loading = await world(page, (w) => (w.pods[0]?.loadProgress ?? 0));
+    expect(loading).toBeLessThan(0.5);
+    await page.getByTestId("step-next").click();
+    await expect(box.locator("b")).toHaveText("GPU memory is split in four; the KV pool is what remains", { timeout: 20_000 });
+    expect(await world(page, (w) => (w.pods[0]?.loadProgress ?? 0))).toBe(1);
+    await page.getByTestId("step-back").click();
+    await expect(box.locator("b")).toHaveText("Weights load into GPU memory");
+    // Back plays the lead-up to the loading step, which starts with no pod bar filled
+    await expect.poll(() => world(page, (w) => (w.pods[0]?.loadProgress ?? 0)), { timeout: 10_000 }).toBeLessThan(0.5);
+    await page.getByTestId("step-next").click();
+    await expect(box.locator("b")).toHaveText("GPU memory is split in four; the KV pool is what remains");
+    // right after Next the bar is being filled again; it ends full
+    const samples: number[] = [];
+    for (let i = 0; i < 40; i++) {
+      samples.push(await world(page, (w) => (w.pods[0]?.state === "ready" ? 1 : (w.pods[0]?.loadProgress ?? 0))));
+      await page.waitForTimeout(100);
+    }
+    expect(samples.some((v) => v > 0.02 && v < 0.98), `samples ${samples.join(",")}`).toBe(true);
+    expect(samples.at(-1)).toBe(1);
+  });
+
+  test("hovering a part of a pod's GPU memory box names it, gives its size and explains it; clicking still selects the pod", async ({ page }) => {
+    await page.goto("/");
+    await page.getByTestId("send-10").click();
+    await page.getByTestId("speed-1").click();
+    await expect.poll(() => world(page, (w) => w.pods.some((p) => p.state === "ready")), { timeout: 30_000 }).toBe(true);
+    await page.getByTestId("toggle-panels").click();
+    await page.waitForTimeout(1500);
+    const expected: [string, RegExp][] = [
+      ["weights", /Weights/],
+      ["work", /Activations and CUDA graphs/],
+      ["kv", /KV pool/],
+      ["headroom", /Headroom/]
+    ];
+    for (const [part, name] of expected) {
+      const at = await page.evaluate((part) => {
+        const l = (window as unknown as { __live: { world: () => { pods: { id: number; state: string }[] }; scene: { segmentCenter: (w: unknown, id: number, part: string) => { x: number; y: number } | null } } }).__live;
+        const w = l.world();
+        return l.scene.segmentCenter(w, w.pods.find((p) => p.state === "ready")!.id, part);
+      }, part);
+      await page.mouse.move(at!.x, at!.y);
+      const tip = page.getByTestId("gpu-tip");
+      await expect(tip).toContainText(name);
+      await expect(tip).toContainText(/\d+(\.\d+)? (GB|MB)/);
+      expect((await tip.innerText()).length).toBeGreaterThan(60);
+    }
+    await page.mouse.move(2, 2);
+    await expect(page.getByTestId("gpu-tip")).toHaveCount(0);
+    // a click on a segment still selects the pod
+    const at = await page.evaluate(() => {
+      const l = (window as unknown as { __live: { world: () => { pods: { id: number; state: string }[] }; scene: { segmentCenter: (w: unknown, id: number, part: string) => { x: number; y: number } | null } } }).__live;
+      const w = l.world();
+      return l.scene.segmentCenter(w, w.pods.find((p) => p.state === "ready")!.id, "kv");
+    });
+    await page.mouse.click(at!.x, at!.y);
+    await page.getByTestId("toggle-panels").click();
+    await expect(page.getByTestId("inspector")).toContainText("pod-");
+  });
+
+  test("each step of the step-through has a Dive deeper section whose items open in the box without pushing Back and Next away", async ({ page }) => {
+    await page.goto("/");
+    await page.getByTestId("step-toggle").click();
+    await page.getByTestId("send-10").click();
+    await page.getByTestId("speed-1").click();
+    const box = page.getByTestId("step-box");
+    await expect(box).toContainText("A user sends a message");
+    const items = page.getByTestId("dive-item");
+    await expect(page.getByTestId("dive").locator("h4")).toHaveText("Dive deeper");
+    expect(await items.count()).toBeGreaterThanOrEqual(2);
+    // closed by default
+    expect(await items.evaluateAll((els) => els.some((e) => (e as HTMLDetailsElement).open))).toBe(false);
+    await items.first().locator("summary").click();
+    await expect(items.first()).toHaveJSProperty("open", true);
+    await expect(items.first().locator(".lv-dive-body")).toBeVisible();
+    // the buttons stay on screen and the box stays inside the window
+    // the box is docked again on the next frame after its height changes, so poll
+    const inside = () =>
+      expect
+        .poll(async () => {
+          const vp = page.viewportSize()!;
+          const rects = await Promise.all([page.getByTestId("step-next").boundingBox(), page.getByTestId("step-back").boundingBox(), box.boundingBox()]);
+          return rects.every((b) => b !== null && b.y >= 0 && b.y + b.height <= vp.height);
+        })
+        .toBe(true);
+    await inside();
+    // open them all: the text scrolls inside the box
+    for (let i = 1; i < (await items.count()); i++) await items.nth(i).locator("summary").click();
+    await inside();
+    const scroll = page.getByTestId("step-scroll");
+    expect(await scroll.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+    // a new step starts with every item closed again
+    await page.getByTestId("step-next").click();
+    await expect(box).toBeVisible();
+    await expect.poll(() => items.evaluateAll((els) => els.some((e) => (e as HTMLDetailsElement).open))).toBe(false);
+  });
+
+  test("the Dive deeper section also fits on a phone-sized screen", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 780 });
+    await page.goto("/");
+    await page.getByTestId("trace-first").click();
+    await expect(page.getByTestId("step-box")).toContainText("A user sends a message");
+    const items = page.getByTestId("dive-item");
+    for (let i = 0; i < (await items.count()); i++) await items.nth(i).locator("summary").click();
+    // the box is docked again on the next frame after its height changes, so poll
+    await expect
+      .poll(async () => {
+        const rects = await Promise.all([page.getByTestId("step-next").boundingBox(), page.getByTestId("step-back").boundingBox(), page.getByTestId("step-box").boundingBox()]);
+        return rects.every((r) => r !== null && r.y >= 0 && r.y + r.height <= 780 && r.x >= 0 && r.x + r.width <= 390);
+      })
+      .toBe(true);
   });
 
   /** Follow one request to the end of the walkthrough, returning every step title. */
@@ -280,7 +408,8 @@ test.describe("live graph view", () => {
     await page.getByTestId("speed-1").click();
     await expect(page.getByTestId("step-box")).toContainText("A user sends a message");
     await expect.poll(() => guideFits(page), { timeout: 10_000 }).toBe(true);
-    await page.mouse.move(700, 400);
+    // beside the step box, which scrolls its own text when the wheel is over it
+    await page.mouse.move(1250, 600);
     await page.mouse.wheel(0, 600);
     const s1 = await page.evaluate(() => (window as unknown as LiveWin).__live.scene.cam.s);
     await page.waitForTimeout(600);

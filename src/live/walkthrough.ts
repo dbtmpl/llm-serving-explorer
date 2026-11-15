@@ -7,7 +7,8 @@
  * A step that teaches a concept is shown the first time the walkthrough meets it (`Script.shown`);
  * later turns of the same session get the short variant or skip it.
  */
-import { DISPLAY_CELLS, kvBytesPerToken, prefixAwareTerms, reloadTimes, replicaSpec, ridge, type SimEvent, type World } from "../sim/index.js";
+import { DISPLAY_CELLS, kvBytesPerToken, prefixAwareTerms, reloadTimes, replicaSpec, ridge, type Routing, type RouteDecision, type SimEvent, type World } from "../sim/index.js";
+import { fill, stepField } from "../content/index.js";
 import { TIER_NAME, calloutFor, make, type Callout } from "./callouts.js";
 import { fmtGB, fmtInt, fmtMs } from "./format.js";
 import type { Target } from "./render.js";
@@ -46,22 +47,75 @@ const tierSize = (gb: number) => (gb > 0 ? `${gb} GB` : "off");
 /** The pod that holds an idle copy of the session's KV in GPU memory, if there is one (so the eviction can be shown). */
 const holdsIdle = (w: World, sid: number, podId?: number): boolean => w.pods.some((p) => (podId === undefined || p.id === podId) && p.entries.get(sid)?.tier === "hbm" && !p.entries.get(sid)!.active);
 
-/** How the arithmetic of a routing decision reads, as values for the `walk.picked` entry. Null when the decision is no longer in the log. */
-function routeValues(e: SimEvent, w: World) {
-  let d: (typeof w.routeLog)[number] | undefined;
+type Candidate = RouteDecision["candidates"][number];
+
+/** The terms of the prefix-aware score of one candidate, formatted for a table row. */
+const termsOf = (c: Candidate, capacity: number) => prefixAwareTerms({ cachedFraction: c.cache, cacheLocation: c.tier, kvUtilisation: c.kvUtilisation, load: c.load, capacity });
+
+const TABLE_ROWS = 6;
+
+/**
+ * How a routing decision reads, as values for the `walk.picked` entry: the table with one row per
+ * candidate and the words that explain it. Null when the decision is no longer in the log.
+ */
+function routeValues(e: SimEvent, w: World, policy: Routing) {
+  let d: RouteDecision | undefined;
   for (const x of w.routeLog) if (x.reqId === e.reqId) d = x;
   if (!d) return null;
-  const terms = (c: (typeof d.candidates)[number]) => prefixAwareTerms({ cachedFraction: c.cache, cacheLocation: c.tier, kvUtilisation: c.kvUtilisation, load: c.load, capacity: d.capacity });
   const chosen = d.candidates.find((c) => c.podId === d.chosen);
   if (!chosen) return null;
-  let runner: (typeof d.candidates)[number] | undefined;
-  for (const c of d.candidates) if (c.podId !== d.chosen && (!runner || c.score > runner.score)) runner = c;
-  const t = terms(chosen);
   const two = (v: number) => v.toFixed(2);
-  const calc = { cacheShare: two(t.cache.share), cacheTerm: two(t.cache.term), kvShare: two(t.kv.share), kvTerm: two(t.kv.term), queueShare: two(t.queue.share), queueTerm: two(t.queue.term), score: two(chosen.score) };
-  const other = runner ? terms(runner) : null;
-  const rival = runner && other ? { otherId: runner.podId, otherCache: two(other.cache.term), otherKv: two(other.kv.term), otherQueue: two(other.queue.term), otherScore: two(runner.score) } : null;
-  return { calc, rival, n: d.candidates.length };
+  const n = d.candidates.length;
+  const decision = d;
+  // the chosen pod first, then the best of the rest, so a long list stays readable
+  const rest = d.candidates.filter((c) => c !== chosen).sort((a, b) => b.score - a.score);
+  const shown = [chosen, ...rest.slice(0, TABLE_ROWS - 1)].sort((a, b) => a.podId - b.podId);
+  const row = (c: Candidate): string => {
+    const win = c === chosen ? "-chosen" : "";
+    const base = { podId: c.podId };
+    if (policy === "prefix-aware") {
+      const t = termsOf(c, decision.capacity);
+      return fill(stepField("walk.picked", `row-${policy}${win}`), { ...base, c: two(t.cache.share), m: two(t.kv.share), q: two(t.queue.share), score: two(c.score) });
+    }
+    return fill(stepField("walk.picked", `row-${policy}${win}`), { ...base, load: c.load });
+  };
+  const table = [stepField("walk.picked", `head-${policy}`), ...shown.map(row)].join("\n");
+  const more = n - shown.length;
+  const out: Record<string, string | number> = { table };
+  const notes: string[] = [];
+  if (more > 0) {
+    out.more = more;
+    notes.push("more");
+  }
+  if (n === 1) notes.push("why-single");
+  else if (policy === "least-loaded") {
+    out.n = n;
+    notes.push("calc-least-loaded");
+  } else if (policy === "round-robin") {
+    Object.assign(out, { turn: d.cursor, n, slot: d.cursor % n });
+    notes.push("calc-round-robin");
+  } else {
+    const terms = (c: Candidate) => termsOf(c, decision.capacity);
+    const load = (c: Candidate) => terms(c).kv.term + terms(c).queue.term;
+    const best = d.candidates.reduce((m, c) => (terms(c).cache.share > terms(m).cache.share ? c : m), d.candidates[0]!);
+    if (terms(best).cache.share === 0) {
+      const first = (w.sessions.get(e.sid ?? -1)?.turn ?? 1) === 0;
+      notes.push(first ? "why-first-message" : "why-nothing-held");
+      if (d.candidates.every((c) => c.score === chosen.score)) notes.push("why-tie");
+    } else if (best === chosen) {
+      const rival = rest.reduce<Candidate | null>((m, c) => (!m || load(c) > load(m) ? c : m), null);
+      const lead = rival ? load(rival) - load(chosen) : 0;
+      Object.assign(out, { cache: (chosen.cache * 100).toFixed(0), cacheTerm: two(terms(chosen).cache.term) });
+      if (rival && lead > 0) {
+        Object.assign(out, { otherId: rival.podId, lead: two(lead) });
+        notes.push("why-cache-wins");
+      } else notes.push("why-cache-clear");
+    } else {
+      Object.assign(out, { otherId: best.podId, otherCache: (best.cache * 100).toFixed(0), otherCacheTerm: two(terms(best).cache.term), lead: two(load(chosen) - load(best)) });
+      notes.push("why-cache-loses");
+    }
+  }
+  return { values: out, notes };
 }
 
 /** The steps for one event of the followed session, in the order they are shown. */
@@ -135,30 +189,27 @@ export function stepsFor(e: SimEvent, w: World, script: Script): Callout[] {
       const policy = w.params.routing;
       const out: Callout[] = [];
       if (first("req.routed")) out.push(...calloutFor(e, w));
-      const rv = routeValues(e, w);
+      const rv = routeValues(e, w, policy);
       const tier = e.tier as string | null;
       const cache = ((e.cache as number) * 100).toFixed(0);
       const load = e.load as number;
       const holds = tier === "hbm" ? "holds-hbm" : tier ? "holds-tier" : "holds-none";
       const busy = load === 0 ? "busy-none" : load === 1 ? "busy-one" : "busy-many";
-      const calc = policy === "prefix-aware" ? (rv ? ["calc", rv.rival ? "runner-up" : "alone"] : []) : policy === "least-loaded" ? ["calc-least-loaded"] : ["calc-round-robin"];
-      const arithmetic = rv !== null || policy === "round-robin" || policy === "least-loaded";
       const sentence = [holds, busy];
       const values = {
         podId: e.podId!,
-        ...(policy === "prefix-aware" && rv ? { ...rv.calc, ...(rv.rival ?? {}) } : {}),
-        ...(policy === "least-loaded" ? { n: (rv?.n ?? (e.n as number)) } : {}),
+        ...(rv?.values ?? {}),
         ...(tier !== null ? { cache } : {}),
         ...(tier !== null && tier !== "hbm" ? { tier: TIER_NAME[tier]! } : {}),
         ...(load > 1 ? { load } : {})
       };
-      // holds-hbm and holds-tier use {cache}; holds-none uses nothing
+      // the table's own values (cache share of the winner) may repeat the holds sentence's {cache}
       out.push(
         make(
           "walk.picked",
           { key: "picked", target: { type: "gateway" }, tone: "info" },
           values,
-          { title: "title", body: arithmetic ? calc : sentence, detail: arithmetic ? [...sentence, "pinned"] : ["pinned"] }
+          { title: "title", body: rv ? ["table", ...rv.notes] : sentence, detail: rv ? [...sentence, "pinned"] : ["pinned"] }
         )
       );
       if (first("walk.arrive")) out.push(make("walk.arrive", { key: "arrive", target: pod("engine"), tone: "info" }));

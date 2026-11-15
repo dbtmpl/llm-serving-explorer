@@ -38,6 +38,9 @@ describe("citation registry", () => {
     // named on the website as products or projects, linked from the prose in src/content/
     const namedInProse: CitationKey[] = ["keda", "vllmRepo", "sglangRepo", "tgiRepo", "tfServing", "dynamoRepo", "openaiRateLimits", "envoyAiGatewayRateLimit", "llmdKvCacheIndexer", "vllmOpenAiServer"];
     for (const key of namedInProse) used.add(key);
+    // every source the site text links with [@key] (src/content/*.md)
+    const content = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../content");
+    for (const f of readdirSync(content).filter((x) => x.endsWith(".md"))) for (const m of readFileSync(path.join(content, f), "utf8").matchAll(/\[@([A-Za-z0-9]+)\]/g)) used.add(m[1]!);
     expect(Object.keys(CITATIONS).filter((key) => !used.has(key))).toEqual([]);
   });
 });

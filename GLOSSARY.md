@@ -21,6 +21,8 @@
 - **Eviction:** Dropping a cached KV block, or moving it to a lower memory tier, to make room.
 - **Preemption:** Taking a running request out of the batch and freeing its KV blocks when memory runs out. The request is recomputed later.
 - **HBM:** High-bandwidth memory, the GPU's own memory. Holds the weights, working space, captured CUDA graphs and the KV cache. A GPU's name rounds its size ("80 GB"); the driver reports a little more (85.0 GB for an H100), and the engine budgets from that figure.
+- **Headroom:** The part of a GPU's memory above `gpu_memory_utilization`, which the engine leaves unused. The KV pool is what remains of the share it may use after weights, activations and CUDA graphs.
+- **Load shedding:** Rejecting excess work early (here with HTTP 429 once a request has waited past its deadline) so the work that is accepted still meets its deadline.
 - **Memory tiers:** The places KV can live below HBM: host DRAM, local SSD and a remote pool shared by all pods.
 - **P/D disaggregation:** Running prefill and decode on separate pools of pods and transferring the KV cache between them.
 - **Tensor parallelism (TP):** Splitting one model's weights and KV cache across several GPUs in a pod.
