@@ -1,6 +1,7 @@
 /** "Dive in" panel: the selected component explained with its live numbers. */
 import type { ReactNode } from "react";
-import { BLOCK_TOKENS, SCORER_WEIGHTS, attnFlops, decodeCurve, flopsPerToken, kvBytesPerToken, livePods, maxBatch, recomputeRatio, replicaSpec, ridge, seqLoad, tierBw, tierCapBlocks, weightBytes, type Pod, type World } from "../sim/index.js";
+import { BLOCK_TOKENS, SCORER_WEIGHTS, attnFlops, decodeCurve, flopsPerToken, kvBytesPerToken, livePods, maxBatch, recomputeRatio, replicaSpec, ridge, seqLoad, tierBw, tierCapBlocks, weightBytes, type Pod } from "../sim/index.js";
+import type { RunWorld } from "./run.js";
 import { inspectorText } from "../content/index.js";
 import { fmtGB, fmtInt, fmtMs } from "./format.js";
 import { Rich } from "./Rich.js";
@@ -92,7 +93,7 @@ function Roofline({ pod }: { pod: Pod }) {
 }
 
 /** Saturating decode throughput against the batch, with the pod's current batch marked. */
-function Throughput({ pod, w, L }: { pod: Pod; w: World; L: number }) {
+function Throughput({ pod, w, L }: { pod: Pod; w: RunWorld; L: number }) {
   const W = 276;
   const H = 110;
   const m = { l: 34, r: 10, t: 10, b: 24 };
@@ -158,7 +159,7 @@ function BlockAnatomy({ pod }: { pod: Pod }) {
   );
 }
 
-function SessionView({ w, id }: { w: World; id: number }) {
+function SessionView({ w, id }: { w: RunWorld; id: number }) {
   const s = w.sessions.get(id);
   if (!s) return <Note id="session.pruned" />;
   const r = s.reqId != null ? w.reqs.get(s.reqId) : undefined;
@@ -190,7 +191,7 @@ function SessionView({ w, id }: { w: World; id: number }) {
   );
 }
 
-function TokenizerView({ w }: { w: World }) {
+function TokenizerView({ w }: { w: RunWorld }) {
   const spec = replicaSpec(w.params);
   const L = w.params.promptTokens;
   const full = seqLoad(spec.model, 0, L).flops;
@@ -215,7 +216,7 @@ function TokenizerView({ w }: { w: World }) {
   );
 }
 
-function GatewayView({ w }: { w: World }) {
+function GatewayView({ w }: { w: RunWorld }) {
   const p = w.params;
   const lr = w.lastRoute;
   const live = livePods(w).length;
@@ -256,7 +257,7 @@ function GatewayView({ w }: { w: World }) {
   );
 }
 
-function PodView({ w, pod, part }: { w: World; pod: Pod; part: string }) {
+function PodView({ w, pod, part }: { w: RunWorld; pod: Pod; part: string }) {
   const p = w.params;
   const b = pod.budget;
   const m = pod.spec.model;
@@ -390,7 +391,7 @@ function PodView({ w, pod, part }: { w: World; pod: Pod; part: string }) {
 
 const TITLES: Record<string, string> = { engine: "Engine loop", gpu: "GPU memory and KV blocks", roofline: "Roofline and throughput", tiers: "Memory tiers and eviction" };
 
-export function Inspector({ w, target, onClose }: { w: World; target: Target; onClose: () => void }) {
+export function Inspector({ w, target, onClose }: { w: RunWorld; target: Target; onClose: () => void }) {
   const pod = target.type === "pod" ? w.pods.find((x) => x.id === target.id) : undefined;
   const title =
     target.type === "session" ? `Session ${target.id}` : target.type === "tokenizer" ? "Gateway · prompt assembly" : target.type === "gateway" ? "Router" : target.type === "store" ? "Conversation store" : target.type === "remote" ? "Remote KV pool" : target.type === "stream" ? "Output stream" : `pod-${target.id}`;

@@ -3,7 +3,8 @@
  * requests reach each stage. It only reads the World; it never changes simulation state.
  */
 import { fmtInt } from "./format.js";
-import { DISPLAY_CELLS as CELLS, GPUS, ridge, tierCapBlocks, weightBytes, type Pod, type Req, type Session, type SimEvent, type World } from "../sim/index.js";
+import { DISPLAY_CELLS as CELLS, GPUS, ridge, tierCapBlocks, weightBytes, type Pod, type Req, type Session, type SimEvent } from "../sim/index.js";
+import type { RunDetail, RunWorld } from "./run.js";
 
 export const C = {
   ink: "#0f172a",
@@ -78,7 +79,7 @@ const FRAME_MAX_SCALE = 1.8;
 const FRAME_MIN_SCALE = 0.15;
 
 /** A target with an id of -1 means "any": the first session, the first ready pod. */
-export function resolveTarget(w: World, t: Target): Target {
+export function resolveTarget(w: RunWorld, t: Target): Target {
   if (t.type === "session" && t.id < 0) return { type: "session", id: (w.sessions.keys().next().value as number | undefined) ?? 0 };
   if (t.type === "pod" && t.id < 0) return { ...t, id: (w.pods.find((x) => x.state === "ready") ?? w.pods[0])?.id ?? 0 };
   return t;
@@ -190,6 +191,21 @@ export class Scene {
   private dotR = 9;
   private remote = { x: PODS_X, y: 260, a: 0, seen: false };
   private storeA = 0;
+  /** `aggregate` for a run that reports how full a pod is but not which blocks (a BLIS replay): no block map, sweep, roofline dot, tiers or conversation store. */
+  detail: RunDetail = "blocks";
+  /** Text drawn where an aggregate pod has no per-step detail to show; set by the interface (src/content/panels.md). */
+  aggregateNote = "";
+  /** Pods whose engine just preempted a request without a block map to flash: pod id and the time on the animation clock. */
+  private pulses: { podId: number; t0: number }[] = [];
+
+  /** Forget everything animated and go back to the state of a new scene (a new run replaces the old one). */
+  reset(detail: RunDetail): void {
+    const { panels, aggregateNote } = this;
+    Object.assign(this, new Scene());
+    this.panels = panels;
+    this.aggregateNote = aggregateNote;
+    this.detail = detail;
+  }
 
   /* ---------------------------------------------------------------- geometry */
 
@@ -221,7 +237,7 @@ export class Scene {
   }
 
   /** World point a callout or the inspector should point at. */
-  anchor(w: World, t: Target): P | null {
+  anchor(w: RunWorld, t: Target): P | null {
     if (t.type === "tokenizer") return this.reveal.tokA > 0.5 ? { x: TOK.x + TOK.w / 2, y: TOK.y + TOK.h } : null;
     if (t.type === "gateway") return this.reveal.gwA > 0.5 ? { x: GW.x + GW.w / 2, y: GW.y - 30 } : null;
     if (t.type === "store") return this.storeA > 0.5 ? { x: STORE.x + STORE.w / 2, y: STORE.y } : null;
@@ -243,7 +259,7 @@ export class Scene {
   }
 
   /** Like anchor(), but for a pod it points at the named part instead of the pod's top edge (used by the tutorial). */
-  anchorPart(w: World, t: Target): P | null {
+  anchorPart(w: RunWorld, t: Target): P | null {
     const top = this.anchor(w, t);
     if (!top || t.type !== "pod") return top;
     const pod = w.pods.find((x) => x.id === t.id)!;
@@ -257,7 +273,7 @@ export class Scene {
    * `part` it is that part: the slot lanes, the GPU boxes with the KV grid, the roofline strip and
    * gauge, or the DRAM and SSD bars. Used to frame and highlight what a step is about.
    */
-  rectOf(w: World, target: Target): Rect | null {
+  rectOf(w: RunWorld, target: Target): Rect | null {
     const t = resolveTarget(w, target);
     switch (t.type) {
       case "tokenizer":
@@ -363,7 +379,8 @@ export class Scene {
   }
 
   /** Which part of a GPU's memory box lies under a screen point, with its size in bytes per GPU; for the hover tooltip. */
-  segmentAt(w: World, sx: number, sy: number): { podId: number; part: GpuPart; bytes: number } | null {
+  segmentAt(w: RunWorld, sx: number, sy: number): { podId: number; part: GpuPart; bytes: number } | null {
+    if (this.detail === "aggregate") return null;
     const p = this.toWorld(sx, sy);
     for (const pod of w.pods) {
       const r = this.podRect(pod);
@@ -385,7 +402,7 @@ export class Scene {
   }
 
   /** Screen position of the middle of one part of a pod's first GPU memory box (tests use it to point at a segment). */
-  segmentCenter(w: World, podId: number, part: GpuPart): P | null {
+  segmentCenter(w: RunWorld, podId: number, part: GpuPart): P | null {
     const pod = w.pods.find((x) => x.id === podId);
     const r = pod && this.podRect(pod);
     if (!pod || !r) return null;
@@ -394,7 +411,7 @@ export class Scene {
     return this.toScreen({ x: r.x + x, y: r.y + s.y + s.h / 2 });
   }
 
-  hit(w: World, sx: number, sy: number): Target | null {
+  hit(w: RunWorld, sx: number, sy: number): Target | null {
     const p = this.toWorld(sx, sy);
     const inside = (r: { x: number; y: number; w: number; h: number }) => p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
     for (const pod of w.pods) {
@@ -418,7 +435,7 @@ export class Scene {
 
   /* ---------------------------------------------------------------- update */
 
-  private layout(w: World, k: number): void {
+  private layout(w: RunWorld, k: number): void {
     const sessions = [...w.sessions.values()];
     const n = sessions.length;
     this.cardMode = n <= 8;
@@ -474,7 +491,7 @@ export class Scene {
     if (!w.sessions.size && !w.pods.length) this.remote.seen = false;
     this.remote.y += (bottom - this.remote.y) * k;
     this.remote.a += ((this.remote.seen ? 1 : 0) - this.remote.a) * k;
-    this.storeA += ((w.seen.tokenizer ? 1 : 0) - this.storeA) * k;
+    this.storeA += ((w.seen.tokenizer && this.detail === "blocks" ? 1 : 0) - this.storeA) * k;
     for (const id of this.podPos.keys()) {
       if (!w.pods.some((p) => p.id === id)) {
         this.podPos.delete(id);
@@ -484,7 +501,7 @@ export class Scene {
   }
 
   /** Ease the camera so the guided target sits centred in the free area. False if there is nothing to frame. */
-  private frame(w: World, k: number): boolean {
+  private frame(w: RunWorld, k: number): boolean {
     const g = this.guide;
     if (!g || this.manual) return false;
     const r = this.rectOf(w, g.target);
@@ -500,7 +517,7 @@ export class Scene {
     return true;
   }
 
-  private fit(w: World, k: number): void {
+  private fit(w: RunWorld, k: number): void {
     if (!this.auto) return;
     let x0 = Infinity;
     let y0 = Infinity;
@@ -514,7 +531,7 @@ export class Scene {
     };
     for (const p of this.sessPos.values()) add(p.x - (this.cardMode ? 172 : this.dotR + 4), p.y - this.dotR - 10, this.cardMode ? 172 : 2 * this.dotR + 8, 2 * this.dotR + 20);
     if (w.sessions.size) add(TOK.x, TOK.y, TOK.w, TOK.h);
-    if (w.seen.tokenizer) add(STORE.x, STORE.y - 30, STORE.w, STORE.h);
+    if (w.seen.tokenizer && this.detail === "blocks") add(STORE.x, STORE.y - 30, STORE.w, STORE.h);
     if (this.remote.seen) add(this.remote.x, this.remote.y, PW, REMOTE_H);
     if (w.seen.tokenizer) add(GW.x, GW.y - 40, GW.w, GW.h + 40);
     for (const pod of w.pods) {
@@ -547,7 +564,7 @@ export class Scene {
     this.parts.push({ pts, t0: this.vt + (o.delay ?? 0), dur: o.dur ?? 1, color, size: o.size ?? 4, fade: o.fade, reply: o.reply });
   }
 
-  private consume(w: World, events: SimEvent[]): void {
+  private consume(w: RunWorld, events: SimEvent[]): void {
     for (const e of events) {
       const pod = e.podId !== undefined ? w.pods.find((p) => p.id === e.podId) : undefined;
       const r = pod && this.podRect(pod);
@@ -566,6 +583,7 @@ export class Scene {
         }
       } else if ((e.kind === "kv.move" || e.kind === "kv.drop" || e.kind === "req.preempted") && pod && r) {
         const cells = (e.cells as number[]) ?? [];
+        if (e.kind === "req.preempted" && !cells.length) this.pulses.push({ podId: pod.id, t0: this.vt });
         const to = e.kind === "kv.move" ? (e.to as "dram" | "ssd" | "remote") : null;
         const color = e.kind === "kv.move" ? (to === "dram" ? C.dram : to === "ssd" ? C.ssd : C.remote) : C.evict;
         if (to === "remote") this.remote.seen = true;
@@ -596,7 +614,7 @@ export class Scene {
     }
   }
 
-  update(w: World, events: SimEvent[], dtWall: number, playing: boolean, width: number, height: number): void {
+  update(w: RunWorld, events: SimEvent[], dtWall: number, playing: boolean, width: number, height: number): void {
     this.w = width;
     this.h = height;
     if (playing) this.vt += dtWall;
@@ -621,9 +639,10 @@ export class Scene {
     if (!w.sessions.size && !w.pods.length) this.reveal = { tok: 0, gw: 0, tokA: 0, gwA: 0 };
     this.parts = this.parts.filter((p) => this.vt < p.t0 + p.dur);
     this.flashes = this.flashes.filter((f) => this.vt < f.t0 + 1.2);
+    this.pulses = this.pulses.filter((f) => this.vt < f.t0 + 1.6);
   }
 
-  private updateLit(w: World, k: number): void {
+  private updateLit(w: RunWorld, k: number): void {
     const h = this.highlight;
     const t = h && resolveTarget(w, h.target);
     const r = t && this.rectOf(w, t);
@@ -674,7 +693,7 @@ export class Scene {
 
   /* ---------------------------------------------------------------- draw */
 
-  draw(ctx: CanvasRenderingContext2D, w: World, dpr: number): void {
+  draw(ctx: CanvasRenderingContext2D, w: RunWorld, dpr: number): void {
     const { s } = this.cam;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = "#ffffff";
@@ -731,7 +750,7 @@ export class Scene {
     ctx.stroke();
   }
 
-  private edges(ctx: CanvasRenderingContext2D, w: World): void {
+  private edges(ctx: CanvasRenderingContext2D, w: RunWorld): void {
     ctx.lineWidth = 1.5;
     ctx.strokeStyle = "#cbd5e1";
     ctx.lineCap = "round";
@@ -802,7 +821,7 @@ export class Scene {
     ctx.fillText(str, x, y);
   }
 
-  private sessions(ctx: CanvasRenderingContext2D, w: World, lod: number): void {
+  private sessions(ctx: CanvasRenderingContext2D, w: RunWorld, lod: number): void {
     for (const [sid, p] of this.sessPos) {
       const sess = w.sessions.get(sid)!;
       const req = sess.reqId != null ? w.reqs.get(sess.reqId) : undefined;
@@ -872,7 +891,7 @@ export class Scene {
     }
   }
 
-  private tokenizer(ctx: CanvasRenderingContext2D, w: World): void {
+  private tokenizer(ctx: CanvasRenderingContext2D, w: RunWorld): void {
     ctx.globalAlpha = this.reveal.tokA;
     this.box(ctx, TOK.x, TOK.y, TOK.w, TOK.h, 14, this.selected?.type === "tokenizer");
     this.text(ctx, "Gateway · prompt assembly", TOK.x + 14, TOK.y + 22, { size: 13, weight: 650, color: C.ink });
@@ -924,7 +943,7 @@ export class Scene {
     ctx.globalAlpha = 1;
   }
 
-  private gateway(ctx: CanvasRenderingContext2D, w: World): void {
+  private gateway(ctx: CanvasRenderingContext2D, w: RunWorld): void {
     ctx.globalAlpha = this.reveal.gwA;
     this.box(ctx, GW.x, GW.y, GW.w, GW.h, 14, this.selected?.type === "gateway");
     this.text(ctx, "Router", GW.x + 14, GW.y + 22, { size: 13, weight: 650, color: C.ink });
@@ -946,7 +965,7 @@ export class Scene {
     ctx.globalAlpha = 1;
   }
 
-  private storeNode(ctx: CanvasRenderingContext2D, w: World): void {
+  private storeNode(ctx: CanvasRenderingContext2D, w: RunWorld): void {
     ctx.globalAlpha = this.storeA;
     this.box(ctx, STORE.x, STORE.y, STORE.w, STORE.h, 12, this.selected?.type === "store");
     this.text(ctx, "Conversation store", STORE.x + 14, STORE.y + 21, { size: 12, weight: 650, color: C.ink });
@@ -961,7 +980,7 @@ export class Scene {
     ctx.globalAlpha = 1;
   }
 
-  private remoteNode(ctx: CanvasRenderingContext2D, w: World): void {
+  private remoteNode(ctx: CanvasRenderingContext2D, w: RunWorld): void {
     const r = this.remote;
     ctx.globalAlpha = r.a;
     this.box(ctx, r.x, r.y, PW, REMOTE_H, 14, this.selected?.type === "remote");
@@ -985,7 +1004,7 @@ export class Scene {
     ctx.globalAlpha = 1;
   }
 
-  private pod(ctx: CanvasRenderingContext2D, w: World, pod: Pod, lod: number): void {
+  private pod(ctx: CanvasRenderingContext2D, w: RunWorld, pod: Pod, lod: number): void {
     const pp = this.podPos.get(pod.id);
     if (!pp) return;
     const g = podGeom(pod.spec.tp);
@@ -1106,8 +1125,23 @@ export class Scene {
           ctx.stroke();
         }
         ctx.restore();
+        // KV pool, aggregate: one bar filled to the share of the pool BLIS reports as in use
+        if (sp.kw > 4 && this.detail === "aggregate") {
+          const fill = clamp(pod.usedBlocks / Math.max(1, b.poolBlocks), 0, 1);
+          ctx.fillStyle = "#eef2f7";
+          ctx.beginPath();
+          ctx.roundRect(sp.kx, sp.y, sp.kw, sp.h, 3);
+          ctx.fill();
+          ctx.save();
+          ctx.beginPath();
+          ctx.roundRect(sp.kx, sp.y, sp.kw, sp.h, 3);
+          ctx.clip();
+          ctx.fillStyle = "hsl(205 62% 60%)";
+          ctx.fillRect(sp.kx, sp.y, sp.kw * fill, sp.h);
+          ctx.restore();
+        }
         // KV pool: paged blocks, coloured by the session that owns them; pale = cached but idle
-        if (sp.kw > 4 && ca) {
+        else if (sp.kw > 4 && ca) {
           const ready = pod.state === "ready" || pod.state === "draining";
           const pad = Math.min(1, sp.cw * 0.12);
           if (lod === 0) {
@@ -1140,9 +1174,36 @@ export class Scene {
           }
         }
       });
-    if (lod > 1 && pod.state === "ready") {
+    if (lod > 1 && pod.state === "ready" && this.detail === "aggregate") {
+      T(`KV pool ${((100 * pod.usedBlocks) / Math.max(1, b.poolBlocks)).toFixed(0)}% · ${fmtInt(pod.usedBlocks)} / ${fmtInt(b.poolBlocks)} blocks`, PW - 14, g.lanesY + 4, { size: 9.5, color: C.mute, align: "right", mono: true });
+    } else if (lod > 1 && pod.state === "ready") {
       const used = pod.usedBlocks * b.blockBytes;
       T(`KV cache ${(used / 1e9).toFixed(1)} / ${((b.kv * pod.spec.tp) / 1e9).toFixed(1)} GB`, PW - 14, g.lanesY + 4, { size: 9.5, color: C.mute, align: "right", mono: true });
+    }
+
+    // the part of the pod BLIS does not report: say so instead of drawing it
+    if (this.detail === "aggregate") {
+      const lines = this.aggregateNote.split("\n");
+      ctx.fillStyle = "#f8fafc";
+      ctx.strokeStyle = C.line;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.roundRect(14, g.stripY, PW - 28, g.h - g.stripY - 14, 10);
+      ctx.fill();
+      ctx.stroke();
+      ctx.setLineDash([]);
+      lines.forEach((ln, i) => T(ln, 24, g.stripY + 22 + i * 14, { size: 9.5, color: i === 0 ? C.sub : C.mute, weight: i === 0 ? 600 : 400 }));
+      for (const pl of this.pulses.filter((x) => x.podId === pod.id)) {
+        const a = clamp(1 - (this.vt - pl.t0) / 1.6, 0, 1);
+        ctx.globalAlpha = pp.a * a;
+        ctx.strokeStyle = C.evict;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.roundRect(-3, -3, PW + 6, g.h + 6, 18);
+        ctx.stroke();
+      }
+      ctx.restore();
+      return;
     }
 
     // forward pass: a sweep across the layers once per engine step
@@ -1249,7 +1310,7 @@ export class Scene {
     }
   }
 
-  private transit(ctx: CanvasRenderingContext2D, w: World, lod: number): void {
+  private transit(ctx: CanvasRenderingContext2D, w: RunWorld, lod: number): void {
     let moving = 0;
     for (const r of w.reqs.values()) if (r.stage === "send" || r.stage === "toGateway" || r.stage === "toPod") moving++;
     const label = lod > 1 && moving <= 6;
