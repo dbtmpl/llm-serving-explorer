@@ -1,0 +1,33 @@
+id: kv-budget-70b-h200-tp4
+title: KV block budget of one replica, Llama 70B on four H200s
+# Tensor parallelism splits the weights and every KV block over the GPUs of a replica; the
+# replica's pool is the sum over its GPUs.
+model: llama-70b
+gpu: h200
+engine:
+  tp: 4
+  gpu_memory_utilisation: 0.9
+  max_num_seqs: 12
+  max_num_batched_tokens: 8192
+  block_size: 16
+  prefix_caching: true
+replicas: 1
+routing: prefix-aware
+requests:
+  - { session: 1, at: 1.0, turns: [[200, 20]] }
+checks:
+  - id: kv-blocks-per-replica
+    claim: One tensor-parallel replica holds the same number of KV blocks in both simulators.
+    kind: exact
+    quantity: kv_blocks_per_replica
+    tolerance: Same reason as for one GPU, and tensor parallelism multiplies any per-GPU error by the degree.
+    known_difference:
+      reason: >-
+        The same cause as kv-budget-8b-h100, per GPU. BLIS budgets 0.9 x the H200's driver-reported 139.80 GiB (150.1 GB)
+        and the TypeScript model 0.9 x the 141 GB datasheet value: 8.2 GB more per GPU in BLIS. What each keeps out of
+        the KV pool differs too: the TypeScript model 35 GB of weights (70e9 parameters, BF16, split four ways) plus a
+        1.3 GB activation estimate; BLIS, inferred from its block count, about 37.1 GB (the real 3.1 70B has slightly
+        more parameters, plus workspace and graph capture): 0.8 GB more per GPU. The net 7.4 GB per GPU, over four
+        GPUs and 5.24 MB per block, is about 5,640 blocks, against the 5,668 observed (74,760 against 69,092, 8%).
+      differences:
+        value: { typescript: 69092, blis: 74760 }

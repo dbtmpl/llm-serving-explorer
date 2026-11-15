@@ -78,6 +78,7 @@ When a paper introduces a decision that has no home yet (for example KV compress
 | [Autoscaling](autoscaling/) | Target concurrency | Run enough pods that each carries at most its target number of requests. | Simplified | [Knative docs, autoscaling](https://knative.dev/docs/serving/autoscaling/autoscaling-concepts/); [llm-d docs, autoscaling](https://github.com/llm-d/llm-d/blob/main/docs/architecture/autoscaling/keda-epp.md) |
 | [Flow control](flowcontrol/) | Deadline shedding | Reject requests that have waited at the router longer than a time-to-live. | Simplified | [llm-d docs, flow control](https://github.com/llm-d/llm-d/blob/main/docs/architecture/router/flow-control.md) |
 | [Workload](workload/) | Closed-loop multi-turn sessions | Users wait for an answer, think, then re-send the whole conversation plus a new message. | Simplified | [Schroeder et al., NSDI 2006](https://www.usenix.org/conference/nsdi-06/presentation/open-versus-closed-cautionary-tale); [Gao et al., USENIX ATC 2024](https://arxiv.org/abs/2403.19708) |
+| [Workload](workload/) | Trace replay | Requests are injected at recorded times with recorded lengths, so a run can be repeated or compared exactly. | Simplified | [Schroeder et al., NSDI 2006](https://www.usenix.org/conference/nsdi-06/presentation/open-versus-closed-cautionary-tale); [Gao et al., USENIX ATC 2024](https://arxiv.org/abs/2403.19708) |
 <!-- generated:approaches:end -->
 
 ## Sources
@@ -95,7 +96,7 @@ When a paper introduces a decision that has no home yet (for example KV compress
 - **Agrawal et al., OSDI 2024.** [Taming Throughput-Latency Tradeoff in LLM Inference with Sarathi-Serve](https://arxiv.org/abs/2403.02310). Used by: Chunked prefill under a token budget.
 - **Zheng et al., 2023.** [SGLang: Efficient Execution of Structured Language Model Programs](https://arxiv.org/abs/2312.07104).
 - **Leviathan et al., ICML 2023.** [Fast Inference from Transformers via Speculative Decoding](https://arxiv.org/abs/2211.17192). Used by: Speculative decoding.
-- **Gao et al., USENIX ATC 2024.** [Cost-Efficient Large Language Model Serving for Multi-turn Conversations with CachedAttention](https://arxiv.org/abs/2403.19708). Used by: LRU, whole session, HBM → DRAM → SSD → shared pool, Closed-loop multi-turn sessions.
+- **Gao et al., USENIX ATC 2024.** [Cost-Efficient Large Language Model Serving for Multi-turn Conversations with CachedAttention](https://arxiv.org/abs/2403.19708). Used by: LRU, whole session, HBM → DRAM → SSD → shared pool, Closed-loop multi-turn sessions, Trace replay.
 - **Qin et al., FAST 2025.** [Mooncake: A KVCache-centric Disaggregated Architecture for LLM Serving](https://arxiv.org/abs/2407.00079). Used by: HBM → DRAM → SSD → shared pool.
 - **Liu et al., 2025 (LMCache).** [LMCache: An Efficient KV Cache Layer for Enterprise-Scale LLM Inference](https://arxiv.org/abs/2510.09665). Used by: HBM → DRAM → SSD → shared pool, Adaptive load-or-recompute.
 - **Liu et al., SIGCOMM 2024.** [CacheGen: KV Cache Compression and Streaming for Fast Large Language Model Serving](https://arxiv.org/abs/2310.07240). Used by: Adaptive load-or-recompute.
@@ -103,7 +104,7 @@ When a paper introduces a decision that has no home yet (for example KV compress
 - **Zhong et al., OSDI 2024.** [DistServe: Disaggregating Prefill and Decoding for Goodput-optimized Large Language Model Serving](https://arxiv.org/abs/2401.09670). Used by: Decode-first with token threshold.
 - **Patel et al., ISCA 2024.** [Splitwise: Efficient Generative LLM Inference Using Phase Splitting](https://arxiv.org/abs/2311.18677). Used by: Decode-first with token threshold.
 - **Sun et al., OSDI 2024.** [Llumnix: Dynamic Scheduling for Large Language Model Serving](https://arxiv.org/abs/2406.03243).
-- **Schroeder et al., NSDI 2006.** [Open Versus Closed: A Cautionary Tale](https://www.usenix.org/conference/nsdi-06/presentation/open-versus-closed-cautionary-tale). Used by: Closed-loop multi-turn sessions.
+- **Schroeder et al., NSDI 2006.** [Open Versus Closed: A Cautionary Tale](https://www.usenix.org/conference/nsdi-06/presentation/open-versus-closed-cautionary-tale). Used by: Closed-loop multi-turn sessions, Trace replay.
 - **vLLM source, scheduler.py.** [vLLM V1 scheduler (decode-first scheduling, preemption, no admission in a preempting step)](https://github.com/vllm-project/vllm/blob/main/vllm/v1/core/sched/scheduler.py). Used by: Chunked prefill under a token budget, Continuous batching, On-demand (paged), Preempt newest, recompute.
 - **vLLM source, config/scheduler.py.** [vLLM SchedulerConfig (max_num_seqs, max_num_batched_tokens)](https://github.com/vllm-project/vllm/blob/main/vllm/config/scheduler.py). Used by: Chunked prefill under a token budget.
 - **vLLM docs, prefix caching.** [vLLM design: Automatic Prefix Caching](https://docs.vllm.ai/en/latest/design/prefix_caching.html). Used by: Block-hash prefix cache, LRU, whole session.
@@ -119,6 +120,16 @@ When a paper introduces a decision that has no home yet (for example KV compress
 - **Envoy docs, load balancers.** [Envoy: supported load balancers (round robin, least request)](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/load_balancers). Used by: Round robin, Least loaded.
 - **Knative docs, autoscaling.** [Knative Serving: autoscaling concepts (target concurrency)](https://knative.dev/docs/serving/autoscaling/autoscaling-concepts/). Used by: Target concurrency.
 - **NVIDIA Dynamo docs.** [NVIDIA Dynamo: KV block manager and tiered KV storage](https://docs.nvidia.com/dynamo/latest/). Used by: HBM → DRAM → SSD → shared pool.
+- **KEDA docs.** [KEDA: Kubernetes event-driven autoscaling](https://keda.sh/).
+- **OpenAI docs, rate limits.** [OpenAI API: rate limits (requests per minute and tokens per minute)](https://platform.openai.com/docs/guides/rate-limits).
+- **Envoy AI Gateway docs, usage-based rate limiting.** [Envoy AI Gateway: usage-based rate limiting (limits counted in tokens)](https://aigateway.envoyproxy.io/docs/capabilities/traffic/usage-based-ratelimiting).
+- **llm-d KV-cache indexer.** [llm-d KV-cache: indexer that maps a prompt's KV-block keys to the pods holding them](https://github.com/llm-d/llm-d-kv-cache).
+- **vLLM docs, OpenAI-compatible server.** [vLLM: OpenAI-compatible server (chat completions, chat template, streaming)](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html).
+- **vLLM repository.** [vLLM: high-throughput and memory-efficient inference and serving engine](https://github.com/vllm-project/vllm).
+- **SGLang repository.** [SGLang: a fast serving framework for large language models](https://github.com/sgl-project/sglang).
+- **TGI repository.** [Text Generation Inference (Hugging Face)](https://github.com/huggingface/text-generation-inference).
+- **TF Serving repository.** [TensorFlow Serving](https://github.com/tensorflow/serving).
+- **NVIDIA Dynamo repository.** [NVIDIA Dynamo: datacenter-scale distributed inference serving framework](https://github.com/ai-dynamo/dynamo).
 - **Meta, Llama 3.1 8B model card.** [meta-llama/Llama-3.1-8B-Instruct (architecture in config.json)](https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct).
 - **Meta, Llama 3 70B model card.** [meta-llama/Meta-Llama-3-70B-Instruct (architecture in config.json)](https://huggingface.co/meta-llama/Meta-Llama-3-70B-Instruct).
 - **NVIDIA H100 datasheet.** [NVIDIA H100 Tensor Core GPU](https://www.nvidia.com/en-us/data-center/h100/).

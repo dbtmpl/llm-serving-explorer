@@ -27,6 +27,7 @@ Fidelity: **Exact** reproduces a published formula or rule and is tested against
 | Reload decision | `ReloadPolicy.shouldLoad(loadSeconds, recomputeSeconds)` | [`reload.ts`](reload.ts) |
 | Preemption | `PreemptionPolicy.pickVictim(running, requester)` | [`preemption.ts`](preemption.ts) |
 | Tier mechanics | functions on pod state | [`hbm.ts`](hbm.ts), [`tiers.ts`](tiers.ts), [`pool.ts`](pool.ts) |
+| Forced eviction | `evictIdleNow(w, sid, podId?)`, called only by the step-through walkthrough; it runs the same `demote` as a real eviction | [`forced.ts`](forced.ts) |
 
 Each decision currently has one approach, bound to a constant (`PREFIX_MATCHER`, `EVICTION`, `RELOAD`, `PREEMPTION`). A second approach turns that constant into a parameter.
 

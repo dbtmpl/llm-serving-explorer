@@ -12,6 +12,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "test:conformance": "vitest run conformance",
+    "conformance:reference": "tsx conformance/scripts/reference.ts",
+    "conformance:report": "tsx conformance/scripts/report.ts",
     "docs:sync": "UPDATE_DOCS=1 vitest run src/sim/__tests__/registry.test.ts"
   },
   "dependencies": {
@@ -24,8 +27,10 @@
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
     "@vitejs/plugin-react": "^4.3.4",
+    "tsx": "^4.23.15",
     "typescript": "^5.8.2",
     "vite": "^6.2.0",
-    "vitest": "^3.0.9"
+    "vitest": "^3.0.9",
+    "yaml": "^2.9.1"
   }
 }

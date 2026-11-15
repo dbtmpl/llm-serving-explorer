@@ -1,0 +1,34 @@
+id: kv-budget-8b-h100
+title: KV block budget of one replica, Llama 3.1 8B on one H100
+# One short request, only so that the run has something to replay. The check is about start-up:
+# how many 16-token KV blocks the engine finds room for after weights, activations and headroom.
+model: llama-3.1-8b
+gpu: h100
+engine:
+  tp: 1
+  gpu_memory_utilisation: 0.9
+  max_num_seqs: 12
+  max_num_batched_tokens: 8192
+  block_size: 16
+  prefix_caching: true
+replicas: 1
+routing: prefix-aware
+requests:
+  - { session: 1, at: 1.0, turns: [[200, 20]] }
+checks:
+  - id: kv-blocks-per-replica
+    claim: One replica holds the same number of KV blocks in both simulators.
+    kind: exact
+    quantity: kv_blocks_per_replica
+    tolerance: A block count is an integer set by memory arithmetic that both simulators state; a few percent of drift would already change when preemption starts, so it is not given any.
+    known_difference:
+      reason: >-
+        BLIS follows vLLM's start-up sizing (pool = ceil(device memory x utilisation) - fixed occupancy, then divided by
+        the block size), using the memory the CUDA driver reports for an H100 80GB (79.19 GiB = 85.03 GB, from its
+        hardware catalogue) and a fixed occupancy of weights plus workspace, communicator buffers and graph capture
+        (about 1.9 GB beyond the 16.06 GB of weights, inferred from the block count). The TypeScript model uses the
+        80 GB datasheet figure and a 0.74 GB activation estimate. Both give the same block size (2,097,152 bytes), so the
+        whole difference is memory: 4.5 GB more usable device memory in BLIS, 1.2 GB more reserved by it, net 3.3 GB or
+        1,603 blocks (6%).
+      differences:
+        value: { typescript: 26323, blis: 27926 }

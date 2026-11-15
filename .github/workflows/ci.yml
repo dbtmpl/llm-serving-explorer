@@ -14,6 +14,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The TypeScript model against BLIS's recorded output (conformance/reference/). Node only: it
+  # needs neither Go nor BLIS. `pnpm test` runs these too; this job names them in the checks list.
+  conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Conformance with BLIS
+        run: pnpm test:conformance
+
   test:
     runs-on: ubuntu-latest
     steps:

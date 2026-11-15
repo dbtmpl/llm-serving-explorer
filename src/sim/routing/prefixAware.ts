@@ -1,4 +1,4 @@
-import { pickHighest, type CacheLocation, type RoutingPolicy } from "./index.js";
+import { pickHighest, type CacheLocation, type CandidateFacts, type RoutingPolicy } from "./index.js";
 
 /**
  * Scorer weights of llm-d's default scheduling profile: `prefix-cache-scorer` 3,
@@ -32,6 +32,21 @@ export const TIER_AFFINITY: Record<CacheLocation, number> = { hbm: 1, dram: 0.7,
  * Differences from llm-d: the prefix term is scaled by `TIER_AFFINITY`; the queue term counts
  * running as well as waiting requests; the router sees exact pod state with no scrape lag.
  */
+/**
+ * The three terms of the score, for showing the arithmetic of one decision. Their sum is exactly
+ * what `prefixAware.score` returns. `share` is the value each weight multiplies, in [0, 1].
+ */
+export function prefixAwareTerms(c: CandidateFacts): { cache: { share: number; term: number }; kv: { share: number; term: number }; queue: { share: number; term: number } } {
+  const cacheShare = c.cachedFraction * (c.cacheLocation ? TIER_AFFINITY[c.cacheLocation] : 0);
+  const kvShare = 1 - c.kvUtilisation;
+  const queueShare = 1 - c.load / c.capacity;
+  return {
+    cache: { share: cacheShare, term: SCORER_WEIGHTS.prefixCache * cacheShare },
+    kv: { share: kvShare, term: SCORER_WEIGHTS.kvUtilisation * kvShare },
+    queue: { share: queueShare, term: SCORER_WEIGHTS.queue * queueShare }
+  };
+}
+
 export const prefixAware: RoutingPolicy = {
   id: "prefix-aware",
   name: "Prefix-cache aware",

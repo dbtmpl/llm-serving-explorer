@@ -1,0 +1,5 @@
+# The inference-sim (BLIS) commit the committed references were generated with.
+# First non-comment line: the full commit hash of https://github.com/inference-sim/inference-sim
+# The Go toolchain to build it with is the `toolchain` of that commit's stack.json (go1.27.2 here).
+# To bump it, see conformance/README.md.
+c79c745619b16a8019339e3bbc79ee5e2923b258

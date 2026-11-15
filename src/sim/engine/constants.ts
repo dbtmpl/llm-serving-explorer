@@ -43,3 +43,6 @@ export const MIXED_STEP = { minDecodeTokens: 2, minPrefillTokens: 512 } as const
 const SECONDS_PER_HOUR = 3600;
 const TOKENS_PER_MILLION = 1e6;
 export const UNITS = { SECONDS_PER_HOUR, TOKENS_PER_MILLION } as const;
+
+/** Routing decisions kept for the interface to explain; only the newest are of interest. */
+export const ROUTE_LOG_SIZE = 32;

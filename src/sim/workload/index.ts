@@ -14,6 +14,7 @@ import type { ApproachMeta, Concept } from "../approach.js";
 import { emit, rand } from "../core/world.js";
 import type { Req, Session, World } from "../core/types.js";
 import { FRONTEND_HOPS } from "./frontend.js";
+import { dueTraceRequests, traceReplay } from "./trace.js";
 
 /** Uniform ranges, as multiples of the configured mean. */
 export const LENGTH_JITTER = {
@@ -53,7 +54,7 @@ export const WORKLOAD: Concept = {
   module: "workload",
   title: "Workload",
   question: "Who sends requests, how long are they, and what happens between turns?",
-  approaches: [closedLoopSessions]
+  approaches: [closedLoopSessions, traceReplay]
 };
 
 const uniform = (w: World, [lo, hi]: readonly [number, number]): number => lo + rand(w) * (hi - lo);
@@ -64,12 +65,18 @@ export function spawnBurst(w: World, n: number, over = 0): void {
   w.pending.sort((a, b) => a - b);
 }
 
-export function newSession(w: World): void {
+/** Lengths fixed by a trace instead of drawn: new prompt tokens and output tokens. */
+export interface FixedLengths {
+  newTokens: number;
+  outputTokens: number;
+}
+
+export function newSession(w: World, fixed?: FixedLengths, traceId?: number): void {
   const id = w.nextId++;
-  const s: Session = { id, hue: (id * HUE_STEP_DEGREES) % 360, turn: 0, ctxTokens: 0, reqId: null, state: "active", nextTurnAt: 0, born: w.t, lastPod: -1, lastTtft: 0, lastTpot: 0 };
+  const s: Session = { id, ...(traceId === undefined ? {} : { traceId }), hue: (id * HUE_STEP_DEGREES) % 360, turn: 0, ctxTokens: 0, reqId: null, state: "active", nextTurnAt: 0, born: w.t, lastPod: -1, lastTtft: 0, lastTpot: 0 };
   w.sessions.set(id, s);
   emit(w, "session.new", { sid: id });
-  newRequest(w, s);
+  newRequest(w, s, fixed);
   if (w.sessions.size > MAX_SESSIONS) {
     for (const old of w.sessions.values()) {
       if (old.state === "idle") {
@@ -81,15 +88,15 @@ export function newSession(w: World): void {
 }
 
 /** The session's next turn: its whole history plus a new message. */
-export function newRequest(w: World, s: Session): void {
+export function newRequest(w: World, s: Session, fixed?: FixedLengths): void {
   const p = w.params;
-  const fresh = s.turn === 0 ? Math.round(p.promptTokens * uniform(w, LENGTH_JITTER.firstPrompt)) : Math.max(1, Math.round(p.followTokens * uniform(w, LENGTH_JITTER.followUp)));
+  const fresh = fixed ? fixed.newTokens : s.turn === 0 ? Math.round(p.promptTokens * uniform(w, LENGTH_JITTER.firstPrompt)) : Math.max(1, Math.round(p.followTokens * uniform(w, LENGTH_JITTER.followUp)));
   const r: Req = {
     id: w.nextId++,
     sid: s.id,
     lIn: Math.max(1, s.ctxTokens + fresh),
     newTokens: fresh,
-    lOut: Math.max(MIN_OUTPUT_TOKENS, Math.round(p.outputTokens * uniform(w, LENGTH_JITTER.output))),
+    lOut: fixed ? fixed.outputTokens : Math.max(MIN_OUTPUT_TOKENS, Math.round(p.outputTokens * uniform(w, LENGTH_JITTER.output))),
     stage: "send",
     stageStart: w.t,
     stageEnd: w.t + FRONTEND_HOPS.send,
@@ -117,4 +124,24 @@ export function newRequest(w: World, s: Session): void {
 /** Seconds until a session that will return sends its next turn. */
 export function thinkSeconds(w: World): number {
   return w.params.thinkTimeS * (THINK_TIME_JITTER.min + THINK_TIME_JITTER.span * rand(w));
+}
+
+/**
+ * Send the trace requests that are due. A round 0 opens a session; a later round continues the
+ * session of the same trace number. A round sent while the session's previous answer is still being
+ * produced is built on an incomplete history; it is flagged with a `trace.overlap` event.
+ */
+export function injectTrace(w: World): void {
+  for (const t of dueTraceRequests(w)) {
+    const fixed = { newTokens: t.newTokens, outputTokens: t.outputTokens };
+    if (t.round === 0) {
+      newSession(w, fixed, t.session);
+      continue;
+    }
+    let found: Session | undefined;
+    for (const s of w.sessions.values()) if (s.traceId === t.session) found = s;
+    if (!found) throw new Error(`trace session ${t.session} round ${t.round}: the session is unknown (pruned, or round 0 was never sent)`);
+    if (found.reqId !== null) emit(w, "trace.overlap", { sid: found.id, session: t.session, round: t.round });
+    newRequest(w, found, fixed);
+  }
 }

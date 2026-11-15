@@ -1,0 +1,68 @@
+id: routing-round-robin
+title: Round-robin routing over four replicas
+# Twelve independent single-turn requests, one second apart and each answered in well under a
+# second, so no replica is ever busy when the next request arrives: any load signal is zero and
+# only the policy's tie-breaking decides.
+model: llama-3.1-8b
+gpu: h100
+engine:
+  tp: 1
+  gpu_memory_utilisation: 0.9
+  max_num_seqs: 12
+  max_num_batched_tokens: 8192
+  block_size: 16
+  prefix_caching: true
+replicas: 4
+routing: round-robin
+requests:
+  - { session: 1, at: 1, turns: [[300, 20]] }
+  - { session: 2, at: 2, turns: [[300, 20]] }
+  - { session: 3, at: 3, turns: [[300, 20]] }
+  - { session: 4, at: 4, turns: [[300, 20]] }
+  - { session: 5, at: 5, turns: [[300, 20]] }
+  - { session: 6, at: 6, turns: [[300, 20]] }
+  - { session: 7, at: 7, turns: [[300, 20]] }
+  - { session: 8, at: 8, turns: [[300, 20]] }
+  - { session: 9, at: 9, turns: [[300, 20]] }
+  - { session: 10, at: 10, turns: [[300, 20]] }
+  - { session: 11, at: 11, turns: [[300, 20]] }
+  - { session: 12, at: 12, turns: [[300, 20]] }
+checks:
+  - id: pod-sequence
+    claim: Request i goes to the replica after the one request i-1 went to, wrapping after four (replicas are named by first use, since which replica starts is arbitrary).
+    kind: exact
+    quantity: routed_pod
+    tolerance: A routing decision is a discrete choice; a request either went to the same replica as the other simulator's or it did not.
+    known_difference:
+      reason: >-
+        The TypeScript model rotates strictly through the replicas (Envoy's round robin), so request i goes to replica
+        i mod 4. The llm-d router has no such policy. The closest configuration, which BLIS ships as
+        reference-configs/round-robin.yaml and runs here, is the max-score picker with no scorers: every replica ties and
+        the picker rotates the tied candidates by a counter, but the scheduler first puts the candidates in a seeded random
+        order before every pick (scheduler_profile.go in the router fork), so the choice is uniformly random among the tied
+        replicas, not a cycle. The fork's reference-configs README says so: "it does not rotate". BLIS's draw for this
+        trace is deterministic for the pinned build and seed. There is no llm-d behaviour for the TypeScript policy to be
+        consistent with; it models Envoy, not llm-d.
+      differences:
+        s2/r0: { typescript: 1, blis: 0 }
+        s3/r0: { typescript: 2, blis: 1 }
+        s4/r0: { typescript: 3, blis: 0 }
+        s5/r0: { typescript: 0, blis: 1 }
+        s6/r0: { typescript: 1, blis: 0 }
+        s8/r0: { typescript: 3, blis: 1 }
+        s9/r0: { typescript: 0, blis: 1 }
+        s10/r0: { typescript: 1, blis: 2 }
+  - id: requests-per-pod
+    claim: Twelve requests over four replicas is three each.
+    kind: exact
+    quantity: requests_per_pod
+    tolerance: Counts of discrete decisions.
+    known_difference:
+      reason: >-
+        Same cause as pod-sequence. A strict rotation gives 3, 3, 3, 3; llm-d's random choice among tied replicas gave
+        4, 4, 3, 1 for this trace (counts sorted from the busiest replica; deterministic for the pinned build and seed).
+        The llm-d configuration is balanced only on average.
+      differences:
+        rank0: { typescript: 3, blis: 4 }
+        rank1: { typescript: 3, blis: 4 }
+        rank3: { typescript: 3, blis: 1 }
