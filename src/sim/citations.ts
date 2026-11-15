@@ -248,15 +248,15 @@ export const CITATIONS = {
   },
   knativeAutoscaling: {
     short: "Knative docs, autoscaling",
-    title: "Knative Serving: autoscaling concepts (target concurrency)",
+    title: "Knative Serving: configuring concurrency (target concurrency per replica)",
     kind: "docs",
-    url: "https://knative.dev/docs/serving/autoscaling/autoscaling-concepts/"
+    url: "https://knative.dev/docs/serving/autoscaling/concurrency/"
   },
   dynamoKvbm: {
     short: "NVIDIA Dynamo docs",
-    title: "NVIDIA Dynamo: KV block manager and tiered KV storage",
-    kind: "docs",
-    url: "https://docs.nvidia.com/dynamo/latest/"
+    title: "NVIDIA Dynamo: KV block manager architecture (memory tiers G1 to G4)",
+    kind: "source",
+    url: "https://github.com/ai-dynamo/dynamo/blob/main/lib/kvbm-engine/docs/architecture.md"
   },
   keda: {
     short: "KEDA docs",
@@ -479,6 +479,36 @@ export const CITATIONS = {
     title: "AMD Instinct MI300X Accelerator",
     kind: "datasheet",
     url: "https://www.amd.com/en/products/accelerators/instinct/mi300/mi300x.html"
+  },
+  knativeScaleBounds: {
+    short: "Knative docs, scale bounds",
+    title: "Knative Serving: configuring scale bounds (min-scale, scale-down delay)",
+    kind: "docs",
+    url: "https://knative.dev/docs/serving/autoscaling/scale-bounds/"
+  },
+  tensorrtLlmScheduler: {
+    short: "TensorRT-LLM source, executor types",
+    title: "TensorRT-LLM: capacity scheduler policies (GUARANTEED_NO_EVICT runs a started request to completion)",
+    kind: "source",
+    url: "https://github.com/NVIDIA/TensorRT-LLM/blob/main/cpp/include/tensorrt_llm/executor/types.h"
+  },
+  databricksInference: {
+    short: "Databricks, 2023",
+    title: "LLM Inference Performance Engineering: Best Practices (defines MBU, compares it with MFU)",
+    kind: "docs",
+    url: "https://www.databricks.com/blog/llm-inference-performance-engineering-best-practices"
+  },
+  grattafiori2024: {
+    short: "Grattafiori et al., 2024 (Llama 3)",
+    title: "The Llama 3 Herd of Models (Table 3: layers and key-value heads of the 8B, 70B and 405B models)",
+    kind: "paper",
+    url: "https://arxiv.org/abs/2407.21783"
+  },
+  wikiTokenBucket: {
+    short: "Token bucket (Wikipedia)",
+    title: "Token bucket: capacity, refill rate and conformance test of a rate limiter",
+    kind: "docs",
+    url: "https://en.wikipedia.org/wiki/Token_bucket"
   }
 } as const satisfies Record<string, Citation>;
 
