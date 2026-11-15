@@ -42,4 +42,3 @@ The alternative, a block-level replay, needs an event stream (`--events-output`)
 - The site has two sources of truth for one graph; the badge and the `Run` kind keep them apart, and the content states what each is evidence for.
 - Bumping `conformance/blis.lock` makes the committed replay files stale: the test names the mismatch, and `pnpm replay:build` regenerates them.
 - The router's per-endpoint scores are read from BLIS's trace log, which is not a stable interface. If a later BLIS changes that log, the generator fails (it checks the chosen pod against the scores) and does not write a file.
-- Models are drawn with the TypeScript catalogue's entries for the same architectures (Llama 3.1 8B, and Llama 3 70B for Llama 3.1 70B). The settings panel uses BLIS's names.

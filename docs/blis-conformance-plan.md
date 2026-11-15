@@ -1,6 +1,6 @@
 # Plan: the TypeScript model and BLIS side by side
 
-Status: accepted; phases 1 to 4 done, phases 5 and 6 not started. Written 2026-11-15 against inference-sim `c79c7456` (2026-11-13). What agreement shows, and the results, are in [`blis-parity.md`](blis-parity.md).
+Status: accepted; phases 1 to 5 done, phase 6 not started. Written 2026-11-15 against inference-sim `c79c7456` (2026-11-13). What agreement shows, and the results, are in [`blis-parity.md`](blis-parity.md).
 
 ## Goal
 
@@ -94,7 +94,7 @@ In both, parameters are fixed per scenario: the menus are read-only, and switchi
 2. **Calibration.** Done. `conformance/calibration/` fits MBU, MFU and the two host-time coefficients per model and GPU (`pnpm conformance:calibrate`, deterministic, documented loss and search), plus the draft cost and the link rate; held-out timing scenarios check time to first token, time per token, end-to-end time and throughput; speculative decoding and the prefill/decode split are checked the same way. Time to first token is the weak spot: a single MFU cannot follow BLIS's prefill cost, and a 32-request burst is recorded as a known difference.
 3. **Registry and docs.** Done. `ApproachMeta.verification` (scenario ids, or `{ notVerifiable }`), the enforcing test, the README column, the parity summary (`conformance/summary.json`, `pnpm conformance:summary`, kept in step by a test) and [`blis-parity.md`](blis-parity.md).
 4. **Directional checks.** Done, with a different scenario shape than first planned: a scenario can have `arms`. Tiers (host memory only), eviction pressure, prefix-aware routing against round robin and autoscaling. BLIS's autoscaler runs only under `blis run`, so that scenario is a constant-rate stream.
-5. **Scene interface and request-level calibrated mode.** Not started. Extract what `Scene` needs from `World` into an interface both the live model and the replay adapter implement.
+5. **Scene interface and request-level calibrated mode.** Done. `Run` (`src/live/run.ts`) is the interface the canvas draws, implemented by the live model and by the replay adapter (`src/replay/`); `pnpm replay:build` writes four replay files from the pinned BLIS to `public/replay/`. What it shows and omits: [ADR 0007](adr/0007-calibrated-replay-mode.md).
 6. **Upstream.** Not started. Propose `--events-output`; step-level replay when it lands.
 
 Phase 1 found real differences (the router sees exact pod state while llm-d scores from scraped metrics with a delay; round robin; KV budget). Each became either a fix or a documented difference, and so did those of phases 2 to 4.
