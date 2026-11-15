@@ -1,0 +1,84 @@
+id: tiers-offload
+title: Host-memory tier on or off, follow-ups to conversations the GPU has already evicted
+# The GPU pool holds about 18 conversations of this size (30 percent memory utilisation, about 57,000 tokens); 30 conversations of 3,050 tokens start one second apart, and
+# each is followed up 60 s later in the same order. Under least-recently-used eviction a repeated scan in the same order is the worst case: every follow-up arrives after
+# its conversation was evicted. With a 32 GB host-memory tier per replica every conversation is kept (BLIS offloads prompt chunks; the TypeScript model moves whole
+# conversations down a tier), so a follow-up reloads its history instead of recomputing it. BLIS evicts chunks and the TypeScript model whole sessions, so hit rates
+# and times are compared, not block traces.
+model: llama-3.1-8b
+gpu: h100
+engine:
+  tp: 1
+  gpu_memory_utilisation: 0.3
+  max_num_seqs: 64
+  max_num_batched_tokens: 8192
+  block_size: 16
+  prefix_caching: true
+  max_model_len: 40000
+replicas: 1
+routing: prefix-aware
+arms:
+  gpu-only: {}
+  with-dram: { offload: { cpu_gb: 32 } }
+requests:
+  - { session: 1, at: 1.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 2, at: 2.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 3, at: 3.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 4, at: 4.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 5, at: 5.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 6, at: 6.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 7, at: 7.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 8, at: 8.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 9, at: 9.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 10, at: 10.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 11, at: 11.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 12, at: 12.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 13, at: 13.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 14, at: 14.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 15, at: 15.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 16, at: 16.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 17, at: 17.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 18, at: 18.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 19, at: 19.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 20, at: 20.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 21, at: 21.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 22, at: 22.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 23, at: 23.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 24, at: 24.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 25, at: 25.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 26, at: 26.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 27, at: 27.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 28, at: 28.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 29, at: 29.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+  - { session: 30, at: 30.00, gap_s: 60, turns: [[3000, 50], [50, 50]] }
+checks:
+  - id: host-tier-hit-rate
+    claim: With the tier, a share of prompt tokens is served from host memory; without it, none is.
+    kind: directional
+    metric: cpu_tier_hit_rate
+    baseline: gpu-only
+    intervention: with-dram
+    effect: difference
+    direction: increase
+    band: [0.67, 1.5]
+    tolerance: "The two simulators' host-tier hit rates must be within a factor of 1.5 of each other: the rate is set by which conversations were evicted and fit in 32 GB, which both decide by least-recently-used order, but BLIS stores whole prompt chunks and not the answer's tokens and the TypeScript model whole conversations, so a few percent of tokens can differ."
+    known_difference:
+      reason: >-
+        BLIS reports a host-tier hit rate of zero in this run (`cpu_tier_hit_rate` in its Result; the per-request rows carry no external-token count either) although the
+        run shows the tier working: a follow-up's scheduling delay is 56.6 ms with the tier against 41.1 ms without (the 15.5 ms is the copy of about 3,050 tokens of KV,
+        400 MB at about 26 GB/s), and the step that prefills it takes 12.6 ms against 63.1 ms, because the history is no longer recomputed. The TypeScript model reports
+        that 49.8 percent of all prompt tokens came from host memory. I did not find why BLIS leaves the counter at zero for a reload that completes before the request is first
+        scheduled (its lookup is recorded at first admission, and a request whose load has landed is scheduled without a new prefix lookup, blis-vllm batch_formation.go);
+        the timing check below shows the effect on time to first token, which both report.
+      differences:
+        effect: { typescript: 0.4984, blis: 0 }
+  - id: follow-up-time-to-first-token
+    claim: A follow-up's time to first token falls when its history is reloaded from host memory instead of recomputed.
+    kind: directional
+    metric: followup_ttft_mean_s
+    baseline: gpu-only
+    intervention: with-dram
+    effect: ratio
+    direction: decrease
+    band: [0.75, 1.33]
+    tolerance: "The two simulators' ratios (with tier over without) must be within a factor of 1.33 of each other: the saving is the recompute of about 3,000 tokens less a copy at the tier's rate (about 20 GB/s in the TypeScript model, the kernel's price for a DRAM device in BLIS) and both fixed overheads are untouched, so a quarter either way allows for the different copy rates."

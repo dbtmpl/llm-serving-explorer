@@ -51,12 +51,11 @@ export interface Aggregates {
   specTokensPerStep: number | null;
   /** Requests sent through the prefill pool. */
   prefillPoolRequests: number | null;
-  /** Most replicas serving at one time, and how many at the end. */
+  /** Replicas that served at least one request. */
   peakReplicas: number | null;
-  finalReplicas: number | null;
 }
 
-export const NO_AGGREGATES: Aggregates = { prefixHitRate: null, cpuTierHitRate: null, kvTransferMeanS: null, specTokensPerStep: null, prefillPoolRequests: null, peakReplicas: null, finalReplicas: null };
+export const NO_AGGREGATES: Aggregates = { prefixHitRate: null, cpuTierHitRate: null, kvTransferMeanS: null, specTokensPerStep: null, prefillPoolRequests: null, peakReplicas: null };
 
 export interface BlisProvenance {
   /** Commit of inference-sim named by `conformance/blis.lock`. */
@@ -201,7 +200,5 @@ export function metricOf(r: Reduced, metric: Metric): number | null {
       return r.aggregates.cpuTierHitRate;
     case "peak_replicas":
       return r.aggregates.peakReplicas;
-    case "final_replicas":
-      return r.aggregates.finalReplicas;
   }
 }

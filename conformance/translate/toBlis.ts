@@ -21,8 +21,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { parse, stringify } from "yaml";
 import { POD_QUEUE_SLACK } from "../../src/sim/index.js";
-import { CONFORMANCE_DIR, MAIN_ARM, type Deployment, type Scenario } from "../scenario.js";
-import { gpuNames, modelNames } from "./names.js";
+import { AUTOSCALE_LOAD_S, CONFORMANCE_DIR, MAIN_ARM, type Deployment, type Scenario } from "../scenario.js";
+import { GPU_MEMORY_GIB, gpuNames, modelNames } from "./names.js";
 
 /** GPUs per node in the simulated cluster. 8 is the usual HGX node; it only bounds how many replicas fit. */
 export const GPUS_PER_NODE = 8;
@@ -49,10 +49,7 @@ export const EPP_PD_FILE = "pd-prefix-based.yaml";
 /** Every file name of `translate/epp/`; the reference script checks each against the binary. */
 export const ALL_EPP_FILES: string[] = [...new Set<string>([...Object.values(EPP_FILES), EPP_PD_FILE])];
 
-/** How long a replica added by the autoscaler takes to load its weights, seconds: the same number is given to both simulators. */
-export const AUTOSCALE_LOAD_S = 5;
-
-/** The autoscaler's tick, seconds. */
+/** The autoscaler's tick, seconds. BLIS's saturation analyzer is told the stream's prompt length as its average input (it turns queue depth into token demand with it). */
 export const AUTOSCALE_TICK_S = 1;
 
 export interface BlisInput {
@@ -186,13 +183,16 @@ export function toBlis(s: Scenario, arm: string = MAIN_ARM): BlisInput {
     args = ["run", "--scenarios", "scenarios", "--scenario", `${name}.yaml`, "--workload-spec", "workload.yaml", "--num-instances", String(d.autoscale ? d.autoscale.minReplicas : d.replicas), "--output", "result.json"];
     if (d.autoscale) {
       files["policy.yaml"] = stringify({
-        autoscaler: { interval_us: AUTOSCALE_TICK_S * US_PER_S, scale_up_stabilization_window_us: 0, scale_down_stabilization_window_us: 0, analyzer: { min_replicas: d.autoscale.minReplicas } },
+        autoscaler: { interval_us: AUTOSCALE_TICK_S * US_PER_S, scale_up_stabilization_window_us: 0, scale_down_stabilization_window_us: 0, analyzer: { min_replicas: d.autoscale.minReplicas, avg_input_tokens: d.stream.promptTokens } },
+        // the autoscaler places new replicas on a node pool: one node of the scenario's GPU holds every replica the scenario allows
+        node_pools: [{ name: "pool", gpu_type: gpu, gpus_per_node: GPUS_PER_NODE, gpu_memory_gib: GPU_MEMORY_GIB[gpu], initial_nodes: nodes, min_nodes: nodes, max_nodes: nodes }],
         instance_lifecycle: { loading_delay: { mean: AUTOSCALE_LOAD_S, stddev: 0 }, warm_start_initial_instances: true }
       });
       args.push("--policy-config", "policy.yaml");
     }
   } else {
-    files["trace.yaml"] = stringify({ trace_version: 4, time_unit: "microseconds", mode: "generated", session_context_growth: "accumulate" });
+    // A trace written as "generated" carries the deployment it was made with and refuses a host-memory tier on replay; "converted" takes it from the scenario
+    files["trace.yaml"] = stringify({ trace_version: 4, time_unit: "microseconds", mode: d.offload ? "converted" : "generated", session_context_growth: "accumulate" });
     const rows = d.requests.map((r, i) => {
       const cells: Record<(typeof TRACE_COLUMNS)[number], string | number> = {
         request_id: i,

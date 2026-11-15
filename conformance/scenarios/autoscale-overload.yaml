@@ -1,0 +1,54 @@
+id: autoscale-overload
+title: Sustained overload with and without an autoscaler
+# A constant 8 requests per second of 1,000-token prompts and 300-token answers for 20 s against replicas that each decode at most 8 sequences (about 2.5 requests
+# per second each), so one replica is overloaded 3 times over and its queue grows without bound. One arm keeps one replica; the other may grow to 4, each new replica taking 5 s to
+# load. The pool is small (30 percent memory utilisation, about 57,000 tokens) because BLIS's analyzer measures saturation in KV tokens (queued prompt tokens against pool capacity), not in batch slots, and would never see a pool of 446,000 tokens saturate. The two autoscalers follow different rules by design (the TypeScript one scales to ceil(requests in flight / slots), at once; BLIS's runs a saturation analyzer every
+# second), so only the direction is compared: more replicas serve the load, and the queue wait, which is nearly all of the time to first token here, falls.
+model: llama-3.1-8b
+gpu: h100
+engine:
+  tp: 1
+  gpu_memory_utilisation: 0.3
+  max_num_seqs: 8
+  max_num_batched_tokens: 8192
+  block_size: 16
+  prefix_caching: true
+  max_model_len: 40000   # BLIS refuses a pool that cannot hold one sequence of the model's full length
+replicas: 1
+routing: least-loaded
+stream: { rate_per_s: 8, count: 160, prompt_tokens: 1000, output_tokens: 300 }
+arms:
+  fixed: {}
+  autoscaled: { autoscale: { min_replicas: 1, max_replicas: 4 } }
+checks:
+  - id: replicas-rise
+    claim: The autoscaled arm serves requests on more replicas than the fixed arm's one.
+    kind: directional
+    metric: peak_replicas
+    baseline: fixed
+    intervention: autoscaled
+    effect: ratio
+    direction: increase
+    band: [0.5, 2]
+    tolerance: "Within a factor of 2 of each other: both scale up under sustained overload, but by different rules (an immediate target and a saturation analyzer on a one-second tick), so the number of replicas reached is not expected to be equal."
+  - id: wait-falls
+    claim: Mean time to first token, which here is queue wait, is lower with the autoscaler.
+    kind: directional
+    metric: ttft_mean_s
+    baseline: fixed
+    intervention: autoscaled
+    effect: ratio
+    direction: decrease
+    band: [0.33, 3]
+    tolerance: "Within a factor of 3 of each other: how much the wait falls depends on how fast and how far each scales (5 s to load in both, but the TypeScript rule reaches its target at once and BLIS's steps), so only that it falls by a similar order of magnitude is claimed."
+    known_difference:
+      reason: >-
+        Both fall, by different amounts, because the two autoscalers react at different times and reach different sizes. The TypeScript rule is concurrency
+        based and acts on the count of requests in flight: it adds a replica at 1.1 s, 2.1 s and 3.1 s (one per second, as the count crosses 8, 16 and 24), so with
+        the 5 s load time the new replicas serve from 6.1, 7.1 and 8.1 s, four replicas in all. BLIS's saturation analyzer (the llm-d workload-variant autoscaler's
+        token-based rule) compares the tokens in the queue and in KV memory with 80 percent of the pool, so it waits until the queue holds enough prompt tokens:
+        its first added replica serves from 11 s, its second from 18 s, and it stops at three. The queue therefore drains later and less in BLIS, and mean time
+        to first token falls to 0.40 of the fixed arm's (8.3 s against 20.7 s) where the TypeScript model's falls to 0.083 (1.7 s against 20.5 s). The rules differ
+        by design (ADR 0004); the direction is the same.
+      differences:
+        effect: { typescript: 0.08289, blis: 0.4021 }

@@ -73,7 +73,8 @@ function directional(check: DirectionalCheck, ts: Records, blis: Records): Outco
   const a = side(ts);
   const b = side(blis);
   const moves = (e: number | null): boolean => e !== null && (check.effect === "ratio" ? (check.direction === "increase" ? e > 1 : e < 1) : check.direction === "increase" ? e > 0 : e < 0);
-  const ratio = a.effect !== null && b.effect !== null && b.effect !== 0 ? a.effect / b.effect : null;
+  // two identical effects (including two zeros, such as a hit rate that falls to nothing in both) agree exactly
+  const ratio = a.effect !== null && b.effect !== null ? (a.effect === b.effect ? 1 : b.effect !== 0 ? a.effect / b.effect : null) : null;
   const holds = moves(a.effect) && moves(b.effect) && ratio !== null && ratio >= check.band[0] && ratio <= check.band[1];
   const r = (x: number | null) => (x === null ? null : round4(x));
   const differences: Outcome["differences"] = holds ? {} : { effect: { typescript: r(a.effect), blis: r(b.effect) } };

@@ -1,0 +1,48 @@
+id: routing-prefix-vs-round-robin
+title: Prefix-aware routing against round robin, time to first token on follow-up turns
+# Seven conversations of three turns on four replicas (not a multiple of the replica count: with eight, strict rotation sends every follow-up back to its own replica by alignment alone, which is a coincidence of the arithmetic, not routing). Their first prompts (2,000 tokens) arrive 0.5 s apart; the follow-ups (150 new tokens) come 20 s and 40 s later.
+# With prefix-aware routing a follow-up returns to the replica that holds its conversation and is served from the prefix cache; with round robin it lands wherever the
+# rotation is (the TypeScript model rotates strictly, like Envoy; BLIS's router picks at random among equals, see routing-round-robin), so some follow-ups recompute 2,000 tokens.
+model: llama-3.1-8b
+gpu: h100
+engine:
+  tp: 1
+  gpu_memory_utilisation: 0.9
+  max_num_seqs: 12
+  max_num_batched_tokens: 8192
+  block_size: 16
+  prefix_caching: true
+replicas: 4
+routing: prefix-aware
+arms:
+  round-robin: { routing: round-robin }
+  prefix-aware: {}
+requests:
+  - { session: 1, at: 1.00, gap_s: 20, turns: [[2000, 100], [150, 40], [150, 40]] }
+  - { session: 2, at: 1.50, gap_s: 20, turns: [[2000, 100], [150, 40], [150, 40]] }
+  - { session: 3, at: 2.00, gap_s: 20, turns: [[2000, 100], [150, 40], [150, 40]] }
+  - { session: 4, at: 2.50, gap_s: 20, turns: [[2000, 100], [150, 40], [150, 40]] }
+  - { session: 5, at: 3.00, gap_s: 20, turns: [[2000, 100], [150, 40], [150, 40]] }
+  - { session: 6, at: 3.50, gap_s: 20, turns: [[2000, 100], [150, 40], [150, 40]] }
+  - { session: 7, at: 4.00, gap_s: 20, turns: [[2000, 100], [150, 40], [150, 40]] }
+checks:
+  - id: prefix-hit-rate
+    claim: Prefix-aware routing serves a larger share of prompt tokens from the prefix cache than round robin.
+    kind: directional
+    metric: prefix_hit_rate
+    baseline: round-robin
+    intervention: prefix-aware
+    effect: difference
+    direction: increase
+    band: [0.5, 2]
+    tolerance: "Within a factor of 2 of each other: the gain depends on how often round robin happens to return a conversation to its replica, which is strict rotation in the TypeScript model and a random pick in BLIS, so the baseline hit rates differ by design and only the order of magnitude of the gain is comparable."
+  - id: follow-up-time-to-first-token
+    claim: A follow-up's time to first token is lower under prefix-aware routing.
+    kind: directional
+    metric: followup_ttft_mean_s
+    baseline: round-robin
+    intervention: prefix-aware
+    effect: ratio
+    direction: decrease
+    band: [0.5, 2]
+    tolerance: "Within a factor of 2 of each other, for the same reason as the hit rate: the saving is the recompute of 2,000 tokens on the follow-ups that round robin misplaces, and how many it misplaces differs by design."

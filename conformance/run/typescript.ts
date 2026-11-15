@@ -1,12 +1,12 @@
 /**
  * Run the TypeScript model on a scenario, headless, and reduce its event log to a `Reduced` record.
  */
-import { MIN_OUTPUT_TOKENS, advance, createWorld, loadTrace, type SimEvent, type World } from "../../src/sim/index.js";
+import { MIN_OUTPUT_TOKENS, advance, createWorld, loadTrace, setParam, type SimEvent, type World } from "../../src/sim/index.js";
 import { FRONTEND_HOPS } from "../../src/sim/workload/frontend.js";
 import { fittedFor, loadFitted, type FittedFile } from "../calibration/fitted.js";
 import { NO_AGGREGATES, microseconds, sortRows, type Aggregates, type Fate, type Reduced, type RequestRow } from "../record.js";
-import { MAIN_ARM, usesCalibration, type Scenario } from "../scenario.js";
-import { toTypescript, type TimingOverride } from "../translate/toTypescript.js";
+import { AUTOSCALE_LOAD_S, MAIN_ARM, usesCalibration, type Scenario } from "../scenario.js";
+import { TS_COLD_START_S, toTypescript, type TimingOverride } from "../translate/toTypescript.js";
 
 /** Clock step of the headless loop, seconds. The engine ticks finer inside it; this only bounds how late the loop notices it is done. */
 const LOOP_STEP_S = 0.05;
@@ -33,6 +33,11 @@ export function runTypescript(s: Scenario, arm: string = MAIN_ARM, timing?: Timi
   const input = toTypescript(s, arm, timing ?? timingFor(s, arm));
   const w = createWorld(input.params, input.seed);
   loadTrace(w, input.requests, MIN_OUTPUT_TOKENS);
+  if (s.arms[arm]!.autoscale) {
+    // The replicas the scenario starts with are loaded (BLIS's `warm_start_initial_instances`); only the ones the autoscaler adds pay the load time.
+    advance(w, TS_COLD_START_S * 1.2);
+    setParam(w, "coldStartS", AUTOSCALE_LOAD_S);
+  }
   while (w.trace.length || w.reqs.size) {
     advance(w, LOOP_STEP_S);
     if (w.t > MAX_SIMULATED_S) throw new Error(`${s.id}: the TypeScript run did not finish within ${MAX_SIMULATED_S} simulated seconds`);
@@ -128,12 +133,6 @@ export function reduceTypescript(s: Scenario, w: World, arm: string = MAIN_ARM):
   const completed = requests.filter((r) => r.fate === "completed");
   // tokens one sequence gains per decode step: every token after the first, over the sequence-steps that made them
   const decodeSteps = participations - firstTokens;
-  let live = 0;
-  let peak = 0;
-  for (const e of w.events) {
-    if (e.kind === "pod.ready") peak = Math.max(peak, ++live);
-    else if (e.kind === "pod.draining" || e.kind === "pod.failed") live--;
-  }
   const aggregates: Aggregates = {
     ...NO_AGGREGATES,
     prefixHitRate: total ? (cached - cpu) / total : null,
@@ -141,8 +140,8 @@ export function reduceTypescript(s: Scenario, w: World, arm: string = MAIN_ARM):
     kvTransferMeanS: transfers.length ? transfers.reduce((a, b) => a + b, 0) / transfers.length : null,
     specTokensPerStep: d.speculative && decodeSteps > 0 ? completed.reduce((a, r) => a + r.outputTokens - 1, 0) / decodeSteps : null,
     prefillPoolRequests: d.disagg ? viaPrefill : null,
-    peakReplicas: peak,
-    finalReplicas: live
+    // replicas that served at least one request: the count both simulators can state the same way
+    peakReplicas: requestsPerPod.filter((n) => n > 0).length
   };
   return {
     simulator: "typescript",
