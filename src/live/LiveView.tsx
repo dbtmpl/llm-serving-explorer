@@ -7,7 +7,7 @@ import { Rich } from "./Rich.js";
 import { architectureText, panelFields, panelText } from "../content/index.js";
 import { fmtInt, fmtMs } from "./format.js";
 import { C, Scene, TONE, type Free, type Target } from "./render.js";
-import { ARCHITECTURES, DEFAULT_ARCH, DEFAULT_PARAMS, GPUS, MODELS, advance, costPerMTok, createWorld, evictIdleNow, kvFill, livePods, median, setParam, spawnBurst, tokensPerSecond, type Params, type World } from "../sim/index.js";
+import { ARCHITECTURES, DEFAULT_ARCH, DEFAULT_PARAMS, GPUS, MODELS, advance, costPerMTok, createWorld, elapsed, evictIdleNow, kvFill, livePods, median, setParam, spawnBurst, tokensPerSecond, type Params, type World } from "../sim/index.js";
 import "./live.css";
 
 const EMPTY_TEXT = panelFields("empty", { title: "title", text: "text", hint: "hint" });
@@ -926,7 +926,7 @@ export function LiveView() {
           {playing ? "❚❚" : "▶"}
         </button>
         <div className="lv-clock" data-testid="clock">
-          <b>{w.t.toFixed(2)} s</b>
+          <b>{elapsed(w).toFixed(2)} s</b>
           <span>simulated</span>
         </div>
         <div className="lv-speed">

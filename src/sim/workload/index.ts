@@ -90,6 +90,7 @@ export function newSession(w: World, fixed?: FixedLengths, traceId?: number): vo
 /** The session's next turn: its whole history plus a new message. */
 export function newRequest(w: World, s: Session, fixed?: FixedLengths): void {
   const p = w.params;
+  w.startedAt ??= w.t;
   const fresh = fixed ? fixed.newTokens : s.turn === 0 ? Math.round(p.promptTokens * uniform(w, LENGTH_JITTER.firstPrompt)) : Math.max(1, Math.round(p.followTokens * uniform(w, LENGTH_JITTER.followUp)));
   const r: Req = {
     id: w.nextId++,

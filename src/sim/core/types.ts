@@ -207,6 +207,12 @@ export interface World {
   arrivalAcc: number;
   tokWindow: { t: number; n: number }[];
   lastSample: number;
+  /**
+   * Simulated time at which the first request was sent; null until then. The visible clock and the
+   * time-based statistics (GPU-seconds, the history charts) count from here, so an empty page does
+   * not run a clock. Pods that are meant to be warm still load their weights before it.
+   */
+  startedAt: number | null;
   /** Whether any request has ever reached this stage of the graph. */
   seen: { tokenizer: boolean; gateway: boolean };
   /** Conversation store: the text of every turn, the record every KV tier is derived from. */
