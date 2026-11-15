@@ -8,7 +8,8 @@ import { newScript, stepsFor } from "../../live/walkthrough.js";
 import { TOUR } from "../../live/Tutorial.js";
 import { run, world } from "../../sim/testing.js";
 import { evictIdleNow, spawnBurst } from "../../sim/index.js";
-import { ALL_DOCS, STEP_THROUGH, citationKeys, fill, fillEntry, parseDoc, parseInline, placeholders, stepText } from "../index.js";
+import { typeset } from "../../live/Rich.js";
+import { ALL_DOCS, STEP_THROUGH, blocks, citationKeys, fill, fillEntry, parseDoc, parseInline, placeholders, stepText } from "../index.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const srcDir = path.resolve(here, "../..");
@@ -19,6 +20,13 @@ const liveSource = (): string => {
     .filter((f) => /\.tsx?$/.test(f))
     .map((f) => readFileSync(path.join(dir, f), "utf8"))
     .join("\n");
+};
+
+const withoutMath = (text: string): string => text.replace(/\$\$[\s\S]+?\$\$|\$[^$\n]+\$/g, "");
+/** The text must split into blocks and every formula in it must typeset (KaTeX throws on a mistake in the TeX). */
+const checkMarkup = (text: string): void => {
+  blocks(text);
+  for (const m of text.matchAll(/\$\$[\s\S]+?\$\$|\$[^$\n]+\$/g)) typeset(m[0].startsWith("$$") ? m[0].slice(2, -2) : m[0].slice(1, -1), m[0].startsWith("$$"));
 };
 
 const docs = Object.entries(ALL_DOCS);
@@ -45,7 +53,9 @@ describe("content files", () => {
             for (const key of citationKeys(text)) expect(CITATIONS, `${e.id}.${field} cites @${key}`).toHaveProperty(key);
             for (const m of text.matchAll(/\]\((\S+?)\)/g)) expect(m[1], `${e.id}.${field}`).toMatch(/^https:\/\//);
             expect(() => parseInline(text), `${e.id}.${field}`).not.toThrow();
-            expect(text, `${e.id}.${field}`).not.toMatch(/\{[^}]*[^a-zA-Z0-9}][^}]*\}/);
+            // head-* and row-* fields are pieces of a table that the code assembles
+            if (!/^(head|row)-/.test(field)) expect(() => checkMarkup(text), `${e.id}.${field}`).not.toThrow();
+            expect(withoutMath(text), `${e.id}.${field}`).not.toMatch(/\{[^}]*[^a-zA-Z0-9}][^}]*\}/);
           }
         }
       });
@@ -97,7 +107,7 @@ describe("code and content agree", () => {
       for (const field of Object.keys(e.fields)) {
         if (["title", "body", "detail", "at"].includes(field)) continue;
         // a variant is named in code either whole or as the end of a computed name such as `detail-${policy}`
-        const stem = field.replace(/-(prefix-aware|least-loaded|round-robin)$/, "-");
+        const stem = field.replace(/-(prefix-aware|least-loaded|round-robin)(-chosen)?$/, "-");
         expect(source.includes(`"${field}"`) || (stem !== field && source.includes(`\`${stem}$`)), `${e.id}.${field}`).toBe(true);
       }
     }
@@ -169,7 +179,8 @@ describe("callouts produced by real simulations", () => {
         for (const c of calloutFor(e, w)) {
           seen.add(c.content);
           for (const text of [c.title, c.body, c.detail ?? ""]) {
-            expect(text, `${name}: ${e.kind}`).not.toMatch(/[{}]/);
+            expect(withoutMath(text), `${name}: ${e.kind}`).not.toMatch(/[{}]/);
+            expect(() => checkMarkup(text), `${name}: ${e.kind}`).not.toThrow();
             expect(() => parseInline(text)).not.toThrow();
           }
           expect(c.title.length, `${name}: ${e.kind}`).toBeGreaterThan(0);
@@ -207,7 +218,8 @@ describe("the step-through script produced from real simulations", () => {
           for (const c of stepsFor(ev, w, script)) {
             ids.add(c.content);
             for (const text of [c.at ?? "", c.title, c.body, c.detail ?? ""]) {
-              expect(text, `${name}: ${e.kind}`).not.toMatch(/[{}]/);
+              expect(withoutMath(text), `${name}: ${e.kind}`).not.toMatch(/[{}]/);
+            expect(() => checkMarkup(text), `${name}: ${e.kind}`).not.toThrow();
               expect(() => parseInline(text)).not.toThrow();
             }
           }
@@ -231,7 +243,7 @@ describe("the step-through script produced from real simulations", () => {
 });
 
 describe("the router step shows the real arithmetic", () => {
-  it("names the winner's three terms and the runner-up, and the cached pod wins on a follow-up", () => {
+  it("tabulates every candidate with the three terms, says in words why the cached pod wins on a follow-up", () => {
     const w = world({ minPods: 3, maxPods: 3, returnProb: 1, thinkTimeS: 1, maxTurns: 2 });
     run(w, 4);
     w.events.length = 0;
@@ -248,10 +260,15 @@ describe("the router step shows the real arithmetic", () => {
     }
     expect(picked).toHaveLength(2);
     // first turn: nobody holds anything, all three pods score the same, the first wins
-    expect(picked[0]).toMatch(/cache 3 × 0\.00 = 0\.00, KV memory 2 × 1\.00 = 2\.00, capacity 2 × 1\.00 = 2\.00\. Total 4\.00\. Runner-up pod-\d+: .* Total 4\.00\./);
+    expect(picked[0]).toContain("| pod | cached share $c$ | free KV memory $m$ | free capacity $q$ | score |");
+    expect(picked[0]).toMatch(/\| \*\*pod-\d+\*\* \| 0\.00 \| 1\.00 \| 1\.00 \| \*\*4\.00, chosen\*\* \|/);
+    expect(picked[0]).toMatch(/\| pod-\d+ \| 0\.00 \| 1\.00 \| 1\.00 \| 4\.00 \|/);
+    expect(picked[0]).toContain("$c$ is 0 for every pod because this is the first message of the conversation");
+    expect(picked[0]).toContain("All pods are equally free, so the first one wins.");
     expect(picked[0]).toContain("It holds none of this prompt");
     // follow-up: the pod holding the history leads by nearly the full 3 points of the cache term
-    expect(picked[1]).toMatch(/cache 3 × 0\.9\d = 2\.[89]\d, .* Total 6\.[89]\d\. Runner-up pod-\d+: cache 0\.00, .* Total 4\.00\./);
+    expect(picked[1]).toMatch(/\| \*\*pod-\d+\*\* \| 0\.9\d \| .* \| \*\*6\.[89]\d, chosen\*\* \|/);
+    expect(picked[1]).toMatch(/holds 9\d% of the prompt, which earns it 2\.[89]\d points/);
     expect(picked[1]).toContain("in its HBM, the GPU's own high-bandwidth memory");
   });
 });

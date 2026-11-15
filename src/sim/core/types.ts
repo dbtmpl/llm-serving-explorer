@@ -145,6 +145,8 @@ export interface RouteDecision {
   policy: RoutingId;
   /** Load at which a pod counts as full (`max_num_seqs` plus the queue slack). */
   capacity: number;
+  /** The policy's carried state before this decision (the round-robin counter). */
+  cursor: number;
   candidates: { podId: number; load: number; cache: number; tier: CacheLocation | null; kvUtilisation: number; score: number }[];
 }
 

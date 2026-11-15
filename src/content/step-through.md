@@ -17,6 +17,8 @@ Session {sid} is one conversation, drawn in its own colour everywhere in the gra
 ### detail
 A model call is stateless: the model remembers nothing between calls, so every request must carry everything it should know [@vllmOpenAiServer]. For this first message that is only the user's words; the gateway adds the rest.
 
+The call is an HTTP chat-completions request: a list of messages goes in, a reply comes out. That request and response format originated with [OpenAI's API][@openaiChatCompletions] and is copied by most open engines (vLLM, SGLang, TGI, llama.cpp, Ollama), which is why tools call it "OpenAI-compatible". It is a convention, not a formal standard, and other vendors such as Anthropic and Google have formats of their own.
+
 ## `req.followup` Same user, same conversation
 _Where:_ Beside the session, when it sends a follow-up message (at most once every five seconds in explain mode); the first box of a follow-up turn in step-through.
 
@@ -96,7 +98,7 @@ The request may wait in the router's queue for at most {limit}. After that it is
 The request may wait in the router's queue as long as it takes: the slider "shed requests waiting longer than" is at never. Set it, and a request that waits longer is rejected rather than answered late.
 
 ### detail
-llm-d calls this limit the flow-control request time-to-live [@llmdFlowControl]. A quick rejection (HTTP 429) helps a client more than an answer that arrives after it has given up, and it keeps the queue from filling with work nobody waits for.
+llm-d calls this limit the flow-control request time-to-live [@llmdFlowControl]. A quick rejection (HTTP 429) helps a client more than an answer that arrives after it has given up, and it keeps the queue from filling with work nobody waits for. This pattern is called load shedding: when more work arrives than can be served, reject the excess early ("fail fast") so that the work that is accepted still meets its deadline, instead of letting every request get slower until all of them are late [@sreHandlingOverload], [@awsLoadShedding].
 
 ## `req.queued` No pod is ready
 _Where:_ Beside the router, the first time a request arrives while no pod is ready.
@@ -161,20 +163,20 @@ The pod copies the model's weights, the learned numbers it computes with, into t
 ### detail
 The dark block filling up is that copy. It is most of the cold start, the {cold} a new pod needs before it takes traffic. GPU memory holds two things: these weights, and the cache of keys and values that comes next [@kwon2023].
 
-## `pod.ready` What is left is the KV pool
+## `pod.ready` The KV pool is what remains
 _Where:_ Beside the GPU memory of a pod, the first time a pod finishes loading.
 
 ### at
 On the new pod, in GPU memory
 
 ### title
-What is left is the KV pool
+GPU memory is split in four; the KV pool is what remains
 
 ### body
-{kv} of GPU memory is left: the KV pool, {blocks} blocks of 16 tokens. The KV cache holds the keys and values the model computed for every token it has read, so it never recomputes them.
+Each GPU's memory has four parts, left to right in the box: the weights ({weights}); activations and CUDA graphs ({work}), the working space of a forward pass and the captured graphs that launch it; the headroom ({headroom}), the part above `gpu_memory_utilization` that the engine leaves unused; and the KV pool, which is what remains of the share the engine may use: {kv} per GPU, {blocks} blocks of 16 tokens for the pod. The KV cache holds the keys and values the model computed for every token it has read, so it never recomputes them.
 
 ### detail
-The grid of empty cells is that pool; each cell takes the colour of the session whose tokens it holds. It is what remains of the memory the engine may use after weights, working space, the CUDA graphs it captures and a safety margin (`gpu_memory_utilization` of the memory the driver reports [@vllmEngineArgs], [@vllmMemoryProfiling]), cut into blocks so no memory is wasted [@kwon2023]. It caps how many requests fit at once.
+The grid of empty cells is that pool; each cell takes the colour of the session whose tokens it holds. The engine may use `gpu_memory_utilization` times the memory the driver reports [@vllmEngineArgs], [@vllmMemoryProfiling]; from that share it takes the weights, the activations and the CUDA graphs it captures, and the rest becomes the pool, cut into blocks so no memory is wasted [@kwon2023]. The headroom is not taken from the pool: it is the memory outside the share. The pool caps how many requests fit at once.
 
 ## `pod.failed` The model does not fit
 _Where:_ Beside the GPU memory of a pod whose weights leave no room for a batch (every time, not only the first).
@@ -198,7 +200,7 @@ At the router
 Routed to pod-{podId}
 
 ### how-prefix-aware
-Prefix-aware: each ready pod gets a score and the highest wins. A pod already holding this conversation's saved work (its KV cache) scores well, unless it is too busy.
+Prefix-aware: each ready pod gets a score and the highest wins. A pod already holding this conversation's saved work (its KV cache) scores well, unless it is too busy: busier than another pod by more than the cache saves.
 
 ### how-least-loaded
 Least-loaded: the pod with the fewest requests running, waiting or on their way, like the least-request balancer of [Envoy][@envoyLoadBalancing].
@@ -213,7 +215,20 @@ Disaggregated serving: most of this prompt is not cached on any decode pod, so i
 Disaggregated serving: the decode pod already holds nearly all of this prompt, so the prefill pool is skipped and the few new tokens are prefilled in place.
 
 ### detail-prefix-aware
-Score = 3 × (share of the prompt cached, scaled by memory tier) + 2 × (share of KV memory free) + 2 × (share of capacity free): [llm-d's weights][@llmdScheduling] in the [Gateway API Inference Extension][@gatewayInferenceExtension]; the tier scaling is the site's own. The cache earns at most 3, the rest up to 4, so a busy cache holder can lose; a pod with {cap} requests running, waiting or inbound is not a candidate.
+The score of a ready pod $p$ is below. The weights are [llm-d's][@llmdScheduling] in the [Gateway API Inference Extension][@gatewayInferenceExtension]; scaling the cache term by memory tier is the site's own.
+
+$$\text{score}(p) = [[wCache]]\,c_p + [[wKv]]\,m_p + [[wQueue]]\,q_p$$
+
+| symbol | in plain words |
+|---|---|
+| $c_p$ | cached share: the share of this prompt's tokens whose KV (saved work) is already on pod $p$, scaled down when it sits in a slower memory tier (HBM ×{affHbm}, DRAM ×{affDram}, SSD ×{affSsd}, remote pool ×{affRemote}) |
+| $m_p$ | free KV memory: the share of pod $p$'s KV memory that running requests do not hold |
+| $q_p$ | free capacity: the share of pod $p$'s request capacity that is still free, counting requests running, waiting or on their way against a capacity of {cap} |
+| [[wCache]], [[wKv]], [[wQueue]] | weights: how much each share counts |
+
+Every share is between 0 and 1, so the cache term is worth at most [[wCache]] points and the two load terms at most [[wKv]] each.
+
+**When is a pod too busy?** A pod with {cap} requests running, waiting or on their way ({slots} slots plus a queue allowance of {slack}) is not a candidate at all. Short of that, a pod is too busy when the other pods lead on the two load terms by more than the cache term is worth. The cached pod $a$ keeps the request while $[[wKv]]\,(m_b - m_a) + [[wQueue]]\,(q_b - q_a) < [[wCache]]\,c_a$. A pod holding the whole prompt in HBM ($c_a = 1$) therefore loses once another pod is ahead by more than [[wCache]] of the at most {loadMax} points the load terms can differ by, and one holding 96% of it once the lead passes {lead96}. In this model that happens when many conversations have their cache on the same pod: their follow-ups pile up there while another pod idles. The trade is between prefill time (recompute the prefix on the idle pod) and queue time (wait behind the full one); the weights say where it flips. Example with {slots} slots: a pod holding all of a prompt in HBM, with a KV pool {exampleKv}% in use, is passed over for an idle pod from {exampleLoad} requests on.
 
 ### detail-least-loaded
 The router counts each pod's running, waiting and inbound requests and takes the smallest. It ignores what the pods hold, so a returning conversation may land on a pod that has to compute its history again.
@@ -222,7 +237,7 @@ The router counts each pod's running, waiting and inbound requests and takes the
 The router keeps a counter and sends the next request to the next pod. It ignores load and cache, so a returning conversation usually lands on a pod that has to compute its history again.
 
 ## `walk.picked` Why this pod
-_Where:_ Step-through only: beside the router, right after the routing policy is explained. The body is the real arithmetic of the decision (or the rule that decided); the detail says what the chosen pod holds. The "holds" part names the memory tier when the pod holds some of the prompt.
+_Where:_ Step-through only: beside the router, right after the routing policy is explained. The body shows the decision as a table with one row per candidate pod (the numbers the router used, or the rule that decided) and one sentence in words about the notable values; the detail says what the chosen pod holds. The "holds" part names the memory tier when the pod holds some of the prompt.
 
 ### at
 At the router
@@ -230,20 +245,68 @@ At the router
 ### title
 Why pod-{podId} was chosen
 
-### calc
-Pod-{podId}: cache 3 × {cacheShare} = {cacheTerm}, KV memory 2 × {kvShare} = {kvTerm}, capacity 2 × {queueShare} = {queueTerm}. Total {score}.
+### table
+{table}
 
-### runner-up
-Runner-up pod-{otherId}: cache {otherCache}, memory {otherKv}, capacity {otherQueue}. Total {otherScore}.
+### head-prefix-aware
+| pod | cached share $c$ | free KV memory $m$ | free capacity $q$ | score |
+|---|---|---|---|---|
 
-### alone
-It was the only candidate.
+### row-prefix-aware
+| pod-{podId} | {c} | {m} | {q} | {score} |
+
+### row-prefix-aware-chosen
+| **pod-{podId}** | {c} | {m} | {q} | **{score}, chosen** |
+
+### head-least-loaded
+| pod | requests running, waiting or on their way | |
+|---|---|---|
+
+### row-least-loaded
+| pod-{podId} | {load} | |
+
+### row-least-loaded-chosen
+| **pod-{podId}** | {load} | **fewest, chosen** |
+
+### head-round-robin
+| pod | requests running, waiting or on their way | |
+|---|---|---|
+
+### row-round-robin
+| pod-{podId} | {load} | |
+
+### row-round-robin-chosen
+| **pod-{podId}** | {load} | **its turn, chosen** |
+
+### more
+{more} more pods scored lower and are not shown.
+
+### why-single
+There is only one pod, so there is nothing to compare; add pods in the menu to see a choice.
+
+### why-first-message
+$c$ is 0 for every pod because this is the first message of the conversation: no pod has seen it yet, so the cache cannot decide and only the two load terms do.
+
+### why-nothing-held
+$c$ is 0 for every pod because none of them still holds this conversation's saved work (it was evicted, dropped or never kept), so only the two load terms decide.
+
+### why-tie
+All pods are equally free, so the first one wins.
+
+### why-cache-clear
+Pod-{podId} holds {cache}% of the prompt, which earns it {cacheTerm} points, and no other pod is less loaded, so the cache decides.
+
+### why-cache-wins
+Pod-{podId} holds {cache}% of the prompt, which earns it {cacheTerm} points. Pod-{otherId} is less loaded and leads by {lead} points on free memory and capacity, but that is less than the cache is worth, so pod-{podId} wins.
+
+### why-cache-loses
+Pod-{otherId} holds more of the prompt ({otherCache}%, worth {otherCacheTerm} points), but pod-{podId} is less loaded and leads by {lead} points on free memory and capacity, more than that cache earns: pod-{otherId} is too busy, and the prefix is computed again on pod-{podId}.
 
 ### calc-least-loaded
-Of {n} ready pods, pod-{podId} has the fewest requests running, waiting or on their way.
+Of {n} ready pods, pod-{podId} has the fewest requests running, waiting or on their way; a tie goes to the first. Whatever the pods hold is ignored.
 
 ### calc-round-robin
-It is pod-{podId}'s turn.
+The router's counter stands at {turn}. With {n} pods, {turn} mod {n} = {slot}, so it is pod-{podId}'s turn, whatever it holds and however busy it is.
 
 ### holds-hbm
 It already holds {cache}% of this prompt in its HBM, the GPU's own high-bandwidth memory,
@@ -276,7 +339,7 @@ On the pod, at the engine's server
 On the pod: tokenised again
 
 ### body
-The request travels to the pod as text over an OpenAI-compatible HTTP API. The engine's own server applies the model's chat template and tokenises it again, giving the token ids the model really consumes.
+The request travels to the pod as text over an HTTP chat-completions API. The engine's own server applies the model's chat template and tokenises it again, giving the token ids the model really consumes.
 
 ### detail
 The gateway's count informed decisions (limits, routing); this second pass is the model's actual input [@vllmOpenAiServer]. Both happen on the host CPU, before the GPU is involved.
@@ -351,7 +414,7 @@ Prefill: the prompt is read
 The engine now reads all {prompt} prompt tokens in one go: prefill. The slot fills orange as it does, and for every token the engine stores keys and values in the KV cache.
 
 ### detail
-Long prompts are cut into chunks of at most the token budget per step, so one big prompt does not stall everyone else [@agrawal2024]. Reading a prompt needs a great deal of arithmetic for each byte fetched from memory.
+Long prompts are cut into chunks of at most the token budget per step, so one big prompt does not stall everyone else [@agrawal2024]. Prefill has high arithmetic intensity: it performs many arithmetic operations (FLOPs) for each byte it fetches from memory [@williams2009], which is what makes it compute-bound (the roofline gauge below shows it).
 
 ## `walk.kvmap` The KV cache as a map of GPU memory
 _Where:_ Step-through only: beside the GPU memory of a pod, while a prompt is being prefilled, the first time.
@@ -411,7 +474,7 @@ Output tokens stream back
 Each blue dot is a generated token leaving the pod. It is turned back into text and sent to the client at once (streaming), so the user watches the answer grow.
 
 ### detail
-One dot per running request per step. Streaming is part of the OpenAI-compatible API the engine serves [@vllmOpenAiServer].
+One dot per running request per step. Streaming is part of the chat-completions API the engine serves [@vllmOpenAiServer].
 
 ## `step.tokens.batch` One weight read, several tokens
 _Where:_ Beside the engine of a pod, the first time a step decodes at least four sequences together.

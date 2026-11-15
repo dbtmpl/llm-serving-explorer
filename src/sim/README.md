@@ -126,6 +126,9 @@ When a paper introduces a decision that has no home yet (for example KV compress
 - **NVIDIA Dynamo docs.** [NVIDIA Dynamo: KV block manager and tiered KV storage](https://docs.nvidia.com/dynamo/latest/). Used by: HBM → DRAM → SSD → shared pool.
 - **KEDA docs.** [KEDA: Kubernetes event-driven autoscaling](https://keda.sh/).
 - **OpenAI docs, rate limits.** [OpenAI API: rate limits (requests per minute and tokens per minute)](https://platform.openai.com/docs/guides/rate-limits).
+- **Google SRE book, Handling Overload.** [Site Reliability Engineering, chapter 21: Handling Overload (load shedding, graceful degradation)](https://sre.google/sre-book/handling-overload/).
+- **AWS Builders' Library, load shedding.** [Using load shedding to avoid overload (Amazon Builders' Library)](https://aws.amazon.com/builders-library/using-load-shedding-to-avoid-overload/).
+- **OpenAI API reference, chat completions.** [OpenAI API reference: create chat completion (the request and response format other engines copy)](https://developers.openai.com/api/reference/typescript/resources/chat/subresources/completions/methods/create).
 - **Envoy AI Gateway docs, usage-based rate limiting.** [Envoy AI Gateway: usage-based rate limiting (limits counted in tokens)](https://aigateway.envoyproxy.io/docs/capabilities/traffic/usage-based-ratelimiting).
 - **llm-d KV-cache indexer.** [llm-d KV-cache: indexer that maps a prompt's KV-block keys to the pods holding them](https://github.com/llm-d/llm-d-kv-cache).
 - **vLLM docs, OpenAI-compatible server.** [vLLM: OpenAI-compatible server (chat completions, chat template, streaming)](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html).
