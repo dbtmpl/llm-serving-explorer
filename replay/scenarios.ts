@@ -7,7 +7,7 @@
  * site never depends on the generator. The sizes are chosen against what each scenario has to show
  * and checked by the generator, which refuses a run that did not show it (see `expects`).
  */
-import type { Scenario, ScenarioRequest } from "../conformance/scenario.js";
+import type { Deployment, Scenario, ScenarioRequest } from "../conformance/scenario.js";
 import type { ReplayFate } from "../src/replay/schema.js";
 
 /** mulberry32, the generator the simulation itself uses; any fixed generator would do. */
@@ -50,6 +50,9 @@ export interface ReplayScenario {
 
 const engine = { tp: 1, gpuMemoryUtilisation: 0.9, maxNumSeqs: 12, maxNumBatchedTokens: 8192, prefixCaching: true };
 
+/** A conformance scenario of one deployment and no checks: a replay asserts nothing, it records. */
+const scenario = (id: string, title: string, main: Deployment): Scenario => ({ id, title, role: "check", arms: { main }, checks: [] });
+
 function conversations(seed: number, n: { sessions: number; start: number; every: number; gap: number; turns: number; first: [number, number]; follow: [number, number]; out: [number, number]; followOut: [number, number] }): ScenarioRequest[] {
   const r = rng(seed);
   const out: ScenarioRequest[] = [];
@@ -83,9 +86,7 @@ export const REPLAY_SCENARIOS: ReplayScenario[] = [
   {
     seriesIntervalS: 1,
     expect: { podsUsed: 4, stickyFollowUps: 20 },
-    scenario: {
-      id: "prefix-followups",
-      title: "Follow-up turns return to their pod",
+    scenario: scenario("prefix-followups", "Follow-up turns return to their pod", {
       model: "llama-3.1-8b",
       gpu: "h100",
       engine,
@@ -94,16 +95,13 @@ export const REPLAY_SCENARIOS: ReplayScenario[] = [
       queueDeadlineS: 0,
       // Eight conversations over four pods. A follow-up comes 11 s after the previous turn, long after
       // its answer finished, so the only thing that distinguishes the pods is who holds the history.
-      requests: conversations(11, { sessions: 8, start: 1, every: 0.6, gap: 11, turns: 4, first: [1500, 3200], follow: [80, 260], out: [150, 320], followOut: [60, 160] }),
-      checks: []
-    }
+      requests: conversations(11, { sessions: 8, start: 1, every: 0.6, gap: 11, turns: 4, first: [1500, 3200], follow: [80, 260], out: [150, 320], followOut: [60, 160] })
+    })
   },
   {
     seriesIntervalS: 0.5,
     expect: { fates: { completed: 10, shed: 5 }, heldAtRouter: 5, engineQueued: 3 },
-    scenario: {
-      id: "overload-shedding",
-      title: "Overload: queueing, then shedding",
+    scenario: scenario("overload-shedding", "Overload: queueing, then shedding", {
       model: "llama-3.1-8b",
       gpu: "h100",
       engine: { ...engine, maxNumSeqs: 4 },
@@ -112,16 +110,13 @@ export const REPLAY_SCENARIOS: ReplayScenario[] = [
       // The router holds a request once a pod has `max_num_seqs` plus its queue slack in flight, and
       // drops it after this many seconds.
       queueDeadlineS: 4,
-      requests: singles(23, { count: 70, start: 1, rate: 7, prompt: [600, 1600], out: [160, 320] }),
-      checks: []
-    }
+      requests: singles(23, { count: 70, start: 1, rate: 7, prompt: [600, 1600], out: [160, 320] })
+    })
   },
   {
     seriesIntervalS: 0.5,
     expect: { preemptions: 1, fates: { completed: 4 } },
-    scenario: {
-      id: "kv-pressure",
-      title: "KV pressure: preemption",
+    scenario: scenario("kv-pressure", "KV pressure: preemption", {
       model: "llama-3.1-8b",
       gpu: "h100",
       // 26 % of the GPU's memory leaves a pool of about 31,600 tokens. Each request grows to 9,000
@@ -130,16 +125,13 @@ export const REPLAY_SCENARIOS: ReplayScenario[] = [
       replicas: 1,
       routing: "prefix-aware",
       queueDeadlineS: 0,
-      requests: [1, 2, 3, 4].map((s) => ({ at: 1 + (s - 1) * 1.5, session: s, round: 0, newTokens: 5000, outputTokens: 4000 })),
-      checks: []
-    }
+      requests: [1, 2, 3, 4].map((s) => ({ at: 1 + (s - 1) * 1.5, session: s, round: 0, newTokens: 5000, outputTokens: 4000 }))
+    })
   },
   {
     seriesIntervalS: 1,
     expect: { podsUsed: 2, stickyFollowUps: 10 },
-    scenario: {
-      id: "steady-chat-70b",
-      title: "Steady chat, Llama 3.1 70B",
+    scenario: scenario("steady-chat-70b", "Steady chat, Llama 3.1 70B", {
       model: "llama-70b",
       gpu: "h200",
       engine: { ...engine, tp: 4 },
@@ -147,8 +139,7 @@ export const REPLAY_SCENARIOS: ReplayScenario[] = [
       routing: "prefix-aware",
       queueDeadlineS: 0,
       // Eight GPUs. A new conversation about every 1.5 s, three turns each with 14 s of thinking between them.
-      requests: conversations(5, { sessions: 14, start: 1, every: 1.5, gap: 14, turns: 3, first: [800, 2400], follow: [60, 220], out: [120, 260], followOut: [60, 180] }),
-      checks: []
-    }
+      requests: conversations(5, { sessions: 14, start: 1, every: 1.5, gap: 14, turns: 3, first: [800, 2400], follow: [60, 220], out: [120, 260], followOut: [60, 180] })
+    })
   }
 ];

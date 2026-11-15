@@ -20,7 +20,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { lockedCommit } from "../conformance/run/blis.js";
-import { BLOCK_TOKENS, CONFORMANCE_DIR, type Scenario } from "../conformance/scenario.js";
+import { BLOCK_TOKENS, CONFORMANCE_DIR, mainArm } from "../conformance/scenario.js";
 import { EPP_FILES, toBlis } from "../conformance/translate/toBlis.js";
 import { REPLAY_SCHEMA, parseReplay, type ReplayFate, type ReplayFile, type ReplayRequest, type ReplayScorer } from "../src/replay/schema.js";
 import { REPLAY_SCENARIOS, type Expect, type ReplayScenario } from "./scenarios.js";
@@ -118,17 +118,18 @@ export function scoresFrom(log: string, scorers: ReplayScorer[], pods: number): 
 }
 
 function reduce(rs: ReplayScenario, result: Result, log: string, binary: string): ReplayFile {
-  const s: Scenario = rs.scenario;
+  const s = rs.scenario;
+  const d = mainArm(s);
   const cluster = result.reports.engine.cluster;
   if (cluster.kv_capacity_tokens_per_replica % BLOCK_TOKENS) throw new Error(`${s.id}: KV capacity is not a whole number of blocks`);
   const scorers = scorersFrom(log);
-  const scores = scorers.length ? scoresFrom(log, scorers, s.replicas) : new Map<number, (number[] | null)[]>();
+  const scores = scorers.length ? scoresFrom(log, scorers, d.replicas) : new Map<number, (number[] | null)[]>();
   const requests: ReplayRequest[] = [];
   const rows = [...result.request_rows].sort((a, b) => Number(a.id.slice(8)) - Number(b.id.slice(8)));
-  if (rows.length !== s.requests.length) throw new Error(`${s.id}: BLIS returned ${rows.length} rows for ${s.requests.length} requests`);
+  if (rows.length !== d.requests.length) throw new Error(`${s.id}: BLIS returned ${rows.length} rows for ${d.requests.length} requests`);
   rows.forEach((row, i) => {
     if (row.id !== `request_${i}`) throw new Error(`${s.id}: expected row request_${i}, got ${row.id}`);
-    const asked = s.requests[i]!;
+    const asked = d.requests[i]!;
     if (row.session_id !== `s${asked.session}` || (row.round_index ?? 0) !== asked.round) throw new Error(`${s.id}: ${row.id} is ${row.session_id}/${row.round_index}, expected s${asked.session}/${asked.round}`);
     const arrival = row.arrival_us / 1e6;
     let fate: ReplayFate;
@@ -166,13 +167,13 @@ function reduce(rs: ReplayScenario, result: Result, log: string, binary: string)
       lastToken: done ? r6(arrival + row.e2e_us! / 1e6) : null,
       resumedAt: resumed ? r6(startAt) : null,
       preemptedAt: null,
-      droppedAt: done ? null : r6(arrival + s.queueDeadlineS),
+      droppedAt: done ? null : r6(arrival + d.queueDeadlineS),
       scores: done && decision ? decision.map((sc) => (sc ? sc.map((v) => Math.round(v * 1e6) / 1e6) : null)) : null
     });
   });
   const series = cluster.server_series;
   const engines = [...series.engines].sort((a, b) => Number(a.id.slice(9)) - Number(b.id.slice(9)));
-  if (engines.length !== s.replicas) throw new Error(`${s.id}: the series has ${engines.length} engines for ${s.replicas} replicas`);
+  if (engines.length !== d.replicas) throw new Error(`${s.id}: the series has ${engines.length} engines for ${d.replicas} replicas`);
   const interval = series.interval_s;
   pausesFrom(requests, engines, interval);
   const endS = Math.max(...requests.map((r) => r.lastToken ?? r.droppedAt ?? r.arrival));
@@ -189,16 +190,16 @@ function reduce(rs: ReplayScenario, result: Result, log: string, binary: string)
       registryHash: result.data.registry.hash
     },
     params: {
-      model: s.model,
-      gpu: s.gpu,
-      tp: s.engine.tp,
-      replicas: s.replicas,
-      routing: s.routing,
-      maxNumSeqs: s.engine.maxNumSeqs,
-      maxNumBatchedTokens: s.engine.maxNumBatchedTokens,
-      gpuMemoryUtilisation: s.engine.gpuMemoryUtilisation,
-      prefixCaching: s.engine.prefixCaching,
-      queueDeadlineS: s.queueDeadlineS,
+      model: d.model,
+      gpu: d.gpu,
+      tp: d.engine.tp,
+      replicas: d.replicas,
+      routing: d.routing,
+      maxNumSeqs: d.engine.maxNumSeqs,
+      maxNumBatchedTokens: d.engine.maxNumBatchedTokens,
+      gpuMemoryUtilisation: d.engine.gpuMemoryUtilisation,
+      prefixCaching: d.engine.prefixCaching,
+      queueDeadlineS: d.queueDeadlineS,
       kvBlocksPerReplica: cluster.kv_capacity_tokens_per_replica / BLOCK_TOKENS,
       blockTokens: BLOCK_TOKENS
     },

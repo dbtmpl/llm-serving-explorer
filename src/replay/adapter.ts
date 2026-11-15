@@ -19,7 +19,7 @@ import type { Run, RunWorld } from "../live/run.js";
 import type { ReplayFile, ReplayRequest } from "./schema.js";
 
 /** Catalogue entry the site draws each neutral model name with (the same architecture BLIS prices). */
-export const MODEL_IDS: Record<string, string> = { "llama-3.1-8b": "llama-3.1-8b", "llama-70b": "llama-3-70b" };
+export const MODEL_IDS: Record<string, string> = { "llama-3.1-8b": "llama-3.1-8b", "llama-70b": "llama-3.1-70b" };
 
 /** Presentation: seconds from a session sending a request to it reaching the router (drawn before BLIS's arrival time). */
 export const HOP_S = 0.3;
