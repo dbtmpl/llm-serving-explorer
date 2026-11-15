@@ -901,7 +901,7 @@ Preempted
 The KV pool is full and nothing idle is left to evict. Session {sid} gives its blocks back. It waits until all {lost} tokens of its context fit again, then re-prefills them.
 
 ### detail
-All of a sequence's blocks go, newest admission first. A waiting request, preempted or new, is let in only when its whole sequence fits in the free blocks, so a preempted one does not come straight back to be preempted again [@vllmScheduler]. The tokens already streamed are kept as text, so the user sees a stall, not a restart [@vllmOptimization].
+All of a sequence's blocks go, newest admission first. A waiting request, preempted or new, is let in only when blocks for its whole prompt (every token it still has to prefill) are free, and none is let in during a step that preempted, so a preempted one does not come straight back to be preempted again [@vllmScheduler]. The tokens already streamed are kept as text, so the user sees a stall, not a restart [@vllmOptimization].
 
 ### dive
 preempt, kvbytes
