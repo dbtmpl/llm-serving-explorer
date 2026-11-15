@@ -202,6 +202,44 @@ test.describe("live graph view", () => {
     expect(samples.at(-1)).toBe(1);
   });
 
+  test("hovering a part of a pod's GPU memory box names it, gives its size and explains it; clicking still selects the pod", async ({ page }) => {
+    await page.goto("/");
+    await page.getByTestId("send-10").click();
+    await page.getByTestId("speed-1").click();
+    await expect.poll(() => world(page, (w) => w.pods.some((p) => p.state === "ready")), { timeout: 30_000 }).toBe(true);
+    await page.getByTestId("toggle-panels").click();
+    await page.waitForTimeout(1500);
+    const expected: [string, RegExp][] = [
+      ["weights", /Weights/],
+      ["work", /Activations and CUDA graphs/],
+      ["kv", /KV pool/],
+      ["headroom", /Headroom/]
+    ];
+    for (const [part, name] of expected) {
+      const at = await page.evaluate((part) => {
+        const l = (window as unknown as { __live: { world: () => { pods: { id: number; state: string }[] }; scene: { segmentCenter: (w: unknown, id: number, part: string) => { x: number; y: number } | null } } }).__live;
+        const w = l.world();
+        return l.scene.segmentCenter(w, w.pods.find((p) => p.state === "ready")!.id, part);
+      }, part);
+      await page.mouse.move(at!.x, at!.y);
+      const tip = page.getByTestId("gpu-tip");
+      await expect(tip).toContainText(name);
+      await expect(tip).toContainText(/\d+(\.\d+)? (GB|MB)/);
+      expect((await tip.innerText()).length).toBeGreaterThan(60);
+    }
+    await page.mouse.move(2, 2);
+    await expect(page.getByTestId("gpu-tip")).toHaveCount(0);
+    // a click on a segment still selects the pod
+    const at = await page.evaluate(() => {
+      const l = (window as unknown as { __live: { world: () => { pods: { id: number; state: string }[] }; scene: { segmentCenter: (w: unknown, id: number, part: string) => { x: number; y: number } | null } } }).__live;
+      const w = l.world();
+      return l.scene.segmentCenter(w, w.pods.find((p) => p.state === "ready")!.id, "kv");
+    });
+    await page.mouse.click(at!.x, at!.y);
+    await page.getByTestId("toggle-panels").click();
+    await expect(page.getByTestId("inspector")).toContainText("pod-");
+  });
+
   /** Follow one request to the end of the walkthrough, returning every step title. */
   async function walkToEnd(page: Page, opts: { until?: RegExp } = {}): Promise<string[]> {
     const box = page.getByTestId("step-box");

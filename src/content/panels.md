@@ -91,3 +91,39 @@ Step {n} of {total} · fleet · {time} s
 
 ### no-rewind
 The graph could not be rewound this far, so it shows where the simulation is now.
+
+## `gpu.weights` Weights segment of the GPU memory box
+_Where:_ Hover tooltip over the dark block at the left of a GPU's memory box in a pod; the size is per GPU.
+
+### title
+Weights
+
+### text
+The model's learned numbers, copied into GPU memory at start-up. They are read in full for every step, so they set how fast a token can be made.
+
+## `gpu.work` Activations and CUDA graphs segment
+_Where:_ Hover tooltip over the thin strip after the weights in a GPU's memory box; the size is per GPU.
+
+### title
+Activations and CUDA graphs
+
+### text
+Working space for one forward pass (the intermediate results between layers) plus the captured CUDA graphs that launch a step cheaply. It is reserved once, before the KV pool is sized.
+
+## `gpu.kv` KV pool segment
+_Where:_ Hover tooltip over the grid of cells in a GPU's memory box; the size is per GPU.
+
+### title
+KV pool
+
+### text
+What remains of the memory the engine may use: blocks of 16 tokens that hold the keys and values of every token read so far. It caps how many requests fit at once.
+
+## `gpu.headroom` Headroom segment
+_Where:_ Hover tooltip over the hatched block at the right of a GPU's memory box; the size is per GPU.
+
+### title
+Headroom
+
+### text
+The part of the GPU's memory above `gpu_memory_utilization`, which the engine leaves unused as a safety margin.

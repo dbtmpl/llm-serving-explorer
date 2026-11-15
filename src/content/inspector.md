@@ -67,7 +67,11 @@ With tensor parallelism every GPU holds a slice of every sequence's KV heads, so
 _Where:_ Dive-in panel of a pod, group "Roofline and throughput", below the throughput rows.
 
 ### text
-A step cannot run faster than its arithmetic allows or than its data can arrive; the ridge is the arithmetic intensity (FLOPs per byte read) where those two limits meet [@williams2009]. Decode reads {weights} of weights to make one token per sequence, so it sits left of the ridge at any batch: throughput is set by bandwidth and context length, not FLOPs. Prefill does thousands of FLOPs per byte and runs at the flat roof.
+A step cannot run faster than its arithmetic allows or than its data can arrive [@williams2009]:
+
+$$t_{\text{step}} = \max\!\left(\frac{\text{FLOPs}}{\text{peak FLOP/s}},\ \frac{\text{bytes read}}{\text{memory bandwidth}}\right)$$
+
+The ridge is the arithmetic intensity (FLOPs per byte read) where the two terms are equal, $\text{peak FLOP/s} \div \text{bandwidth}$. Decode reads {weights} of weights to make one token per sequence, so it sits left of the ridge at any batch: throughput is set by bandwidth and context length, not FLOPs. Prefill does thousands of FLOPs per byte and runs at the flat roof.
 
 ## `pod.tiers.note` Memory tiers and eviction
 _Where:_ Dive-in panel of a pod, group "Memory tiers and eviction", below the table of tiers.

@@ -5,8 +5,8 @@ import { TOUR, TourArt } from "./Tutorial.js";
 import { Inspector } from "./Inspector.js";
 import { Rich } from "./Rich.js";
 import { architectureText, panelFields, panelText } from "../content/index.js";
-import { fmtInt, fmtMs } from "./format.js";
-import { C, Scene, TONE, type Free, type Target } from "./render.js";
+import { fmtGB, fmtInt, fmtMs } from "./format.js";
+import { C, Scene, TONE, type Free, type GpuPart, type Target } from "./render.js";
 import { ARCHITECTURES, DEFAULT_ARCH, DEFAULT_PARAMS, GPUS, MODELS, advance, costPerMTok, createWorld, elapsed, evictIdleNow, kvFill, livePods, median, setParam, spawnBurst, tokensPerSecond, type Params, type World } from "../sim/index.js";
 import "./live.css";
 
@@ -105,6 +105,14 @@ const PRESETS: Preset[] = [
   { id: "churn", label: "Conversations with churn", hint: panelText("scenario.churn"), params: { arrivalRate: 2, returnProb: 0.8, thinkTimeS: 3, maxTurns: 8, maxPods: 12 }, speed: 0.25, burst: [100, 2] }
 ];
 
+/** Hover text of the four parts of a GPU's memory box (src/content/panels.md). */
+const GPU_TIP: Record<GpuPart, { title: string; text: string }> = {
+  weights: panelFields("gpu.weights", { title: "title", text: "text" }),
+  work: panelFields("gpu.work", { title: "title", text: "text" }),
+  kv: panelFields("gpu.kv", { title: "title", text: "text" }),
+  headroom: panelFields("gpu.headroom", { title: "title", text: "text" })
+};
+
 function Slider({ label, value, min, max, step, fmt, onChange, id }: { label: string; value: number; min: number; max: number; step: number; fmt?: (v: number) => string; onChange: (v: number) => void; id?: string }) {
   return (
     <label className="lv-slider">
@@ -153,6 +161,7 @@ export function LiveView() {
   const [speed, setSpeed] = useState(0.1);
   const [explain, setExplain] = useState(true);
   const [selected, setSelected] = useState<Target | null>(null);
+  const [tip, setTip] = useState<{ x: number; y: number; part: GpuPart; bytes: number } | null>(null);
   const [callouts, setCallouts] = useState<Shown[]>([]);
   const [preset, setPreset] = useState<string | null>(null);
   const [stepMode, setStepMode] = useState(false);
@@ -406,6 +415,8 @@ export function LiveView() {
     };
     const move = (e: PointerEvent) => {
       if (!drag) {
+        const seg = scene.segmentAt(worldRef.current, e.offsetX, e.offsetY);
+        setTip((cur) => (seg ? { x: e.offsetX, y: e.offsetY, part: seg.part, bytes: seg.bytes } : cur ? null : cur));
         canvas.style.cursor = scene.hit(worldRef.current, e.offsetX, e.offsetY) ? "pointer" : "grab";
         return;
       }
@@ -436,11 +447,14 @@ export function LiveView() {
       scene.cam.x += before.x - after.x;
       scene.cam.y += before.y - after.y;
     };
+    const leave = () => setTip(null);
+    canvas.addEventListener("pointerleave", leave);
     canvas.addEventListener("pointerdown", down);
     canvas.addEventListener("pointermove", move);
     canvas.addEventListener("pointerup", up);
     canvas.addEventListener("wheel", wheel, { passive: false });
     return () => {
+      canvas.removeEventListener("pointerleave", leave);
       canvas.removeEventListener("pointerdown", down);
       canvas.removeEventListener("pointermove", move);
       canvas.removeEventListener("pointerup", up);
@@ -747,6 +761,16 @@ export function LiveView() {
           </div>
         ))}
       </div>
+
+      {tip && (
+        <div className="lv-tip" data-testid="gpu-tip" style={{ left: tip.x + 14, top: tip.y + 16 }}>
+          <b>{GPU_TIP[tip.part].title}</b>
+          <i>{fmtGB(tip.bytes, 2)} per GPU</i>
+          <span>
+            <Rich inline text={GPU_TIP[tip.part].text} />
+          </span>
+        </div>
+      )}
 
       {held && (
         <div className={`lv-callout lv-step tone-${held.tone}`} ref={heldEl} data-testid="step-box">
