@@ -28,4 +28,4 @@ export const LLAMA_70B = MODELS["llama-3.1-70b"]!;
 export const H100 = GPUS.h100!;
 
 /** Llama 3.1 8B in BF16 on one H100 at 0.9 memory utilisation, plus overrides. */
-export const replica = (over: Partial<ReplicaSpec> = {}): ReplicaSpec => ({ model: LLAMA_8B, gpu: H100, precision: "bf16", tp: 1, gpuMemUtil: 0.9, ...over });
+export const replica = (over: Partial<ReplicaSpec> = {}): ReplicaSpec => ({ model: LLAMA_8B, gpu: H100, precision: "bf16", tp: 1, gpuMemUtil: 0.9, maxNumBatchedTokens: 8192, maxNumSeqs: 256, ...over });

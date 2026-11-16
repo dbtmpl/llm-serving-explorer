@@ -1,6 +1,6 @@
 /** "Dive in" panel: the selected component explained with its live numbers. */
 import type { ReactNode } from "react";
-import { BLOCK_TOKENS, SCORER_WEIGHTS, attnFlops, decodeCurve, flopsPerToken, kvBytesPerToken, livePods, maxBatch, recomputeRatio, replicaSpec, ridge, seqLoad, tierBw, tierCapBlocks, weightBytes, type Pod } from "../sim/index.js";
+import { BLOCK_TOKENS, SCORER_WEIGHTS, attnFlops, computeSeconds, decodeCurve, flopsPerToken, kvBytesPerToken, livePods, maxBatch, recomputeRatio, replicaSpec, ridge, seqLoad, tierBw, tierCapBlocks, weightBytes, type Pod } from "../sim/index.js";
 import type { RunWorld } from "./run.js";
 import { inspectorText } from "../content/index.js";
 import { fmtGB, fmtInt, fmtMs } from "./format.js";
@@ -344,7 +344,7 @@ function PodView({ w, pod, part }: { w: RunWorld; pod: Pod; part: string }) {
         </table>
         <Row k={`a ${fmtInt(typical)}-token sequence`} v={fmtGB(bytes, 2)} />
         <Row k="reload from DRAM / SSD" v={`${fmtMs(bytes / tierBw(p).dram)} / ${fmtMs(bytes / tierBw(p).ssd)}`} />
-        <Row k="recompute by prefill" v={fmtMs(seqLoad(m, 0, typical).flops / (pod.spec.tp * pod.spec.gpu.peak * p.mfu))} />
+        <Row k="recompute by prefill" v={fmtMs(computeSeconds(pod.spec, seqLoad(m, 0, typical).flops, p, typical))} />
         <Note id="pod.tiers.note" />
       </>
     );
@@ -364,7 +364,9 @@ function PodView({ w, pod, part }: { w: RunWorld; pod: Pod; part: string }) {
           <Stack
             parts={[
               { label: "host (CPU) per step", value: last.tCpu, color: "#94a3b8", text: fmtMs(last.tCpu) },
-              { label: "GPU forward pass", value: last.tGpu, color: last.bound === "memory" ? C.decode : C.prefill, text: fmtMs(last.tGpu) }
+              { label: `GPU: ${last.bound === "memory" ? "memory-bound" : "compute-bound"} roofline max(memory, compute)`, value: last.tGpu - last.tComm - last.tLaunch, color: last.bound === "memory" ? C.decode : C.prefill, text: fmtMs(last.tGpu - last.tComm - last.tLaunch) },
+              ...(last.tComm > 0 ? [{ label: "tensor-parallel all-reduces", value: last.tComm, color: "#a78bfa", text: fmtMs(last.tComm) }] : []),
+              { label: "kernel launches (per layer)", value: last.tLaunch, color: "#cbd5e1", text: fmtMs(last.tLaunch) }
             ]}
           />
           <Row k={p.overlap ? "step = max(host, GPU)" : "step = host + GPU"} v={fmtMs(last.dur)} />
