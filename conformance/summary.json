@@ -1,7 +1,7 @@
 {
   "scenarios": {
-    "total": 38,
-    "calibration": 17,
+    "total": 48,
+    "calibration": 27,
     "withChecks": 21
   },
   "references": {
@@ -11,8 +11,8 @@
       "kind": "simulator",
       "lock": "c79c745619b16a8019339e3bbc79ee5e2923b258",
       "scenarios": {
-        "total": 36,
-        "calibration": 17,
+        "total": 46,
+        "calibration": 27,
         "withChecks": 19
       },
       "checks": {
@@ -20,17 +20,17 @@
         "byKind": {
           "exact": {
             "total": 12,
-            "exact": 10,
-            "known_difference": 2
+            "exact": 9,
+            "known_difference": 3
           },
           "capacity": {
             "total": 2,
-            "within_tolerance": 2
+            "known_difference": 2
           },
           "calibrated": {
             "total": 24,
-            "within_tolerance": 22,
-            "known_difference": 2
+            "within_tolerance": 23,
+            "known_difference": 1
           },
           "directional": {
             "total": 8,
@@ -38,27 +38,27 @@
             "known_difference": 2
           }
         },
-        "agree": 40,
-        "knownDifferences": 6,
+        "agree": 38,
+        "knownDifferences": 8,
         "disputed": 0
       },
       "headline": {
         "definition": "share of the checks BLIS covers that agree (exact, within tolerance or directionally)",
-        "agree": 40,
+        "agree": 38,
         "total": 46,
-        "share": 0.8696,
-        "knownDifferences": 6
+        "share": 0.8261,
+        "knownDifferences": 8
       },
       "deviations": {
         "definition": "One deviation per check the reference covers: |model - reference| / reference for a quantity or metric, the share of individual decisions that differ for exact checks, |effect ratio - 1| for directional checks. Medians and maxima are over those numbers; 'within x%' counts the checks at or below x%.",
         "groups": {
           "capacity": {
             "n": 2,
-            "median": 0.0002365,
-            "max": 0.0004013,
+            "median": 0.01772,
+            "max": 0.02195,
             "unbounded": 0,
             "within": {
-              "1": 2,
+              "1": 0,
               "5": 2,
               "10": 2,
               "25": 2
@@ -67,13 +67,13 @@
           "decisions": {
             "n": 12,
             "median": 0,
-            "max": 0.75,
+            "max": 1,
             "unbounded": 0,
             "within": {
-              "1": 10,
-              "5": 10,
-              "10": 10,
-              "25": 10
+              "1": 9,
+              "5": 9,
+              "10": 9,
+              "25": 9
             }
           },
           "timings_defaults": {
@@ -90,19 +90,19 @@
           },
           "timings": {
             "n": 24,
-            "median": 0.03989,
-            "max": 0.3914,
+            "median": 0.02662,
+            "max": 0.3357,
             "unbounded": 0,
             "within": {
-              "1": 8,
-              "5": 15,
-              "10": 19,
+              "1": 4,
+              "5": 17,
+              "10": 20,
               "25": 23
             }
           },
           "effects": {
             "n": 8,
-            "median": 0.158,
+            "median": 0.1396,
             "max": null,
             "unbounded": 1,
             "within": {
@@ -115,14 +115,14 @@
         },
         "overall": {
           "n": 46,
-          "median": 0.03083,
+          "median": 0.02391,
           "max": null,
           "unbounded": 1,
           "within": {
-            "1": 21,
-            "5": 28,
+            "1": 14,
+            "5": 29,
             "10": 34,
-            "25": 40
+            "25": 39
           }
         },
         "directionMismatches": 1
@@ -156,15 +156,15 @@
           "kind": "directional",
           "group": "effects",
           "what": "mean time to first token, fixed to autoscaled",
-          "ours": "8.3% of baseline",
+          "ours": "8.4% of baseline",
           "theirs": "40% of baseline",
           "deviation": {
             "kind": "effect",
-            "ratio": 0.20614916558789384,
+            "ratio": 0.21011415935381617,
             "directionMatches": true
           },
-          "absDeviation": 0.7939,
-          "deviationText": "ratio 0.206",
+          "absDeviation": 0.7899,
+          "deviationText": "ratio 0.21",
           "tolerance": "effect ratio 0.33 to 3",
           "holds": false,
           "cause": "The autoscalers follow different rules and reach different sizes",
@@ -202,11 +202,11 @@
           "theirs": "200% of baseline",
           "deviation": {
             "kind": "effect",
-            "ratio": 1.116623090820534,
+            "ratio": 1.1096068554780247,
             "directionMatches": true
           },
-          "absDeviation": 0.1166,
-          "deviationText": "ratio 1.12",
+          "absDeviation": 0.1096,
+          "deviationText": "ratio 1.11",
           "tolerance": "effect ratio 0.75 to 1.33",
           "holds": true,
           "cause": null,
@@ -219,17 +219,17 @@
           "kind": "capacity",
           "group": "capacity",
           "what": "KV blocks per replica",
-          "ours": "74,790 blocks",
+          "ours": "75,768 blocks",
           "theirs": "74,760 blocks",
           "deviation": {
             "kind": "relative",
-            "value": 0.0004012841091492777
+            "value": 0.01348314606741573
           },
-          "absDeviation": 0.0004013,
-          "deviationText": "+0.04%",
+          "absDeviation": 0.01348,
+          "deviationText": "+1.3%",
           "tolerance": "0.1%",
-          "holds": true,
-          "cause": null,
+          "holds": false,
+          "cause": "The graph estimate: a flat median in BLIS, derived from the capture list in the model",
           "byDesign": false
         },
         {
@@ -239,17 +239,17 @@
           "kind": "capacity",
           "group": "capacity",
           "what": "KV blocks per replica",
-          "ours": "27,928 blocks",
+          "ours": "28,539 blocks",
           "theirs": "27,926 blocks",
           "deviation": {
             "kind": "relative",
-            "value": 0.00007161784716751415
+            "value": 0.021950870156843084
           },
-          "absDeviation": 0.00007162,
-          "deviationText": "+0.007%",
+          "absDeviation": 0.02195,
+          "deviationText": "+2.2%",
           "tolerance": "0.1%",
-          "holds": true,
-          "cause": null,
+          "holds": false,
+          "cause": "The graph estimate: a flat median in BLIS, derived from the capture list in the model",
           "byDesign": false
         },
         {
@@ -302,14 +302,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "mean time to first token",
-          "ours": "87 ms",
+          "ours": "88 ms",
           "theirs": "80 ms",
           "deviation": {
             "kind": "relative",
-            "value": 0.09338358766032488
+            "value": 0.10597091380678784
           },
-          "absDeviation": 0.09338,
-          "deviationText": "+9.3%",
+          "absDeviation": 0.106,
+          "deviationText": "+10.6%",
           "tolerance": "30%",
           "holds": true,
           "cause": null,
@@ -322,20 +322,20 @@
           "kind": "exact",
           "group": "decisions",
           "what": "preemptions",
-          "ours": "1",
+          "ours": "0",
           "theirs": "1",
           "deviation": {
             "kind": "decisions",
-            "differing": 0,
+            "differing": 1,
             "total": 1,
-            "share": 0,
-            "maxRelative": 0
+            "share": 1,
+            "maxRelative": 1
           },
-          "absDeviation": 0,
-          "deviationText": "0 of 1 differ (0%)",
+          "absDeviation": 1,
+          "deviationText": "1 of 1 differ (100%); largest 100%",
           "tolerance": "equal",
-          "holds": true,
-          "cause": null,
+          "holds": false,
+          "cause": "The model's pool is 17 percent larger, so both sequences fit and nothing is preempted",
           "byDesign": false
         },
         {
@@ -550,15 +550,15 @@
           "kind": "directional",
           "group": "effects",
           "what": "mean time to first token of follow-up turns, round-robin to prefix-aware",
-          "ours": "51% of baseline",
+          "ours": "53% of baseline",
           "theirs": "63% of baseline",
           "deviation": {
             "kind": "effect",
-            "ratio": 0.8004887408763623,
+            "ratio": 0.8303275320976565,
             "directionMatches": true
           },
-          "absDeviation": 0.1995,
-          "deviationText": "ratio 0.8",
+          "absDeviation": 0.1697,
+          "deviationText": "ratio 0.83",
           "tolerance": "effect ratio 0.5 to 2",
           "holds": true,
           "cause": null,
@@ -637,14 +637,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "mean time per output token",
-          "ours": "4 ms",
+          "ours": "5 ms",
           "theirs": "4 ms",
           "deviation": {
             "kind": "relative",
-            "value": 0.0019894972248350354
+            "value": 0.0219490449675752
           },
-          "absDeviation": 0.001989,
-          "deviationText": "+0.2%",
+          "absDeviation": 0.02195,
+          "deviationText": "+2.2%",
           "tolerance": "12%",
           "holds": true,
           "cause": null,
@@ -678,15 +678,15 @@
           "kind": "directional",
           "group": "effects",
           "what": "mean time to first token of follow-up turns, gpu-only to with-dram",
-          "ours": "62% of baseline",
+          "ours": "63% of baseline",
           "theirs": "66% of baseline",
           "deviation": {
             "kind": "effect",
-            "ratio": 0.9382691540203345,
+            "ratio": 0.9434357946164426,
             "directionMatches": true
           },
-          "absDeviation": 0.06173,
-          "deviationText": "ratio 0.938",
+          "absDeviation": 0.05656,
+          "deviationText": "ratio 0.943",
           "tolerance": "effect ratio 0.75 to 1.33",
           "holds": true,
           "cause": null,
@@ -699,14 +699,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "mean time to first token",
-          "ours": "206 ms",
+          "ours": "203 ms",
           "theirs": "208 ms",
           "deviation": {
             "kind": "relative",
-            "value": -0.006069153424199241
+            "value": -0.020606777312274976
           },
-          "absDeviation": 0.006069,
-          "deviationText": "-0.6%",
+          "absDeviation": 0.02061,
+          "deviationText": "-2.1%",
           "tolerance": "30%",
           "holds": true,
           "cause": null,
@@ -719,14 +719,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "mean time per output token",
-          "ours": "24 ms",
+          "ours": "23 ms",
           "theirs": "22 ms",
           "deviation": {
             "kind": "relative",
-            "value": 0.06366092242496726
+            "value": 0.038387567549270966
           },
-          "absDeviation": 0.06366,
-          "deviationText": "+6.4%",
+          "absDeviation": 0.03839,
+          "deviationText": "+3.8%",
           "tolerance": "12%",
           "holds": true,
           "cause": null,
@@ -739,14 +739,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "mean end-to-end time",
-          "ours": "3,340 ms",
+          "ours": "3,280 ms",
           "theirs": "3,180 ms",
           "deviation": {
             "kind": "relative",
-            "value": 0.049232987671586376
+            "value": 0.03142386187448008
           },
-          "absDeviation": 0.04923,
-          "deviationText": "+4.9%",
+          "absDeviation": 0.03142,
+          "deviationText": "+3.1%",
           "tolerance": "15%",
           "holds": true,
           "cause": null,
@@ -763,9 +763,9 @@
           "theirs": "221 tok/s",
           "deviation": {
             "kind": "relative",
-            "value": -0.0023725724393374044
+            "value": -0.001990323743338936
           },
-          "absDeviation": 0.002373,
+          "absDeviation": 0.00199,
           "deviationText": "-0.2%",
           "tolerance": "10%",
           "holds": true,
@@ -779,14 +779,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "mean time to first token",
-          "ours": "58 ms",
+          "ours": "59 ms",
           "theirs": "67 ms",
           "deviation": {
             "kind": "relative",
-            "value": -0.13680545143782466
+            "value": -0.11555031635131659
           },
-          "absDeviation": 0.1368,
-          "deviationText": "-13.7%",
+          "absDeviation": 0.1156,
+          "deviationText": "-11.6%",
           "tolerance": "30%",
           "holds": true,
           "cause": null,
@@ -803,10 +803,10 @@
           "theirs": "5 ms",
           "deviation": {
             "kind": "relative",
-            "value": -0.03971856946770492
+            "value": 0.04893096342247855
           },
-          "absDeviation": 0.03972,
-          "deviationText": "-4.0%",
+          "absDeviation": 0.04893,
+          "deviationText": "+4.9%",
           "tolerance": "12%",
           "holds": true,
           "cause": null,
@@ -819,14 +819,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "mean end-to-end time",
-          "ours": "963 ms",
+          "ours": "1,050 ms",
           "theirs": "1,010 ms",
           "deviation": {
             "kind": "relative",
-            "value": -0.04567844232491272
+            "value": 0.0371824414379088
           },
-          "absDeviation": 0.04568,
-          "deviationText": "-4.6%",
+          "absDeviation": 0.03718,
+          "deviationText": "+3.7%",
           "tolerance": "15%",
           "holds": true,
           "cause": null,
@@ -839,14 +839,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "throughput",
-          "ours": "422 tok/s",
+          "ours": "418 tok/s",
           "theirs": "421 tok/s",
           "deviation": {
             "kind": "relative",
-            "value": 0.003627194352266404
+            "value": -0.005792854239227463
           },
-          "absDeviation": 0.003627,
-          "deviationText": "+0.4%",
+          "absDeviation": 0.005793,
+          "deviationText": "-0.6%",
           "tolerance": "10%",
           "holds": true,
           "cause": null,
@@ -859,14 +859,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "mean time to first token",
-          "ours": "759 ms",
+          "ours": "728 ms",
           "theirs": "545 ms",
           "deviation": {
             "kind": "relative",
-            "value": 0.39141278533080937
+            "value": 0.33570187030335563
           },
-          "absDeviation": 0.3914,
-          "deviationText": "+39.1%",
+          "absDeviation": 0.3357,
+          "deviationText": "+33.6%",
           "tolerance": "30%",
           "holds": false,
           "cause": "One compute-efficiency factor cannot follow the reference's prefill cost curve",
@@ -883,10 +883,10 @@
           "theirs": "14 ms",
           "deviation": {
             "kind": "relative",
-            "value": 0.06339007558226718
+            "value": 0.01081722670410923
           },
-          "absDeviation": 0.06339,
-          "deviationText": "+6.3%",
+          "absDeviation": 0.01082,
+          "deviationText": "+1.1%",
           "tolerance": "12%",
           "holds": true,
           "cause": null,
@@ -899,14 +899,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "mean end-to-end time",
-          "ours": "3,790 ms",
+          "ours": "3,610 ms",
           "theirs": "3,390 ms",
           "deviation": {
             "kind": "relative",
-            "value": 0.11609507331354046
+            "value": 0.06301801614624822
           },
-          "absDeviation": 0.1161,
-          "deviationText": "+11.6%",
+          "absDeviation": 0.06302,
+          "deviationText": "+6.3%",
           "tolerance": "15%",
           "holds": true,
           "cause": null,
@@ -919,17 +919,17 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "throughput",
-          "ours": "1,678 tok/s",
+          "ours": "1,761 tok/s",
           "theirs": "1,870 tok/s",
           "deviation": {
             "kind": "relative",
-            "value": -0.10273153524283778
+            "value": -0.0581739331219527
           },
-          "absDeviation": 0.1027,
-          "deviationText": "-10.3%",
+          "absDeviation": 0.05817,
+          "deviationText": "-5.8%",
           "tolerance": "10%",
-          "holds": false,
-          "cause": "Same prefill cost curve, seen from the throughput side",
+          "holds": true,
+          "cause": null,
           "byDesign": false
         },
         {
@@ -939,14 +939,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "mean time to first token",
-          "ours": "83 ms",
+          "ours": "85 ms",
           "theirs": "92 ms",
           "deviation": {
             "kind": "relative",
-            "value": -0.09305686972644861
+            "value": -0.0702094679868882
           },
-          "absDeviation": 0.09306,
-          "deviationText": "-9.3%",
+          "absDeviation": 0.07021,
+          "deviationText": "-7.0%",
           "tolerance": "30%",
           "holds": true,
           "cause": null,
@@ -963,10 +963,10 @@
           "theirs": "11 ms",
           "deviation": {
             "kind": "relative",
-            "value": 0.007928365319368094
+            "value": 0.01737566612097171
           },
-          "absDeviation": 0.007928,
-          "deviationText": "+0.8%",
+          "absDeviation": 0.01738,
+          "deviationText": "+1.7%",
           "tolerance": "12%",
           "holds": true,
           "cause": null,
@@ -979,14 +979,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "mean end-to-end time",
-          "ours": "2,070 ms",
+          "ours": "2,090 ms",
           "theirs": "2,070 ms",
           "deviation": {
             "kind": "relative",
-            "value": 0.001172915804114777
+            "value": 0.011620465117404924
           },
-          "absDeviation": 0.001173,
-          "deviationText": "+0.1%",
+          "absDeviation": 0.01162,
+          "deviationText": "+1.2%",
           "tolerance": "15%",
           "holds": true,
           "cause": null,
@@ -999,14 +999,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "throughput",
-          "ours": "378 tok/s",
+          "ours": "377 tok/s",
           "theirs": "378 tok/s",
           "deviation": {
             "kind": "relative",
-            "value": -0.00026148042142477276
+            "value": -0.002713406360174905
           },
-          "absDeviation": 0.0002615,
-          "deviationText": "-0.03%",
+          "absDeviation": 0.002713,
+          "deviationText": "-0.3%",
           "tolerance": "10%",
           "holds": true,
           "cause": null,
@@ -1019,14 +1019,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "mean time to first token",
-          "ours": "331 ms",
+          "ours": "244 ms",
           "theirs": "279 ms",
           "deviation": {
             "kind": "relative",
-            "value": 0.18647532643160514
+            "value": -0.12470400490803712
           },
-          "absDeviation": 0.1865,
-          "deviationText": "+18.6%",
+          "absDeviation": 0.1247,
+          "deviationText": "-12.5%",
           "tolerance": "30%",
           "holds": true,
           "cause": null,
@@ -1039,14 +1039,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "mean time per output token",
-          "ours": "20 ms",
+          "ours": "19 ms",
           "theirs": "20 ms",
           "deviation": {
             "kind": "relative",
-            "value": 0.03426913860350064
+            "value": -0.02002410054661533
           },
-          "absDeviation": 0.03427,
-          "deviationText": "+3.4%",
+          "absDeviation": 0.02002,
+          "deviationText": "-2.0%",
           "tolerance": "12%",
           "holds": true,
           "cause": null,
@@ -1059,14 +1059,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "mean end-to-end time",
-          "ours": "6,960 ms",
+          "ours": "6,520 ms",
           "theirs": "6,690 ms",
           "deviation": {
             "kind": "relative",
-            "value": 0.04007007407481384
+            "value": -0.02586082319822053
           },
-          "absDeviation": 0.04007,
-          "deviationText": "+4.0%",
+          "absDeviation": 0.02586,
+          "deviationText": "-2.6%",
           "tolerance": "15%",
           "holds": true,
           "cause": null,
@@ -1079,14 +1079,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "throughput",
-          "ours": "2,039 tok/s",
+          "ours": "2,119 tok/s",
           "theirs": "2,073 tok/s",
           "deviation": {
             "kind": "relative",
-            "value": -0.016829382476272112
+            "value": 0.021801390326547973
           },
-          "absDeviation": 0.01683,
-          "deviationText": "-1.7%",
+          "absDeviation": 0.0218,
+          "deviationText": "+2.2%",
           "tolerance": "10%",
           "holds": true,
           "cause": null,
@@ -1099,6 +1099,7 @@
         "batching/continuous",
         "cost/flops-per-token",
         "cost/host-overhead",
+        "cost/kernel-launch",
         "cost/kv-bytes-per-token",
         "cost/roofline",
         "cost/tensor-parallelism",
@@ -1124,6 +1125,24 @@
           "claim": "Mean time to first token, which here is queue wait, is lower with the autoscaler."
         },
         {
+          "scenario": "kv-budget-70b-h200-tp4",
+          "check": "kv-blocks-per-replica",
+          "kind": "capacity",
+          "claim": "One tensor-parallel replica holds the same number of KV blocks as the reference, to within 0.1 percent."
+        },
+        {
+          "scenario": "kv-budget-8b-h100",
+          "check": "kv-blocks-per-replica",
+          "kind": "capacity",
+          "claim": "One replica holds the same number of KV blocks as the reference, to within 0.1 percent."
+        },
+        {
+          "scenario": "preemption-overflow",
+          "check": "preemption-count",
+          "kind": "exact",
+          "claim": "Exactly one preemption happens, and both requests finish."
+        },
+        {
           "scenario": "routing-round-robin",
           "check": "pod-sequence",
           "kind": "exact",
@@ -1146,12 +1165,6 @@
           "check": "ttft-mean",
           "kind": "calibrated",
           "claim": "Mean time to first token agrees with BLIS after calibration."
-        },
-        {
-          "scenario": "timing-8b-h100-burst",
-          "check": "throughput",
-          "kind": "calibrated",
-          "claim": "Output tokens per second over the run agree with BLIS after calibration."
         }
       ]
     },
@@ -1166,7 +1179,7 @@
         "withChecks": 2
       },
       "checks": {
-        "total": 43,
+        "total": 51,
         "byKind": {
           "exact": {
             "total": 1,
@@ -1177,35 +1190,35 @@
             "known_difference": 2
           },
           "calibrated": {
-            "total": 40,
-            "known_difference": 21,
-            "within_tolerance": 19
+            "total": 48,
+            "within_tolerance": 39,
+            "known_difference": 9
           },
           "directional": {
             "total": 0
           }
         },
-        "agree": 20,
-        "knownDifferences": 23,
+        "agree": 40,
+        "knownDifferences": 11,
         "disputed": 0
       },
       "headline": {
         "definition": "share of the checks Measured vLLM covers that agree (exact, within tolerance or directionally)",
-        "agree": 20,
-        "total": 43,
-        "share": 0.4651,
-        "knownDifferences": 23
+        "agree": 40,
+        "total": 51,
+        "share": 0.7843,
+        "knownDifferences": 11
       },
       "deviations": {
         "definition": "One deviation per check the reference covers: |model - reference| / reference for a quantity or metric, the share of individual decisions that differ for exact checks, |effect ratio - 1| for directional checks. Medians and maxima are over those numbers; 'within x%' counts the checks at or below x%.",
         "groups": {
           "capacity": {
             "n": 2,
-            "median": 0.06713,
-            "max": 0.1213,
+            "median": 0.07469,
+            "max": 0.141,
             "unbounded": 0,
             "within": {
-              "1": 0,
+              "1": 1,
               "5": 1,
               "10": 1,
               "25": 2
@@ -1225,26 +1238,26 @@
           },
           "timings_defaults": {
             "n": 20,
-            "median": 0.7326,
-            "max": 1.355,
+            "median": 0.09979,
+            "max": 0.277,
             "unbounded": 0,
             "within": {
               "1": 0,
-              "5": 0,
-              "10": 0,
-              "25": 0
+              "5": 1,
+              "10": 10,
+              "25": 19
             }
           },
           "timings": {
-            "n": 20,
-            "median": 0.08069,
-            "max": 0.3189,
+            "n": 28,
+            "median": 0.03457,
+            "max": 0.3523,
             "unbounded": 0,
             "within": {
-              "1": 0,
-              "5": 3,
-              "10": 15,
-              "25": 19
+              "1": 7,
+              "5": 19,
+              "10": 21,
+              "25": 27
             }
           },
           "effects": {
@@ -1261,15 +1274,15 @@
           }
         },
         "overall": {
-          "n": 43,
-          "median": 0.1526,
-          "max": 1.355,
+          "n": 51,
+          "median": 0.06075,
+          "max": 0.3523,
           "unbounded": 0,
           "within": {
-            "1": 1,
-            "5": 5,
-            "10": 17,
-            "25": 22
+            "1": 9,
+            "5": 22,
+            "10": 33,
+            "25": 49
           }
         },
         "directionMismatches": 0
@@ -1282,17 +1295,17 @@
           "kind": "capacity",
           "group": "capacity",
           "what": "KV blocks per replica",
-          "ours": "2,274 blocks",
+          "ours": "2,953 blocks",
           "theirs": "2,588 blocks",
           "deviation": {
             "kind": "relative",
-            "value": -0.1213292117465224
+            "value": 0.1410355486862442
           },
-          "absDeviation": 0.1213,
-          "deviationText": "-12.1%",
+          "absDeviation": 0.141,
+          "deviationText": "+14.1%",
           "tolerance": "0.1%",
           "holds": false,
-          "cause": "The activation and graph terms of the model's memory budget are not the real engine's",
+          "cause": "The model's pool is larger: the engine's profile counted memory the model has no term for",
           "byDesign": false
         },
         {
@@ -1302,17 +1315,17 @@
           "kind": "calibrated",
           "group": "timings_defaults",
           "what": "mean time to first token",
-          "ours": "135.1 s",
+          "ours": "70.91 s",
           "theirs": "65.49 s",
           "deviation": {
             "kind": "relative",
-            "value": 1.0630040052108265
+            "value": 0.08281866532755362
           },
-          "absDeviation": 1.063,
-          "deviationText": "+106.3%",
+          "absDeviation": 0.08282,
+          "deviationText": "+8.3%",
           "tolerance": "30%",
-          "holds": false,
-          "cause": "Queue wait compounds the slower service rate: the engine is saturated from the first requests",
+          "holds": true,
+          "cause": null,
           "byDesign": false
         },
         {
@@ -1322,17 +1335,17 @@
           "kind": "calibrated",
           "group": "timings_defaults",
           "what": "median time to first token",
-          "ours": "130.2 s",
+          "ours": "70.45 s",
           "theirs": "60.13 s",
           "deviation": {
             "kind": "relative",
-            "value": 1.1649312776918503
+            "value": 0.17175594279514686
           },
-          "absDeviation": 1.165,
-          "deviationText": "+116.5%",
+          "absDeviation": 0.1718,
+          "deviationText": "+17.2%",
           "tolerance": "30%",
-          "holds": false,
-          "cause": "Queue wait compounds the slower service rate: the engine is saturated from the first requests",
+          "holds": true,
+          "cause": null,
           "byDesign": false
         },
         {
@@ -1342,17 +1355,17 @@
           "kind": "calibrated",
           "group": "timings_defaults",
           "what": "99th percentile time to first token",
-          "ours": "274.1 s",
+          "ours": "152 s",
           "theirs": "137.4 s",
           "deviation": {
             "kind": "relative",
-            "value": 0.995149314477157
+            "value": 0.10691132860795097
           },
-          "absDeviation": 0.9951,
-          "deviationText": "+99.5%",
+          "absDeviation": 0.1069,
+          "deviationText": "+10.7%",
           "tolerance": "30%",
-          "holds": false,
-          "cause": "Queue wait compounds the slower service rate: the engine is saturated from the first requests",
+          "holds": true,
+          "cause": null,
           "byDesign": false
         },
         {
@@ -1362,17 +1375,17 @@
           "kind": "calibrated",
           "group": "timings_defaults",
           "what": "mean time per output token",
-          "ours": "51 ms",
+          "ours": "40 ms",
           "theirs": "32 ms",
           "deviation": {
             "kind": "relative",
-            "value": 0.5827627197563701
+            "value": 0.2174628603025069
           },
-          "absDeviation": 0.5828,
-          "deviationText": "+58.3%",
+          "absDeviation": 0.2175,
+          "deviationText": "+21.7%",
           "tolerance": "12%",
           "holds": false,
-          "cause": "The model's decode step is slower than the real engine's at default parameters, and the fit goes to a bound",
+          "cause": "Time per token: the model recomputes preempted requests from zero where the engine reuses its prefix cache",
           "byDesign": false
         },
         {
@@ -1382,17 +1395,17 @@
           "kind": "calibrated",
           "group": "timings_defaults",
           "what": "median time per output token",
-          "ours": "49 ms",
+          "ours": "38 ms",
           "theirs": "31 ms",
           "deviation": {
             "kind": "relative",
-            "value": 0.6009167999554907
+            "value": 0.22531899764027827
           },
-          "absDeviation": 0.6009,
-          "deviationText": "+60.1%",
+          "absDeviation": 0.2253,
+          "deviationText": "+22.5%",
           "tolerance": "12%",
           "holds": false,
-          "cause": "The model's decode step is slower than the real engine's at default parameters, and the fit goes to a bound",
+          "cause": "Time per token: the model recomputes preempted requests from zero where the engine reuses its prefix cache",
           "byDesign": false
         },
         {
@@ -1402,17 +1415,17 @@
           "kind": "calibrated",
           "group": "timings_defaults",
           "what": "99th percentile time per output token",
-          "ours": "87 ms",
+          "ours": "72 ms",
           "theirs": "56 ms",
           "deviation": {
             "kind": "relative",
-            "value": 0.5450965374274663
+            "value": 0.2770482745069098
           },
-          "absDeviation": 0.5451,
-          "deviationText": "+54.5%",
+          "absDeviation": 0.277,
+          "deviationText": "+27.7%",
           "tolerance": "20%",
           "holds": false,
-          "cause": "The model's decode step is slower than the real engine's at default parameters, and the fit goes to a bound",
+          "cause": "Time per token: the model recomputes preempted requests from zero where the engine reuses its prefix cache",
           "byDesign": false
         },
         {
@@ -1422,17 +1435,17 @@
           "kind": "calibrated",
           "group": "timings_defaults",
           "what": "mean end-to-end time",
-          "ours": "168.6 s",
+          "ours": "96.65 s",
           "theirs": "86.61 s",
           "deviation": {
             "kind": "relative",
-            "value": 0.946577885319651
+            "value": 0.11592821921983779
           },
-          "absDeviation": 0.9466,
-          "deviationText": "+94.7%",
+          "absDeviation": 0.1159,
+          "deviationText": "+11.6%",
           "tolerance": "15%",
-          "holds": false,
-          "cause": "End-to-end time is the queue wait plus a decode that is over half again too slow",
+          "holds": true,
+          "cause": null,
           "byDesign": false
         },
         {
@@ -1442,17 +1455,17 @@
           "kind": "calibrated",
           "group": "timings_defaults",
           "what": "median end-to-end time",
-          "ours": "161.6 s",
+          "ours": "94.22 s",
           "theirs": "83.42 s",
           "deviation": {
             "kind": "relative",
-            "value": 0.937492886095848
+            "value": 0.12936154358823582
           },
-          "absDeviation": 0.9375,
-          "deviationText": "+93.7%",
+          "absDeviation": 0.1294,
+          "deviationText": "+12.9%",
           "tolerance": "15%",
-          "holds": false,
-          "cause": "End-to-end time is the queue wait plus a decode that is over half again too slow",
+          "holds": true,
+          "cause": null,
           "byDesign": false
         },
         {
@@ -1462,17 +1475,17 @@
           "kind": "calibrated",
           "group": "timings_defaults",
           "what": "99th percentile end-to-end time",
-          "ours": "301.4 s",
+          "ours": "169.2 s",
           "theirs": "153.6 s",
           "deviation": {
             "kind": "relative",
-            "value": 0.9617377484150602
+            "value": 0.1011719239086879
           },
-          "absDeviation": 0.9617,
-          "deviationText": "+96.2%",
+          "absDeviation": 0.1012,
+          "deviationText": "+10.1%",
           "tolerance": "20%",
-          "holds": false,
-          "cause": "End-to-end time is the queue wait plus a decode that is over half again too slow",
+          "holds": true,
+          "cause": null,
           "byDesign": false
         },
         {
@@ -1482,17 +1495,17 @@
           "kind": "calibrated",
           "group": "timings_defaults",
           "what": "throughput",
-          "ours": "590 tok/s",
+          "ours": "979 tok/s",
           "theirs": "1,066 tok/s",
           "deviation": {
             "kind": "relative",
-            "value": -0.44667808832503647
+            "value": -0.08172020968093792
           },
-          "absDeviation": 0.4467,
-          "deviationText": "-44.7%",
+          "absDeviation": 0.08172,
+          "deviationText": "-8.2%",
           "tolerance": "10%",
-          "holds": false,
-          "cause": "Throughput follows the slower service rate",
+          "holds": true,
+          "cause": null,
           "byDesign": false
         },
         {
@@ -1502,14 +1515,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "mean time to first token",
-          "ours": "97.29 s",
+          "ours": "87.32 s",
           "theirs": "89.3 s",
           "deviation": {
             "kind": "relative",
-            "value": 0.08943965313269922
+            "value": -0.02225985542173952
           },
-          "absDeviation": 0.08944,
-          "deviationText": "+8.9%",
+          "absDeviation": 0.02226,
+          "deviationText": "-2.2%",
           "tolerance": "30%",
           "holds": true,
           "cause": null,
@@ -1522,14 +1535,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "median time to first token",
-          "ours": "98.88 s",
+          "ours": "85.59 s",
           "theirs": "90.38 s",
           "deviation": {
             "kind": "relative",
-            "value": 0.09410344887907156
+            "value": -0.052949491556138165
           },
-          "absDeviation": 0.0941,
-          "deviationText": "+9.4%",
+          "absDeviation": 0.05295,
+          "deviationText": "-5.3%",
           "tolerance": "30%",
           "holds": true,
           "cause": null,
@@ -1542,14 +1555,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "99th percentile time to first token",
-          "ours": "145.1 s",
+          "ours": "137 s",
           "theirs": "137.8 s",
           "deviation": {
             "kind": "relative",
-            "value": 0.05336451168895405
+            "value": -0.005953706233955977
           },
-          "absDeviation": 0.05336,
-          "deviationText": "+5.3%",
+          "absDeviation": 0.005954,
+          "deviationText": "-0.6%",
           "tolerance": "30%",
           "holds": true,
           "cause": null,
@@ -1562,14 +1575,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "mean time per output token",
-          "ours": "28 ms",
+          "ours": "35 ms",
           "theirs": "32 ms",
           "deviation": {
             "kind": "relative",
-            "value": -0.10851097339113835
+            "value": 0.10397536280087459
           },
-          "absDeviation": 0.1085,
-          "deviationText": "-10.9%",
+          "absDeviation": 0.104,
+          "deviationText": "+10.4%",
           "tolerance": "12%",
           "holds": true,
           "cause": null,
@@ -1582,17 +1595,17 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "median time per output token",
-          "ours": "28 ms",
+          "ours": "34 ms",
           "theirs": "31 ms",
           "deviation": {
             "kind": "relative",
-            "value": -0.08064157292429122
+            "value": 0.12027552183025078
           },
-          "absDeviation": 0.08064,
-          "deviationText": "-8.1%",
+          "absDeviation": 0.1203,
+          "deviationText": "+12.0%",
           "tolerance": "12%",
-          "holds": true,
-          "cause": null,
+          "holds": false,
+          "cause": "Time per token: the model recomputes preempted requests from zero where the engine reuses its prefix cache",
           "byDesign": false
         },
         {
@@ -1602,17 +1615,17 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "99th percentile time per output token",
-          "ours": "38 ms",
+          "ours": "56 ms",
           "theirs": "55 ms",
           "deviation": {
             "kind": "relative",
-            "value": -0.31887774216687603
+            "value": 0.020802451680617656
           },
-          "absDeviation": 0.3189,
-          "deviationText": "-31.9%",
+          "absDeviation": 0.0208,
+          "deviationText": "+2.1%",
           "tolerance": "20%",
-          "holds": false,
-          "cause": "The real run has a heavier tail of per-token time than the model reproduces; not explained",
+          "holds": true,
+          "cause": null,
           "byDesign": false
         },
         {
@@ -1622,14 +1635,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "mean end-to-end time",
-          "ours": "115.2 s",
+          "ours": "109.5 s",
           "theirs": "109.4 s",
           "deviation": {
             "kind": "relative",
-            "value": 0.053343892120127925
+            "value": 0.001303282750613455
           },
-          "absDeviation": 0.05334,
-          "deviationText": "+5.3%",
+          "absDeviation": 0.001303,
+          "deviationText": "+0.1%",
           "tolerance": "15%",
           "holds": true,
           "cause": null,
@@ -1642,14 +1655,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "median end-to-end time",
-          "ours": "116 s",
+          "ours": "109.3 s",
           "theirs": "110 s",
           "deviation": {
             "kind": "relative",
-            "value": 0.054456384932784686
+            "value": -0.006143672638100396
           },
-          "absDeviation": 0.05446,
-          "deviationText": "+5.4%",
+          "absDeviation": 0.006144,
+          "deviationText": "-0.6%",
           "tolerance": "15%",
           "holds": true,
           "cause": null,
@@ -1662,14 +1675,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "99th percentile end-to-end time",
-          "ours": "160.7 s",
+          "ours": "153.1 s",
           "theirs": "153.8 s",
           "deviation": {
             "kind": "relative",
-            "value": 0.04444665488249041
+            "value": -0.004917464649950156
           },
-          "absDeviation": 0.04445,
-          "deviationText": "+4.4%",
+          "absDeviation": 0.004917,
+          "deviationText": "-0.5%",
           "tolerance": "20%",
           "holds": true,
           "cause": null,
@@ -1682,14 +1695,94 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "throughput",
-          "ours": "702 tok/s",
+          "ours": "732 tok/s",
           "theirs": "729 tok/s",
           "deviation": {
             "kind": "relative",
-            "value": -0.03769286112300662
+            "value": 0.003599498979795619
           },
-          "absDeviation": 0.03769,
-          "deviationText": "-3.8%",
+          "absDeviation": 0.003599,
+          "deviationText": "+0.4%",
+          "tolerance": "10%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "crossfit-ttft-mean",
+          "reference": "vllm-measured",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "mean time to first token",
+          "ours": "63.88 s",
+          "theirs": "65.49 s",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.02460234235308793
+          },
+          "absDeviation": 0.0246,
+          "deviationText": "-2.5%",
+          "tolerance": "30%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "crossfit-tpot-mean",
+          "reference": "vllm-measured",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "mean time per output token",
+          "ours": "37 ms",
+          "theirs": "32 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.12419125467059823
+          },
+          "absDeviation": 0.1242,
+          "deviationText": "+12.4%",
+          "tolerance": "12%",
+          "holds": false,
+          "cause": "Time per token: the model recomputes preempted requests from zero where the engine reuses its prefix cache",
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "crossfit-e2e-mean",
+          "reference": "vllm-measured",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "mean end-to-end time",
+          "ours": "87.62 s",
+          "theirs": "86.61 s",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.011719414819763765
+          },
+          "absDeviation": 0.01172,
+          "deviationText": "+1.2%",
+          "tolerance": "15%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "crossfit-throughput",
+          "reference": "vllm-measured",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "throughput",
+          "ours": "1,062 tok/s",
+          "theirs": "1,066 tok/s",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.003979052932771042
+          },
+          "absDeviation": 0.003979,
+          "deviationText": "-0.4%",
           "tolerance": "10%",
           "holds": true,
           "cause": null,
@@ -1702,17 +1795,17 @@
           "kind": "capacity",
           "group": "capacity",
           "what": "KV blocks per replica",
-          "ours": "36,174 blocks",
+          "ours": "36,956 blocks",
           "theirs": "36,649 blocks",
           "deviation": {
             "kind": "relative",
-            "value": -0.012960790198914022
+            "value": 0.008376763349613904
           },
-          "absDeviation": 0.01296,
-          "deviationText": "-1.3%",
+          "absDeviation": 0.008377,
+          "deviationText": "+0.8%",
           "tolerance": "0.1%",
           "holds": false,
-          "cause": "The activation and graph terms of the model's memory budget are not the real engine's",
+          "cause": "The model's pool is larger: the engine's profile counted memory the model has no term for",
           "byDesign": false
         },
         {
@@ -1745,17 +1838,17 @@
           "kind": "calibrated",
           "group": "timings_defaults",
           "what": "mean time to first token",
-          "ours": "14.58 s",
+          "ours": "5,590 ms",
           "theirs": "6,520 ms",
           "deviation": {
             "kind": "relative",
-            "value": 1.2380858157532
+            "value": -0.1426003915706203
           },
-          "absDeviation": 1.238,
-          "deviationText": "+123.8%",
+          "absDeviation": 0.1426,
+          "deviationText": "-14.3%",
           "tolerance": "30%",
-          "holds": false,
-          "cause": "Queue wait compounds the slower service rate: the engine is saturated after the first 100 requests",
+          "holds": true,
+          "cause": null,
           "byDesign": false
         },
         {
@@ -1765,17 +1858,17 @@
           "kind": "calibrated",
           "group": "timings_defaults",
           "what": "median time to first token",
-          "ours": "19.7 s",
+          "ours": "7,550 ms",
           "theirs": "8,370 ms",
           "deviation": {
             "kind": "relative",
-            "value": 1.3548464438312495
+            "value": -0.09787619865938264
           },
-          "absDeviation": 1.355,
-          "deviationText": "+135.5%",
+          "absDeviation": 0.09788,
+          "deviationText": "-9.8%",
           "tolerance": "30%",
-          "holds": false,
-          "cause": "Queue wait compounds the slower service rate: the engine is saturated after the first 100 requests",
+          "holds": true,
+          "cause": null,
           "byDesign": false
         },
         {
@@ -1785,17 +1878,17 @@
           "kind": "calibrated",
           "group": "timings_defaults",
           "what": "99th percentile time to first token",
-          "ours": "39.75 s",
+          "ours": "15.57 s",
           "theirs": "18.39 s",
           "deviation": {
             "kind": "relative",
-            "value": 1.1617960882842275
+            "value": -0.15328292955677134
           },
-          "absDeviation": 1.162,
-          "deviationText": "+116.2%",
+          "absDeviation": 0.1533,
+          "deviationText": "-15.3%",
           "tolerance": "30%",
-          "holds": false,
-          "cause": "Queue wait compounds the slower service rate: the engine is saturated after the first 100 requests",
+          "holds": true,
+          "cause": null,
           "byDesign": false
         },
         {
@@ -1805,17 +1898,17 @@
           "kind": "calibrated",
           "group": "timings_defaults",
           "what": "mean time per output token",
-          "ours": "48 ms",
+          "ours": "30 ms",
           "theirs": "31 ms",
           "deviation": {
             "kind": "relative",
-            "value": 0.5100749093825117
+            "value": -0.05980454245526367
           },
-          "absDeviation": 0.5101,
-          "deviationText": "+51.0%",
+          "absDeviation": 0.0598,
+          "deviationText": "-6.0%",
           "tolerance": "12%",
-          "holds": false,
-          "cause": "The model's decode step is slower than the real engine's at default parameters, and the fit goes to a bound",
+          "holds": true,
+          "cause": null,
           "byDesign": false
         },
         {
@@ -1825,17 +1918,17 @@
           "kind": "calibrated",
           "group": "timings_defaults",
           "what": "median time per output token",
-          "ours": "49 ms",
+          "ours": "31 ms",
           "theirs": "33 ms",
           "deviation": {
             "kind": "relative",
-            "value": 0.5090182190339312
+            "value": -0.06074569363303406
           },
-          "absDeviation": 0.509,
-          "deviationText": "+50.9%",
+          "absDeviation": 0.06075,
+          "deviationText": "-6.1%",
           "tolerance": "12%",
-          "holds": false,
-          "cause": "The model's decode step is slower than the real engine's at default parameters, and the fit goes to a bound",
+          "holds": true,
+          "cause": null,
           "byDesign": false
         },
         {
@@ -1845,17 +1938,17 @@
           "kind": "calibrated",
           "group": "timings_defaults",
           "what": "99th percentile time per output token",
-          "ours": "53 ms",
+          "ours": "33 ms",
           "theirs": "36 ms",
           "deviation": {
             "kind": "relative",
-            "value": 0.4585796855006051
+            "value": -0.08114050245961367
           },
-          "absDeviation": 0.4586,
-          "deviationText": "+45.9%",
+          "absDeviation": 0.08114,
+          "deviationText": "-8.1%",
           "tolerance": "20%",
-          "holds": false,
-          "cause": "The model's decode step is slower than the real engine's at default parameters, and the fit goes to a bound",
+          "holds": true,
+          "cause": null,
           "byDesign": false
         },
         {
@@ -1865,17 +1958,17 @@
           "kind": "calibrated",
           "group": "timings_defaults",
           "what": "mean end-to-end time",
-          "ours": "45.48 s",
+          "ours": "24.8 s",
           "theirs": "26.95 s",
           "deviation": {
             "kind": "relative",
-            "value": 0.6877399918662492
+            "value": -0.07964205096752067
           },
-          "absDeviation": 0.6877,
-          "deviationText": "+68.8%",
+          "absDeviation": 0.07964,
+          "deviationText": "-8.0%",
           "tolerance": "15%",
-          "holds": false,
-          "cause": "End-to-end time is the queue wait plus a decode that is half again too slow",
+          "holds": true,
+          "cause": null,
           "byDesign": false
         },
         {
@@ -1885,17 +1978,17 @@
           "kind": "calibrated",
           "group": "timings_defaults",
           "what": "median end-to-end time",
-          "ours": "49.25 s",
+          "ours": "25.57 s",
           "theirs": "28.36 s",
           "deviation": {
             "kind": "relative",
-            "value": 0.7367011781223339
+            "value": -0.09838318829104223
           },
-          "absDeviation": 0.7367,
-          "deviationText": "+73.7%",
+          "absDeviation": 0.09838,
+          "deviationText": "-9.8%",
           "tolerance": "15%",
-          "holds": false,
-          "cause": "End-to-end time is the queue wait plus a decode that is half again too slow",
+          "holds": true,
+          "cause": null,
           "byDesign": false
         },
         {
@@ -1905,17 +1998,17 @@
           "kind": "calibrated",
           "group": "timings_defaults",
           "what": "99th percentile end-to-end time",
-          "ours": "62.34 s",
+          "ours": "33.12 s",
           "theirs": "36.06 s",
           "deviation": {
             "kind": "relative",
-            "value": 0.7284974845048993
+            "value": -0.08165890858211819
           },
-          "absDeviation": 0.7285,
-          "deviationText": "+72.8%",
+          "absDeviation": 0.08166,
+          "deviationText": "-8.2%",
           "tolerance": "20%",
-          "holds": false,
-          "cause": "End-to-end time is the queue wait plus a decode that is half again too slow",
+          "holds": true,
+          "cause": null,
           "byDesign": false
         },
         {
@@ -1925,17 +2018,17 @@
           "kind": "calibrated",
           "group": "timings_defaults",
           "what": "throughput",
-          "ours": "2,067 tok/s",
+          "ours": "3,187 tok/s",
           "theirs": "3,068 tok/s",
           "deviation": {
             "kind": "relative",
-            "value": -0.3264511806709611
+            "value": 0.03880015399325096
           },
-          "absDeviation": 0.3265,
-          "deviationText": "-32.6%",
+          "absDeviation": 0.0388,
+          "deviationText": "+3.9%",
           "tolerance": "10%",
-          "holds": false,
-          "cause": "Throughput follows the slower service rate",
+          "holds": true,
+          "cause": null,
           "byDesign": false
         },
         {
@@ -1945,14 +2038,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "mean time to first token",
-          "ours": "8,360 ms",
+          "ours": "9,190 ms",
           "theirs": "9,700 ms",
           "deviation": {
             "kind": "relative",
-            "value": -0.13788403926693846
+            "value": -0.05313131119117337
           },
-          "absDeviation": 0.1379,
-          "deviationText": "-13.8%",
+          "absDeviation": 0.05313,
+          "deviationText": "-5.3%",
           "tolerance": "30%",
           "holds": true,
           "cause": null,
@@ -1965,14 +2058,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "median time to first token",
-          "ours": "8,960 ms",
+          "ours": "10.01 s",
           "theirs": "10.18 s",
           "deviation": {
             "kind": "relative",
-            "value": -0.1201830367441065
+            "value": -0.016521162217402637
           },
-          "absDeviation": 0.1202,
-          "deviationText": "-12.0%",
+          "absDeviation": 0.01652,
+          "deviationText": "-1.7%",
           "tolerance": "30%",
           "holds": true,
           "cause": null,
@@ -1985,14 +2078,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "99th percentile time to first token",
-          "ours": "15.67 s",
+          "ours": "17.62 s",
           "theirs": "18.49 s",
           "deviation": {
             "kind": "relative",
-            "value": -0.15260556196460304
+            "value": -0.04692732892615382
           },
-          "absDeviation": 0.1526,
-          "deviationText": "-15.3%",
+          "absDeviation": 0.04693,
+          "deviationText": "-4.7%",
           "tolerance": "30%",
           "holds": true,
           "cause": null,
@@ -2005,14 +2098,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "mean time per output token",
-          "ours": "30 ms",
+          "ours": "31 ms",
           "theirs": "32 ms",
           "deviation": {
             "kind": "relative",
-            "value": -0.05399835584508386
+            "value": -0.02705876463207034
           },
-          "absDeviation": 0.054,
-          "deviationText": "-5.4%",
+          "absDeviation": 0.02706,
+          "deviationText": "-2.7%",
           "tolerance": "12%",
           "holds": true,
           "cause": null,
@@ -2025,14 +2118,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "median time per output token",
-          "ours": "31 ms",
+          "ours": "33 ms",
           "theirs": "33 ms",
           "deviation": {
             "kind": "relative",
-            "value": -0.0590822695739648
+            "value": -0.004799247443613751
           },
-          "absDeviation": 0.05908,
-          "deviationText": "-5.9%",
+          "absDeviation": 0.004799,
+          "deviationText": "-0.5%",
           "tolerance": "12%",
           "holds": true,
           "cause": null,
@@ -2045,14 +2138,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "99th percentile time per output token",
-          "ours": "33 ms",
+          "ours": "35 ms",
           "theirs": "36 ms",
           "deviation": {
             "kind": "relative",
-            "value": -0.08809809823713408
+            "value": -0.037947246868049914
           },
-          "absDeviation": 0.0881,
-          "deviationText": "-8.8%",
+          "absDeviation": 0.03795,
+          "deviationText": "-3.8%",
           "tolerance": "20%",
           "holds": true,
           "cause": null,
@@ -2065,14 +2158,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "mean end-to-end time",
-          "ours": "27.18 s",
+          "ours": "28.5 s",
           "theirs": "29.57 s",
           "deviation": {
             "kind": "relative",
-            "value": -0.08072782425466223
+            "value": -0.03606093174714227
           },
-          "absDeviation": 0.08073,
-          "deviationText": "-8.1%",
+          "absDeviation": 0.03606,
+          "deviationText": "-3.6%",
           "tolerance": "15%",
           "holds": true,
           "cause": null,
@@ -2085,14 +2178,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "median end-to-end time",
-          "ours": "27.31 s",
+          "ours": "28.82 s",
           "theirs": "30.04 s",
           "deviation": {
             "kind": "relative",
-            "value": -0.09090659135358665
+            "value": -0.04062304386518671
           },
-          "absDeviation": 0.09091,
-          "deviationText": "-9.1%",
+          "absDeviation": 0.04062,
+          "deviationText": "-4.1%",
           "tolerance": "15%",
           "holds": true,
           "cause": null,
@@ -2105,14 +2198,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "99th percentile end-to-end time",
-          "ours": "33.3 s",
+          "ours": "34.81 s",
           "theirs": "36.09 s",
           "deviation": {
             "kind": "relative",
-            "value": -0.07725486129288413
+            "value": -0.03525173312994513
           },
-          "absDeviation": 0.07725,
-          "deviationText": "-7.7%",
+          "absDeviation": 0.03525,
+          "deviationText": "-3.5%",
           "tolerance": "20%",
           "holds": true,
           "cause": null,
@@ -2125,17 +2218,97 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "throughput",
-          "ours": "2,376 tok/s",
+          "ours": "2,406 tok/s",
           "theirs": "2,327 tok/s",
           "deviation": {
             "kind": "relative",
-            "value": 0.020968566422825234
+            "value": 0.03389180436806866
           },
-          "absDeviation": 0.02097,
-          "deviationText": "+2.1%",
+          "absDeviation": 0.03389,
+          "deviationText": "+3.4%",
           "tolerance": "10%",
           "holds": true,
           "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "crossfit-ttft-mean",
+          "reference": "vllm-measured",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "mean time to first token",
+          "ours": "4,220 ms",
+          "theirs": "6,520 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.352257225441638
+          },
+          "absDeviation": 0.3523,
+          "deviationText": "-35.2%",
+          "tolerance": "30%",
+          "holds": false,
+          "cause": "Parameters fitted on the other card carry the recompute error of its run",
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "crossfit-tpot-mean",
+          "reference": "vllm-measured",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "mean time per output token",
+          "ours": "27 ms",
+          "theirs": "31 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.1474967294572029
+          },
+          "absDeviation": 0.1475,
+          "deviationText": "-14.7%",
+          "tolerance": "12%",
+          "holds": false,
+          "cause": "Parameters fitted on the other card carry the recompute error of its run",
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "crossfit-e2e-mean",
+          "reference": "vllm-measured",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "mean end-to-end time",
+          "ours": "21.64 s",
+          "theirs": "26.95 s",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.19708381960217777
+          },
+          "absDeviation": 0.1971,
+          "deviationText": "-19.7%",
+          "tolerance": "15%",
+          "holds": false,
+          "cause": "Parameters fitted on the other card carry the recompute error of its run",
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "crossfit-throughput",
+          "reference": "vllm-measured",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "throughput",
+          "ours": "3,500 tok/s",
+          "theirs": "3,068 tok/s",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.1406066019602167
+          },
+          "absDeviation": 0.1406,
+          "deviationText": "+14.1%",
+          "tolerance": "10%",
+          "holds": false,
+          "cause": "Parameters fitted on the other card carry the recompute error of its run",
           "byDesign": false
         }
       ],
@@ -2158,24 +2331,6 @@
         },
         {
           "scenario": "measured-8b-rtx-4090",
-          "check": "default-ttft-mean",
-          "kind": "calibrated",
-          "claim": "Mean time to first token over all 300 requests, the site's default parameters agrees with the measured run."
-        },
-        {
-          "scenario": "measured-8b-rtx-4090",
-          "check": "default-ttft-p50",
-          "kind": "calibrated",
-          "claim": "Median time to first token over all 300 requests, the site's default parameters agrees with the measured run."
-        },
-        {
-          "scenario": "measured-8b-rtx-4090",
-          "check": "default-ttft-p99",
-          "kind": "calibrated",
-          "claim": "99th-percentile time to first token over all 300 requests, the site's default parameters agrees with the measured run."
-        },
-        {
-          "scenario": "measured-8b-rtx-4090",
           "check": "default-tpot-mean",
           "kind": "calibrated",
           "claim": "Mean time per output token over all 300 requests, the site's default parameters agrees with the measured run."
@@ -2194,33 +2349,15 @@
         },
         {
           "scenario": "measured-8b-rtx-4090",
-          "check": "default-e2e-mean",
+          "check": "fitted-tpot-p50",
           "kind": "calibrated",
-          "claim": "Mean end-to-end time over all 300 requests, the site's default parameters agrees with the measured run."
+          "claim": "Median time per output token over the 200 held-out requests, parameters fitted to the first 100 agrees with the measured run."
         },
         {
           "scenario": "measured-8b-rtx-4090",
-          "check": "default-e2e-p50",
+          "check": "crossfit-tpot-mean",
           "kind": "calibrated",
-          "claim": "Median end-to-end time over all 300 requests, the site's default parameters agrees with the measured run."
-        },
-        {
-          "scenario": "measured-8b-rtx-4090",
-          "check": "default-e2e-p99",
-          "kind": "calibrated",
-          "claim": "99th-percentile end-to-end time over all 300 requests, the site's default parameters agrees with the measured run."
-        },
-        {
-          "scenario": "measured-8b-rtx-4090",
-          "check": "default-throughput",
-          "kind": "calibrated",
-          "claim": "Output tokens per second from the first arrival to the last completion over all 300 requests, the site's default parameters agrees with the measured run."
-        },
-        {
-          "scenario": "measured-8b-rtx-4090",
-          "check": "fitted-tpot-p99",
-          "kind": "calibrated",
-          "claim": "99th-percentile time per output token over the 200 held-out requests, parameters fitted to the first 100 agrees with the measured run."
+          "claim": "Mean time per output token over all 300 requests, parameters fitted to the RTX PRO 6000 run (a different GPU) agrees with the measured run."
         },
         {
           "scenario": "measured-8b-rtx-pro-6000",
@@ -2230,63 +2367,27 @@
         },
         {
           "scenario": "measured-8b-rtx-pro-6000",
-          "check": "default-ttft-mean",
+          "check": "crossfit-ttft-mean",
           "kind": "calibrated",
-          "claim": "Mean time to first token over all 300 requests, the site's default parameters agrees with the measured run."
+          "claim": "Mean time to first token over all 300 requests, parameters fitted to the RTX 4090 run (a different GPU) agrees with the measured run."
         },
         {
           "scenario": "measured-8b-rtx-pro-6000",
-          "check": "default-ttft-p50",
+          "check": "crossfit-tpot-mean",
           "kind": "calibrated",
-          "claim": "Median time to first token over all 300 requests, the site's default parameters agrees with the measured run."
+          "claim": "Mean time per output token over all 300 requests, parameters fitted to the RTX 4090 run (a different GPU) agrees with the measured run."
         },
         {
           "scenario": "measured-8b-rtx-pro-6000",
-          "check": "default-ttft-p99",
+          "check": "crossfit-e2e-mean",
           "kind": "calibrated",
-          "claim": "99th-percentile time to first token over all 300 requests, the site's default parameters agrees with the measured run."
+          "claim": "Mean end-to-end time over all 300 requests, parameters fitted to the RTX 4090 run (a different GPU) agrees with the measured run."
         },
         {
           "scenario": "measured-8b-rtx-pro-6000",
-          "check": "default-tpot-mean",
+          "check": "crossfit-throughput",
           "kind": "calibrated",
-          "claim": "Mean time per output token over all 300 requests, the site's default parameters agrees with the measured run."
-        },
-        {
-          "scenario": "measured-8b-rtx-pro-6000",
-          "check": "default-tpot-p50",
-          "kind": "calibrated",
-          "claim": "Median time per output token over all 300 requests, the site's default parameters agrees with the measured run."
-        },
-        {
-          "scenario": "measured-8b-rtx-pro-6000",
-          "check": "default-tpot-p99",
-          "kind": "calibrated",
-          "claim": "99th-percentile time per output token over all 300 requests, the site's default parameters agrees with the measured run."
-        },
-        {
-          "scenario": "measured-8b-rtx-pro-6000",
-          "check": "default-e2e-mean",
-          "kind": "calibrated",
-          "claim": "Mean end-to-end time over all 300 requests, the site's default parameters agrees with the measured run."
-        },
-        {
-          "scenario": "measured-8b-rtx-pro-6000",
-          "check": "default-e2e-p50",
-          "kind": "calibrated",
-          "claim": "Median end-to-end time over all 300 requests, the site's default parameters agrees with the measured run."
-        },
-        {
-          "scenario": "measured-8b-rtx-pro-6000",
-          "check": "default-e2e-p99",
-          "kind": "calibrated",
-          "claim": "99th-percentile end-to-end time over all 300 requests, the site's default parameters agrees with the measured run."
-        },
-        {
-          "scenario": "measured-8b-rtx-pro-6000",
-          "check": "default-throughput",
-          "kind": "calibrated",
-          "claim": "Output tokens per second from the first arrival to the last completion over all 300 requests, the site's default parameters agrees with the measured run."
+          "claim": "Throughput over all 300 requests, parameters fitted to the RTX 4090 run (a different GPU) agrees with the measured run."
         }
       ]
     }
@@ -2297,8 +2398,8 @@
     "entries": []
   },
   "approaches": {
-    "total": 27,
-    "verified": 21,
+    "total": 28,
+    "verified": 22,
     "notVerifiable": 6
   },
   "verified": [
@@ -2307,6 +2408,7 @@
     "batching/continuous",
     "cost/flops-per-token",
     "cost/host-overhead",
+    "cost/kernel-launch",
     "cost/kv-bytes-per-token",
     "cost/roofline",
     "cost/tensor-parallelism",
