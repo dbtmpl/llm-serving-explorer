@@ -18,6 +18,7 @@
     "conformance:calibrate": "tsx conformance/scripts/calibrate.ts",
     "conformance:summary": "tsx conformance/scripts/summary.ts",
     "conformance:extract": "tsx conformance/refs/vllm-measured/extract.ts",
+    "conformance:extract-llmservingsim": "tsx conformance/refs/llmservingsim/extract.ts",
     "replay:build": "tsx replay/generate.ts",
     "docs:sync": "UPDATE_DOCS=1 vitest run src/sim/__tests__/registry.test.ts conformance/__tests__/docs.test.ts"
   },

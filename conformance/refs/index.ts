@@ -5,11 +5,12 @@ import { existsSync, readFileSync } from "node:fs";
 import type { ReferenceFile } from "../record.js";
 import { referenceFile, type Check, type Scenario } from "../scenario.js";
 import { blis } from "./blis/index.js";
+import { llmservingsim } from "./llmservingsim/index.js";
 import { vllmMeasured } from "./vllm-measured/index.js";
 import { canState, unsupportedBecause, type Reference } from "./reference.js";
 
 /** Every reference, in the order the summary and the docs list them. */
-export const REFERENCES: readonly Reference<any, any>[] = [blis, vllmMeasured];
+export const REFERENCES: readonly Reference<any, any>[] = [blis, vllmMeasured, llmservingsim];
 
 export function referenceById(id: string): Reference<any, any> {
   const r = REFERENCES.find((x) => x.id === id);

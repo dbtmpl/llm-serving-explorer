@@ -1,0 +1,4 @@
+# The LLMServingSim commit this reference is built from and the measured-run prefix data was reduced from
+# (https://github.com/casys-kaist/LLMServingSim, MIT licence; see LICENSE-LLMServingSim).
+# First non-comment line: the full commit hash. Bump: see conformance/README.md.
+49df63f2af61230da63dd2136044a2dbf9bd4161
