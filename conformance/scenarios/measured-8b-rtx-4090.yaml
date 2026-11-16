@@ -6,11 +6,13 @@ title: "Measured vLLM 0.19.0: Llama 3.1 8B on one RTX 4090, 300 ShareGPT request
 #
 # What the run was: vLLM 0.19.0, one GeForce RTX 4090 (the driver reported 25,250,627,584 bytes), gpu_memory_utilization 0.9, max_num_seqs 256, max_num_batched_tokens 2048, chunked prefill, prefix caching on; the engine reported 2,588 KV blocks (41,408 tokens). The same 300 ShareGPT prompts at about 10 requests per second; the KV pool, not max_num_seqs, limits the batch (at most 49 sequences ran) and a long queue builds (mean time to first token about a minute). Preemptions were not recorded in this run.
 # Not represented: prompt token ids (the model has no token content, so it sees no prefix reuse between requests; the real engine served an unrecorded number
-# of the 257,239 prompt tokens from its prefix cache), asynchronous scheduling, CUDA graphs, the API server's tokeniser pool, and max_model_len (the
-# model has no limit).
+# of the 257,239 prompt tokens from its prefix cache), the API server's tokeniser pool, and max_model_len (the
+# model has no limit). Asynchronous scheduling is represented (it makes host time overlap GPU time) and so are CUDA graphs (as a per-layer launch
+# time that is lower up to the largest captured step); vLLM's recompute after a preemption is represented without its prefix-cache hits.
 #
 # Two readings of timing, kept apart:
 #   default-*  the site's DEFAULT efficiency parameters, no fit, over all 300 requests: how far the model is from real hardware out of the box.
+#   crossfit-* the parameters fitted to the OTHER card's first 100 requests (a different GPU), over all 300 requests: a held-out reading that needs no split.
 #   fitted-*   MBU, MFU and the two host-time terms fitted (conformance:calibrate) to the first 100 requests by arrival (the calibration subset),
 #              then checked on the other 200 (held out). The fit sees the measured time to first token of each calibration request and their
 #              mean time per token, nothing else, and nothing is fitted to the held-out requests.
@@ -24,6 +26,7 @@ engine:
   max_num_batched_tokens: 2048
   block_size: 16
   prefix_caching: true
+  async_scheduling: true
 replicas: 1
 routing: prefix-aware
 fit_reference: vllm-measured
@@ -339,18 +342,20 @@ checks:
     tolerance: "0.1 percent: the capacity rule of 2026-11-16 (docs/parity.md), applied unchanged to a real engine. The terms that remain are estimates on both sides and a difference below one part in a thousand changes no admission decision; a larger one is explained term by term in the known difference."
     known_difference:
       reference: vllm-measured
-      cause: "The activation and graph terms of the model's memory budget are not the real engine's"
+      cause: "The model's pool is larger: the engine's profile counted memory the model has no term for"
       reason: &r_kv >-
-        Term by term, per the model's budget (src/sim/cost/memory.ts). Requested memory is ceil(25,250,627,584 x 0.9) = 22,725,564,826 bytes on both sides.
-        Weights are 16.06e9 bytes on both. The real engine set aside 22.726 - 16.061 - 5.427 (its 2,588 blocks of 2,097,152 bytes) = 1.238 GB for activations,
-        graphs and everything else; the model sets aside 1.895 GB (735,313,920 bytes of activations at an 8,192-token step, 1,159,725,056 bytes of graphs) and
-        gets 2,274 blocks, 314 fewer (658 MB, 12.1 percent). The engine profiled a 2,048-token step; scaling the model's activation term by 2,048/8,192 gives
-        183.8 MB and accounts for 263 blocks. The remaining 51 blocks (106 MB) are the model's graph term (the median of H100 start-up logs of another vLLM
-        version) against the 1.054 GB the run implies for graphs and other overhead, a remainder not a measurement. The pool is small here (weights take 71
-        percent of the requested memory), so the same fixed errors weigh 12 percent where they weigh 1.3 percent on the 96 GB card. Not tuned: the model's
-        budget is left as it is.
+        Term by term, per the model's budget (src/sim/cost/memory.ts). Requested memory is ceil(25,250,627,584 x 0.9) = 22,725,564,826 bytes on both sides, and the weights are
+        16.06e9 bytes on both. The real engine set aside 22.726 - 16.061 - 5.427 (its 2,588 blocks of 2,097,152 bytes) = 1.238 GB for everything else; the model sets aside 0.471 GB
+        and gets 2,953 blocks, 365 more (765 MB, +14.1 percent). The model's 0.471 GB is derived from the run's own settings: the start-up profiling pass is a forward pass over
+        max_num_batched_tokens = 2,048 tokens (151.0 MB) followed by the sampler over min(2,048, 256) rows of the 128,256-token vocabulary (2,048 x 4,096 x 2 + 256 x 128,256 x 10
+        = 345.1 MB, the larger of the two), plus 125.8 MB for the 51 + 35 CUDA graphs of the capture list. The run was vLLM 0.19.0, which does not subtract a graph estimate from the
+        pool (VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS is off until v0.21), so the graph term has no counterpart here (60 blocks); the other 305 blocks (0.64 GB) are what the engine's
+        profile counted and the model has no term for: memory the process holds outside torch's allocator (vllm/utils/mem_utils.py counts the growth of non-torch memory) and the
+        allocator's own rounding, neither of which the run records. On the RTX PRO 6000 the same unexplained part is 0.65 GB, so it looks like a property of the engine and not of the card,
+        but the two cards ran different vLLM versions and one run is not enough to derive it. Not tuned: the model's budget is left as the sources give it. The pool is small here (weights take
+        71 percent of the requested memory), so an error that is 0.8 percent on the 96 GB card is 14 percent here.
       differences:
-        value: { typescript: 2274, vllm-measured: 2588 }
+        value: { typescript: 2953, vllm-measured: 2588 }
   - id: default-ttft-mean
     claim: Mean time to first token over all 300 requests, the site's default parameters agrees with the measured run.
     kind: calibrated
@@ -359,17 +364,6 @@ checks:
     params: defaults
     subset: all
     tolerance: "30 percent: the standard the BLIS timing checks use for time to first token. Under queueing a small step-cost error is amplified into a larger wait, so this is the loosest of the timing standards."
-    known_difference:
-      reference: vllm-measured
-      cause: "Queue wait compounds the slower service rate: the engine is saturated from the first requests"
-      reason: &r_queue >-
-        The load (195,753 output tokens in 29 s, about 6,750 per second) is far above this card's measured service rate of 1,066 tokens per second, so a queue
-        builds from the start and the wait of the k-th request is the shortfall accumulated before it (mean time to first token for the first 100 requests is
-        already 17.9 s, then 64.7 s, then 113.9 s). The model at default parameters serves 590 tokens per second (-45 percent), so its queue grows 1.8 times
-        as fast: mean time to first token 135 s against 65.5 s, median 130 against 60, 99th percentile 274 against 137. The error is the decode-cost error
-        amplified by queueing.
-      differences:
-        value: { typescript: 135.1, vllm-measured: 65.49 }
   - id: default-ttft-p50
     claim: Median time to first token over all 300 requests, the site's default parameters agrees with the measured run.
     kind: calibrated
@@ -378,12 +372,6 @@ checks:
     params: defaults
     subset: all
     tolerance: "30 percent: the same standard as the mean."
-    known_difference:
-      reference: vllm-measured
-      cause: "Queue wait compounds the slower service rate: the engine is saturated from the first requests"
-      reason: *r_queue
-      differences:
-        value: { typescript: 130.2, vllm-measured: 60.13 }
   - id: default-ttft-p99
     claim: 99th-percentile time to first token over all 300 requests, the site's default parameters agrees with the measured run.
     kind: calibrated
@@ -392,12 +380,6 @@ checks:
     params: defaults
     subset: all
     tolerance: "30 percent: the same standard as the mean; the tail is set by the longest queue, which a step-cost error compounds."
-    known_difference:
-      reference: vllm-measured
-      cause: "Queue wait compounds the slower service rate: the engine is saturated from the first requests"
-      reason: *r_queue
-      differences:
-        value: { typescript: 274.1, vllm-measured: 137.4 }
   - id: default-tpot-mean
     claim: Mean time per output token over all 300 requests, the site's default parameters agrees with the measured run.
     kind: calibrated
@@ -408,17 +390,17 @@ checks:
     tolerance: "12 percent: the standard the BLIS timing checks use for time per token (memory-bound decoding, the best-conditioned timing)."
     known_difference:
       reference: vllm-measured
-      cause: "The model's decode step is slower than the real engine's at default parameters, and the fit goes to a bound"
-      reason: &r_decode >-
-        Default parameters: MBU 0.6, MFU 0.5, host time 1.5 ms plus 0.05 ms per sequence. The model's mean time per output token is 51.4 ms against 32.4 ms
-        measured (+58 percent). The weight read alone is 16.06 GB over 0.6 x 1,008 GB/s = 26.6 ms. At the largest batch the run reached (49 sequences of about
-        1,190 tokens of context, 7.6 GB of KV) the real step moves 23.7 GB in 32.4 ms, 731 GB/s, which is 73 percent of the datasheet bandwidth with no
-        allowance for host time, so no MBU below about 0.73 can reproduce it. The fit to the first 100 requests puts MBU at its upper bound, 1.0, host time at
-        its lower bound, and MFU at 0.8: parameters at their limits say that the structure of the decode cost, not a factor, is off; which part was not
-        isolated here. This card's pool also differs from the engine's (2,274 blocks against 2,588), and the model preempts 184 times at default parameters,
-        188 fitted; the run recorded no preemption count, so the effect of that on the real engine's decode is not known.
+      cause: "Time per token: the model recomputes preempted requests from zero where the engine reuses its prefix cache"
+      reason: &r_tpot >-
+        The decode step itself agrees. The run's per-second statistics give 24.4 to 25.9 ms per step in its saturated stretches (33 to 37 running sequences, 98 percent of the KV pool,
+        about 21.5 GB read per step, 0.83 to 0.88 of the datasheet bandwidth), and the model's step for such a batch is 26.1 ms (21.5 GB at MBU 0.85, plus 1.0 ms to launch 32 layers). The
+        excess is elsewhere. The model preempts 183 times and recomputes 168,669 tokens, 66 percent of the prompt tokens; a vLLM block that is freed stays in the prefix cache until another
+        sequence reuses it, so a preempted request re-enters at whatever is still cached, where the model's recompute starts from zero (the run recorded neither preemptions nor cache hits, so the
+        real count is not known). The model's pool is also 14 percent larger than the engine's (kv-blocks-per-replica), which lets more sequences share each step; with the pool set to the engine's
+        2,588 blocks (a run made for this note, not a check) the model's mean time per token is +16 percent and its 99th percentile +15 percent, with 186 preemptions and 193,313 recomputed tokens.
+        So about 16 of the 22 points are the recompute, and that, not the cost of a step, is the largest known error of this scenario. Not tuned.
       differences:
-        value: { typescript: 0.05136, vllm-measured: 0.03245 }
+        value: { typescript: 0.0395, vllm-measured: 0.03245 }
   - id: default-tpot-p50
     claim: Median time per output token over all 300 requests, the site's default parameters agrees with the measured run.
     kind: calibrated
@@ -429,10 +411,10 @@ checks:
     tolerance: "12 percent: the same standard as the mean."
     known_difference:
       reference: vllm-measured
-      cause: "The model's decode step is slower than the real engine's at default parameters, and the fit goes to a bound"
-      reason: *r_decode
+      cause: "Time per token: the model recomputes preempted requests from zero where the engine reuses its prefix cache"
+      reason: *r_tpot
       differences:
-        value: { typescript: 0.04924, vllm-measured: 0.03076 }
+        value: { typescript: 0.03769, vllm-measured: 0.03076 }
   - id: default-tpot-p99
     claim: 99th-percentile time per output token over all 300 requests, the site's default parameters agrees with the measured run.
     kind: calibrated
@@ -443,10 +425,10 @@ checks:
     tolerance: "20 percent: the tail of time per token is set by the few steps that carry a long prefill chunk or a large batch, which a mean-fitted model reproduces less closely than the mean."
     known_difference:
       reference: vllm-measured
-      cause: "The model's decode step is slower than the real engine's at default parameters, and the fit goes to a bound"
-      reason: *r_decode
+      cause: "Time per token: the model recomputes preempted requests from zero where the engine reuses its prefix cache"
+      reason: *r_tpot
       differences:
-        value: { typescript: 0.08653, vllm-measured: 0.056 }
+        value: { typescript: 0.07152, vllm-measured: 0.056 }
   - id: default-e2e-mean
     claim: Mean end-to-end time over all 300 requests, the site's default parameters agrees with the measured run.
     kind: calibrated
@@ -455,15 +437,6 @@ checks:
     params: defaults
     subset: all
     tolerance: "15 percent: the standard the BLIS timing checks use for end-to-end time."
-    known_difference:
-      reference: vllm-measured
-      cause: "End-to-end time is the queue wait plus a decode that is over half again too slow"
-      reason: &r_e2e >-
-        End-to-end time is time to first token plus the decode of about 650 tokens: at default parameters the model's mean is 168.6 s against 86.6 s measured
-        (+95 percent), median +94 percent, 99th percentile +96 percent. About 70 s of it is the queue (135 against 65.5 s) and the rest the slower decode
-        (51.4 against 32.4 ms over about 650 tokens).
-      differences:
-        value: { typescript: 168.6, vllm-measured: 86.61 }
   - id: default-e2e-p50
     claim: Median end-to-end time over all 300 requests, the site's default parameters agrees with the measured run.
     kind: calibrated
@@ -472,12 +445,6 @@ checks:
     params: defaults
     subset: all
     tolerance: "15 percent: the same standard as the mean."
-    known_difference:
-      reference: vllm-measured
-      cause: "End-to-end time is the queue wait plus a decode that is over half again too slow"
-      reason: *r_e2e
-      differences:
-        value: { typescript: 161.6, vllm-measured: 83.42 }
   - id: default-e2e-p99
     claim: 99th-percentile end-to-end time over all 300 requests, the site's default parameters agrees with the measured run.
     kind: calibrated
@@ -486,12 +453,6 @@ checks:
     params: defaults
     subset: all
     tolerance: "20 percent: the tail adds the longest queue to the longest answer."
-    known_difference:
-      reference: vllm-measured
-      cause: "End-to-end time is the queue wait plus a decode that is over half again too slow"
-      reason: *r_e2e
-      differences:
-        value: { typescript: 301.4, vllm-measured: 153.6 }
   - id: default-throughput
     claim: Output tokens per second from the first arrival to the last completion over all 300 requests, the site's default parameters agrees with the measured run.
     kind: calibrated
@@ -500,14 +461,6 @@ checks:
     params: defaults
     subset: all
     tolerance: "10 percent: the standard the BLIS timing checks use for throughput; the load is open loop, so throughput differs only through how late the last answers finish."
-    known_difference:
-      reference: vllm-measured
-      cause: "Throughput follows the slower service rate"
-      reason: &r_tput >-
-        Output tokens per second from the first arrival to the last completion: 590 in the model at default parameters, 1,066 measured (-44.7 percent). The
-        load exceeds the engine's capacity throughout, so throughput is the service rate, which is the decode speed (51.4 against 32.4 ms per token).
-      differences:
-        value: { typescript: 590, vllm-measured: 1066 }
   - id: fitted-ttft-mean
     claim: Mean time to first token over the 200 held-out requests, parameters fitted to the first 100 agrees with the measured run.
     kind: calibrated
@@ -548,6 +501,12 @@ checks:
     params: fitted
     subset: held-out
     tolerance: "12 percent: the same standard as the mean."
+    known_difference:
+      reference: vllm-measured
+      cause: "Time per token: the model recomputes preempted requests from zero where the engine reuses its prefix cache"
+      reason: *r_tpot
+      differences:
+        value: { typescript: 0.03436, vllm-measured: 0.03068 }
   - id: fitted-tpot-p99
     claim: 99th-percentile time per output token over the 200 held-out requests, parameters fitted to the first 100 agrees with the measured run.
     kind: calibrated
@@ -556,17 +515,6 @@ checks:
     params: fitted
     subset: held-out
     tolerance: "20 percent: the tail of time per token is set by the few steps that carry a long prefill chunk or a large batch, which a mean-fitted model reproduces less closely than the mean."
-    known_difference:
-      reference: vllm-measured
-      cause: "The real run has a heavier tail of per-token time than the model reproduces; not explained"
-      reason: &r_p99 >-
-        On the 200 held-out requests with the fitted parameters the model's 99th-percentile time per output token is 37.5 ms against 55.0 ms measured (-31.9
-        percent), while its median (28.2 against 30.8 ms) and mean (28.2 against 31.7 ms, -10.9 percent) are inside tolerance. The measured tail is 1.8 times
-        its median, the model's 1.3 times. Candidates, none tested here: stalls from preemption and recompute in the real engine (the run did not record
-        preemptions, so this cannot be checked; the model's own pool is smaller and it preempts 188 times); step-time variance of the real card (clocks, host
-        jitter) that a deterministic model does not have; prefix-cache hits (not representable). Recorded as a miss, not tuned.
-      differences:
-        value: { typescript: 0.03747, vllm-measured: 0.05501 }
   - id: fitted-e2e-mean
     claim: Mean end-to-end time over the 200 held-out requests, parameters fitted to the first 100 agrees with the measured run.
     kind: calibrated
@@ -599,3 +547,41 @@ checks:
     params: fitted
     subset: held-out
     tolerance: "10 percent: the standard the BLIS timing checks use for throughput; the load is open loop, so throughput differs only through how late the last answers finish."
+  - id: crossfit-ttft-mean
+    claim: "Mean time to first token over all 300 requests, parameters fitted to the RTX PRO 6000 run (a different GPU) agrees with the measured run."
+    kind: calibrated
+    metric: ttft_mean_s
+    rel_tol: 0.3
+    params: fitted-on:rtx-pro-6000
+    subset: all
+    tolerance: "30 percent: the standard of the default and held-out checks of this scenario. The parameters (MBU, MFU, host time) were fitted to the first 100 requests of the RTX PRO 6000 run and never saw this GPU: the held-out reading that needs no split."
+  - id: crossfit-tpot-mean
+    claim: "Mean time per output token over all 300 requests, parameters fitted to the RTX PRO 6000 run (a different GPU) agrees with the measured run."
+    kind: calibrated
+    metric: tpot_mean_s
+    rel_tol: 0.12
+    params: fitted-on:rtx-pro-6000
+    subset: all
+    tolerance: "12 percent: the standard of the default and held-out checks of this scenario. The parameters (MBU, MFU, host time) were fitted to the first 100 requests of the RTX PRO 6000 run and never saw this GPU: the held-out reading that needs no split."
+    known_difference:
+      reference: vllm-measured
+      cause: "Time per token: the model recomputes preempted requests from zero where the engine reuses its prefix cache"
+      reason: *r_tpot
+      differences:
+        value: { typescript: 0.03648, vllm-measured: 0.03245 }
+  - id: crossfit-e2e-mean
+    claim: "Mean end-to-end time over all 300 requests, parameters fitted to the RTX PRO 6000 run (a different GPU) agrees with the measured run."
+    kind: calibrated
+    metric: e2e_mean_s
+    rel_tol: 0.15
+    params: fitted-on:rtx-pro-6000
+    subset: all
+    tolerance: "15 percent: the standard of the default and held-out checks of this scenario. The parameters (MBU, MFU, host time) were fitted to the first 100 requests of the RTX PRO 6000 run and never saw this GPU: the held-out reading that needs no split."
+  - id: crossfit-throughput
+    claim: "Throughput over all 300 requests, parameters fitted to the RTX PRO 6000 run (a different GPU) agrees with the measured run."
+    kind: calibrated
+    metric: throughput_tokens_per_s
+    rel_tol: 0.1
+    params: fitted-on:rtx-pro-6000
+    subset: all
+    tolerance: "10 percent: the standard of the default and held-out checks of this scenario. The parameters (MBU, MFU, host time) were fitted to the first 100 requests of the RTX PRO 6000 run and never saw this GPU: the held-out reading that needs no split."

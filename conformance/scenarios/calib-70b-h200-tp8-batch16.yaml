@@ -1,0 +1,33 @@
+id: calib-70b-h200-tp8-batch16
+title: Calibration data, sixteen sequences decoding together, Llama 3.1 70B on eight H200s
+role: calibration
+# Sixteen requests 80 ms apart: the batch grows to 16 and decodes together, short context.
+model: llama-70b
+gpu: h200
+engine:
+  tp: 8
+  gpu_memory_utilisation: 0.9
+  max_num_seqs: 64
+  max_num_batched_tokens: 8192
+  block_size: 16
+  prefix_caching: true
+replicas: 1
+routing: round-robin
+requests:
+  - { session: 1, at: 1.00, turns: [[1000, 400]] }
+  - { session: 2, at: 1.08, turns: [[1000, 400]] }
+  - { session: 3, at: 1.16, turns: [[1000, 400]] }
+  - { session: 4, at: 1.24, turns: [[1000, 400]] }
+  - { session: 5, at: 1.32, turns: [[1000, 400]] }
+  - { session: 6, at: 1.40, turns: [[1000, 400]] }
+  - { session: 7, at: 1.48, turns: [[1000, 400]] }
+  - { session: 8, at: 1.56, turns: [[1000, 400]] }
+  - { session: 9, at: 1.64, turns: [[1000, 400]] }
+  - { session: 10, at: 1.72, turns: [[1000, 400]] }
+  - { session: 11, at: 1.80, turns: [[1000, 400]] }
+  - { session: 12, at: 1.88, turns: [[1000, 400]] }
+  - { session: 13, at: 1.96, turns: [[1000, 400]] }
+  - { session: 14, at: 2.04, turns: [[1000, 400]] }
+  - { session: 15, at: 2.12, turns: [[1000, 400]] }
+  - { session: 16, at: 2.20, turns: [[1000, 400]] }
+checks: []
