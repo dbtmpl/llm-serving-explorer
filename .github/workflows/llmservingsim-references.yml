@@ -1,0 +1,88 @@
+name: LLMServingSim references
+
+# Build LLMServingSim at the commit pinned in conformance/refs/llmservingsim/lock, regenerate the reference records the conformance tests compare against,
+# and fail if they differ from the committed ones. This is the only place its Python and C++ build are needed; the ordinary CI job (`conformance`) reads the
+# committed records. Nightly, because the upstream repository is very active: the commit is pinned, so a failure here is a change in this job's environment
+# (a runner image, a package) or in the adapter, not upstream drift.
+on:
+  schedule:
+    - cron: "41 3 * * *"
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - conformance/refs/llmservingsim/**
+      - conformance/refs/reference.ts
+      - conformance/record.ts
+      - .github/workflows/llmservingsim-references.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: llmservingsim-references-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  llmservingsim-references:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the build tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential cmake git protobuf-compiler libprotobuf-dev
+
+      # its Dockerfile-free route: the Python it was developed with (3.10), the pinned packages, and Chakra from the checkout itself
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Build LLMServingSim at the pinned commit
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install -r conformance/refs/llmservingsim/requirements.txt
+          bash conformance/refs/llmservingsim/build.sh "$RUNNER_TEMP/LLMServingSim"
+          python -m pip install "$RUNNER_TEMP/LLMServingSim/astra-sim/extern/graph_frontend/chakra"
+          echo "LLMSERVINGSIM_DIR=$RUNNER_TEMP/LLMServingSim" >> "$GITHUB_ENV"
+          echo "LLMSERVINGSIM_PYTHON=$(which python)" >> "$GITHUB_ENV"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Reproduce LLMServingSim's own committed result for the measured example
+        run: |
+          set -euo pipefail
+          cd "$LLMSERVINGSIM_DIR"
+          python -m serving --cluster-config bench/examples/RTXPRO6000/Llama-3.1-8B/config.json --dataset workloads/sharegpt-llama-3.1-8b-300-sps10.jsonl \
+            --output "$RUNNER_TEMP/pro6000.csv" --num-reqs 300 --max-num-seqs 128 --max-num-batched-tokens 2048 --block-size 16 --log-level WARNING --network-backend analytical > /dev/null
+          cmp "$RUNNER_TEMP/pro6000.csv" bench/examples/RTXPRO6000/Llama-3.1-8B/outputs/sim.csv
+
+      - name: Regenerate the references
+        run: pnpm conformance:reference --ref llmservingsim
+
+      - name: Fail if they differ from the committed references
+        run: |
+          if [ -n "$(git status --porcelain -- conformance/reference)" ]; then
+            git status --short -- conformance/reference
+            git --no-pager diff -- conformance/reference
+            echo "::error::LLMServingSim at the pinned commit no longer produces the committed references. Review the difference, update the scenarios' records if it is real, and commit the regenerated files."
+            exit 1
+          fi
+
+      - name: Run the conformance tests against the regenerated references
+        run: pnpm test:conformance

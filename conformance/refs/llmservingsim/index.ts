@@ -23,7 +23,7 @@ export const llmservingsim: Reference<LssInput, LssRaw> = {
     gpus: Object.keys(GPU_NAMES),
     mechanisms: ["multi-replica", "multi-turn", "disaggregation", "host-offload", "speculative"],
     quantities: ["kv_blocks_per_replica", "prefix_cached_tokens", "routed_pod", "requests_per_pod", "preemptions", "request_fate"],
-    metrics: ["ttft_mean_s", "ttft_p50_s", "ttft_p99_s", "tpot_mean_s", "tpot_p50_s", "tpot_p99_s", "e2e_mean_s", "e2e_p50_s", "e2e_p99_s", "throughput_tokens_per_s", "prefix_hit_rate", "cpu_tier_hit_rate", "preemptions", "peak_replicas", "completed"],
+    metrics: ["ttft_mean_s", "ttft_p50_s", "ttft_p99_s", "tpot_mean_s", "tpot_p50_s", "tpot_p99_s", "e2e_mean_s", "e2e_p50_s", "e2e_p99_s", "throughput_tokens_per_s", "followup_ttft_mean_s", "prefix_hit_rate", "cpu_tier_hit_rate", "preemptions", "peak_replicas", "completed"],
     arms: true
   },
   lock: lockedCommit,

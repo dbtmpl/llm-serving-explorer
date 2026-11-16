@@ -1,0 +1,31 @@
+id: lss-preemption-overflow
+title: Preemption when two growing sequences outgrow the KV pool, RTX PRO 6000
+references: [llmservingsim]
+# Memory utilisation 0.24 gives the TypeScript model a pool of about 49,700 tokens and LLMServingSim one of about 64,200 (it sets nothing aside for activations; see lss-kv-budget-8b-rtx-pro-6000). Two requests each
+# need 40,000 tokens by the time they finish (12,000 of prompt, 28,000 generated). Either fits alone in either pool; together (80,000) they fit in neither, and both prompts fit at admission (24,000), so
+# both are admitted and the pool runs out while both generate. vLLM frees the most recently admitted sequence and recomputes it later. The sizes are chosen against both pools, which are far from the extremes (R < pool < 2R in both), not tuned to a result.
+model: llama-3.1-8b
+gpu: rtx-pro-6000
+engine:
+  tp: 1
+  gpu_memory_utilisation: 0.24
+  max_num_seqs: 12
+  max_num_batched_tokens: 8192
+  block_size: 16
+  prefix_caching: true
+replicas: 1
+routing: round-robin
+requests:
+  - { session: 1, at: 1.0, turns: [[12000, 28000]] }
+  - { session: 2, at: 1.5, turns: [[12000, 28000]] }
+checks:
+  - id: preemption-count
+    claim: At least one preemption happens in each simulator, and the same number.
+    kind: exact
+    quantity: preemptions
+    tolerance: A count of discrete engine events in a case built to produce at least one on both sides; equal.
+  - id: both-complete
+    claim: Both requests complete.
+    kind: exact
+    quantity: request_fate
+    tolerance: Fate is discrete.

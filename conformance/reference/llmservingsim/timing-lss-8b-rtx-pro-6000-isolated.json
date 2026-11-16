@@ -1,0 +1,82 @@
+{
+  "scenario": "timing-lss-8b-rtx-pro-6000-isolated",
+  "reference": "llmservingsim",
+  "inputHash": "07705c2defdb676ef04f51f786aae8fd9c81b4630fe265786f0c7f1a4c5fb272",
+  "provenance": {
+    "lock": "49df63f2af61230da63dd2136044a2dbf9bd4161",
+    "replay": "no"
+  },
+  "records": {
+    "main": {
+      "source": "llmservingsim",
+      "scenario": "timing-lss-8b-rtx-pro-6000-isolated",
+      "kvBlocksPerReplica": 37090,
+      "requests": [
+        {
+          "session": 1,
+          "round": 0,
+          "inputTokens": 300,
+          "outputTokens": 200,
+          "cachedTokens": 0,
+          "pod": 0,
+          "arrivalS": 1,
+          "firstTokenS": 1.018155,
+          "lastTokenS": 3.263654,
+          "fate": "completed",
+          "preemptions": null
+        },
+        {
+          "session": 2,
+          "round": 0,
+          "inputTokens": 1500,
+          "outputTokens": 200,
+          "cachedTokens": 0,
+          "pod": 0,
+          "arrivalS": 16,
+          "firstTokenS": 16.065141,
+          "lastTokenS": 18.336503,
+          "fate": "completed",
+          "preemptions": null
+        },
+        {
+          "session": 3,
+          "round": 0,
+          "inputTokens": 3000,
+          "outputTokens": 200,
+          "cachedTokens": 0,
+          "pod": 0,
+          "arrivalS": 31,
+          "firstTokenS": 31.129887,
+          "lastTokenS": 33.441752,
+          "fate": "completed",
+          "preemptions": null
+        },
+        {
+          "session": 4,
+          "round": 0,
+          "inputTokens": 6000,
+          "outputTokens": 200,
+          "cachedTokens": 0,
+          "pod": 0,
+          "arrivalS": 46,
+          "firstTokenS": 46.272158,
+          "lastTokenS": 48.645286,
+          "fate": "completed",
+          "preemptions": null
+        }
+      ],
+      "preemptions": 0,
+      "requestsPerPod": [
+        4
+      ],
+      "aggregates": {
+        "prefixHitRate": 0,
+        "cpuTierHitRate": 0,
+        "kvTransferMeanS": null,
+        "specTokensPerStep": null,
+        "prefillPoolRequests": null,
+        "peakReplicas": 1
+      }
+    }
+  }
+}

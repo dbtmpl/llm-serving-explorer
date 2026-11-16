@@ -1,0 +1,179 @@
+{
+  "scenario": "lss-spec-decoding",
+  "reference": "llmservingsim",
+  "inputHash": "3aabc9b5e3c8d171e8ae190a7383ea1d2fdeb4ab927cacb508fb3a8fc8a3bd53",
+  "provenance": {
+    "lock": "49df63f2af61230da63dd2136044a2dbf9bd4161",
+    "replay": "no"
+  },
+  "records": {
+    "off": {
+      "source": "llmservingsim",
+      "scenario": "lss-spec-decoding",
+      "kvBlocksPerReplica": 37090,
+      "requests": [
+        {
+          "session": 1,
+          "round": 0,
+          "inputTokens": 300,
+          "outputTokens": 300,
+          "cachedTokens": 0,
+          "pod": 0,
+          "arrivalS": 1,
+          "firstTokenS": 1.018155,
+          "lastTokenS": 4.393383,
+          "fate": "completed",
+          "preemptions": null
+        },
+        {
+          "session": 2,
+          "round": 0,
+          "inputTokens": 700,
+          "outputTokens": 300,
+          "cachedTokens": 0,
+          "pod": 0,
+          "arrivalS": 16,
+          "firstTokenS": 16.032477,
+          "lastTokenS": 19.418453,
+          "fate": "completed",
+          "preemptions": null
+        },
+        {
+          "session": 3,
+          "round": 0,
+          "inputTokens": 1500,
+          "outputTokens": 300,
+          "cachedTokens": 0,
+          "pod": 0,
+          "arrivalS": 31,
+          "firstTokenS": 31.06494,
+          "lastTokenS": 34.479608,
+          "fate": "completed",
+          "preemptions": null
+        },
+        {
+          "session": 4,
+          "round": 0,
+          "inputTokens": 3000,
+          "outputTokens": 300,
+          "cachedTokens": 0,
+          "pod": 0,
+          "arrivalS": 46,
+          "firstTokenS": 46.129992,
+          "lastTokenS": 49.605674,
+          "fate": "completed",
+          "preemptions": null
+        },
+        {
+          "session": 5,
+          "round": 0,
+          "inputTokens": 6000,
+          "outputTokens": 300,
+          "cachedTokens": 0,
+          "pod": 0,
+          "arrivalS": 61,
+          "firstTokenS": 61.27208,
+          "lastTokenS": 64.838999,
+          "fate": "completed",
+          "preemptions": null
+        }
+      ],
+      "preemptions": 0,
+      "requestsPerPod": [
+        5
+      ],
+      "aggregates": {
+        "prefixHitRate": 0,
+        "cpuTierHitRate": 0,
+        "kvTransferMeanS": null,
+        "specTokensPerStep": null,
+        "prefillPoolRequests": null,
+        "peakReplicas": 1
+      }
+    },
+    "on": {
+      "source": "llmservingsim",
+      "scenario": "lss-spec-decoding",
+      "kvBlocksPerReplica": 37090,
+      "requests": [
+        {
+          "session": 1,
+          "round": 0,
+          "inputTokens": 300,
+          "outputTokens": 300,
+          "cachedTokens": 0,
+          "pod": 0,
+          "arrivalS": 1,
+          "firstTokenS": 1.018155,
+          "lastTokenS": 2.522879,
+          "fate": "completed",
+          "preemptions": null
+        },
+        {
+          "session": 2,
+          "round": 0,
+          "inputTokens": 700,
+          "outputTokens": 300,
+          "cachedTokens": 0,
+          "pod": 0,
+          "arrivalS": 16,
+          "firstTokenS": 16.032974,
+          "lastTokenS": 17.632023,
+          "fate": "completed",
+          "preemptions": null
+        },
+        {
+          "session": 3,
+          "round": 0,
+          "inputTokens": 1500,
+          "outputTokens": 300,
+          "cachedTokens": 0,
+          "pod": 0,
+          "arrivalS": 31,
+          "firstTokenS": 31.06451,
+          "lastTokenS": 32.632034,
+          "fate": "completed",
+          "preemptions": null
+        },
+        {
+          "session": 4,
+          "round": 0,
+          "inputTokens": 3000,
+          "outputTokens": 300,
+          "cachedTokens": 0,
+          "pod": 0,
+          "arrivalS": 46,
+          "firstTokenS": 46.129418,
+          "lastTokenS": 47.713917,
+          "fate": "completed",
+          "preemptions": null
+        },
+        {
+          "session": 5,
+          "round": 0,
+          "inputTokens": 6000,
+          "outputTokens": 300,
+          "cachedTokens": 0,
+          "pod": 0,
+          "arrivalS": 61,
+          "firstTokenS": 61.272323,
+          "lastTokenS": 62.922466,
+          "fate": "completed",
+          "preemptions": null
+        }
+      ],
+      "preemptions": 0,
+      "requestsPerPod": [
+        5
+      ],
+      "aggregates": {
+        "prefixHitRate": 0,
+        "cpuTierHitRate": 0,
+        "kvTransferMeanS": null,
+        "specTokensPerStep": null,
+        "prefillPoolRequests": null,
+        "peakReplicas": 1
+      }
+    }
+  }
+}

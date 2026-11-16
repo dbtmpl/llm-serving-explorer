@@ -1,0 +1,56 @@
+{
+  "scenario": "lss-preemption-overflow",
+  "reference": "llmservingsim",
+  "inputHash": "043d8d0a6c9845db5bff555f870b6b9a2b95775a32403ba1b10300d2d6d41045",
+  "provenance": {
+    "lock": "49df63f2af61230da63dd2136044a2dbf9bd4161",
+    "replay": "no"
+  },
+  "records": {
+    "main": {
+      "source": "llmservingsim",
+      "scenario": "lss-preemption-overflow",
+      "kvBlocksPerReplica": 4015,
+      "requests": [
+        {
+          "session": 1,
+          "round": 0,
+          "inputTokens": 12000,
+          "outputTokens": 28000,
+          "cachedTokens": 0,
+          "pod": 0,
+          "arrivalS": 1,
+          "firstTokenS": 1.610065,
+          "lastTokenS": 424.533558,
+          "fate": "completed",
+          "preemptions": null
+        },
+        {
+          "session": 2,
+          "round": 0,
+          "inputTokens": 12000,
+          "outputTokens": 28000,
+          "cachedTokens": 0,
+          "pod": 0,
+          "arrivalS": 1.5,
+          "firstTokenS": 2.237694,
+          "lastTokenS": 541.47917,
+          "fate": "completed",
+          "preemptions": null
+        }
+      ],
+      "preemptions": 1,
+      "requestsPerPod": [
+        2
+      ],
+      "aggregates": {
+        "prefixHitRate": 0,
+        "cpuTierHitRate": 0,
+        "kvTransferMeanS": null,
+        "specTokensPerStep": null,
+        "prefillPoolRequests": null,
+        "peakReplicas": 1
+      }
+    }
+  }
+}

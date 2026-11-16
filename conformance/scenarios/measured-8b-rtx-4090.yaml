@@ -24,6 +24,7 @@ engine:
   max_num_batched_tokens: 2048
   block_size: 16
   prefix_caching: true
+references: [vllm-measured, llmservingsim]
 replicas: 1
 routing: prefix-aware
 fit_reference: vllm-measured
@@ -334,6 +335,7 @@ checks:
     claim: One replica holds the same number of KV blocks as the real engine reported, to within 0.1 percent.
     kind: capacity
     quantity: kv_blocks_per_replica
+    references: [vllm-measured]
     rel_tol: 0.001
     params: defaults
     tolerance: "0.1 percent: the capacity rule of 2026-11-16 (docs/parity.md), applied unchanged to a real engine. The terms that remain are estimates on both sides and a difference below one part in a thousand changes no admission decision; a larger one is explained term by term in the known difference."
@@ -351,6 +353,41 @@ checks:
         budget is left as it is.
       differences:
         value: { typescript: 2274, vllm-measured: 2588 }
+  - id: prefix-hit-rate
+    claim: The share of prompt tokens served from the prefix cache agrees with the real engine's.
+    kind: calibrated
+    metric: prefix_hit_rate
+    rel_tol: 0.05
+    params: defaults
+    subset: all
+    references: [llmservingsim]
+    tolerance: "5 percent relative: both sides count whole 16-token blocks of the same 257,239 prompt tokens, so two engines that find the same sharing differ by a handful of blocks (5 percent is about 970 tokens); a model that sees no sharing at all is 100 percent off."
+    known_difference:
+      reference: llmservingsim
+      cause: "The model has no token content, so it sees no prefix sharing"
+      reason: >-
+        LLMServingSim, given token ids with the sharing structure of the real prompts, serves 1.9 percent of the 257,239 prompt tokens from its prefix cache on this GPU (the pool is small, 2,588 blocks, so most
+        shared blocks are evicted before they are reused; on the larger RTX PRO 6000 pool it serves 7.6 percent). The model's workload has token counts, not ids, so it sees no sharing at all: 0. The real engine did not record
+        its cached tokens in this run, so there is no measured value to compare with.
+      differences:
+        value: { typescript: 0, llmservingsim: 0.01885 }
+  - id: preemptions
+    claim: LLMServingSim and the model preempt the same number of times in this run (the real engine did not record its preemptions).
+    kind: exact
+    quantity: preemptions
+    references: [llmservingsim]
+    params: defaults
+    tolerance: A count of discrete engine events; equal.
+    known_difference:
+      reference: llmservingsim
+      cause: "Pool size, step speed and prefix hits all differ; not isolated"
+      reason: >-
+        The model preempts 184 times and LLMServingSim 191. Three things differ at once and pull in different directions, so the counts are not comparable like for like: the model's pool is 2,274 blocks and LLMServingSim's
+        2,588 (its memory utilisation was calibrated by its authors to the real engine's block count; the model sets aside activations and graphs itself), which should make the model preempt more; the model serves 1.6
+        times slower at default parameters (decode 51 ms against 32 ms), so its batch holds more sequences at any moment, which should too; and LLMServingSim's prefix cache reuses some blocks the model recomputes. The
+        real engine did not record its preemptions, so neither count is checked against a measurement. Not isolated: which term moves the count.
+      differences:
+        value: { typescript: 184, llmservingsim: 191 }
   - id: default-ttft-mean
     claim: Mean time to first token over all 300 requests, the site's default parameters agrees with the measured run.
     kind: calibrated
@@ -360,16 +397,21 @@ checks:
     subset: all
     tolerance: "30 percent: the standard the BLIS timing checks use for time to first token. Under queueing a small step-cost error is amplified into a larger wait, so this is the loosest of the timing standards."
     known_difference:
-      reference: vllm-measured
-      cause: "Queue wait compounds the slower service rate: the engine is saturated from the first requests"
-      reason: &r_queue >-
-        The load (195,753 output tokens in 29 s, about 6,750 per second) is far above this card's measured service rate of 1,066 tokens per second, so a queue
-        builds from the start and the wait of the k-th request is the shortfall accumulated before it (mean time to first token for the first 100 requests is
-        already 17.9 s, then 64.7 s, then 113.9 s). The model at default parameters serves 590 tokens per second (-45 percent), so its queue grows 1.8 times
-        as fast: mean time to first token 135 s against 65.5 s, median 130 against 60, 99th percentile 274 against 137. The error is the decode-cost error
-        amplified by queueing.
-      differences:
-        value: { typescript: 135.1, vllm-measured: 65.49 }
+      - reference: vllm-measured
+        cause: "Queue wait compounds the slower service rate: the engine is saturated from the first requests"
+        reason: &r_queue >-
+          The load (195,753 output tokens in 29 s, about 6,750 per second) is far above this card's measured service rate of 1,066 tokens per second, so a queue
+          builds from the start and the wait of the k-th request is the shortfall accumulated before it (mean time to first token for the first 100 requests is
+          already 17.9 s, then 64.7 s, then 113.9 s). The model at default parameters serves 590 tokens per second (-45 percent), so its queue grows 1.8 times
+          as fast: mean time to first token 135 s against 65.5 s, median 130 against 60, 99th percentile 274 against 137. The error is the decode-cost error
+          amplified by queueing.
+        differences:
+          value: { typescript: 135.1, vllm-measured: 65.49 }
+      - reference: llmservingsim
+        cause: "Queue wait compounds the slower service rate: the engine is saturated from the first requests"
+        reason: "LLMServingSim gives 65.71 where the model gives 135.1 (+105.6 percent). The measured value is 65.49, so LLMServingSim and the real engine agree with each other here and the cause is the one recorded for vllm-measured. LLMServingSim's step times are per-layer kernel tables profiled on this GPU and its authors validated it against these very runs, so close agreement between it and the measurement is what they report, not independent evidence about the model. Cause, as recorded for vllm-measured: Queue wait compounds the slower service rate: the engine is saturated from the first requests"
+        differences:
+          value: { typescript: 135.1, llmservingsim: 65.71 }
   - id: default-ttft-p50
     claim: Median time to first token over all 300 requests, the site's default parameters agrees with the measured run.
     kind: calibrated
@@ -379,11 +421,16 @@ checks:
     subset: all
     tolerance: "30 percent: the same standard as the mean."
     known_difference:
-      reference: vllm-measured
-      cause: "Queue wait compounds the slower service rate: the engine is saturated from the first requests"
-      reason: *r_queue
-      differences:
-        value: { typescript: 130.2, vllm-measured: 60.13 }
+      - reference: vllm-measured
+        cause: "Queue wait compounds the slower service rate: the engine is saturated from the first requests"
+        reason: *r_queue
+        differences:
+          value: { typescript: 130.2, vllm-measured: 60.13 }
+      - reference: llmservingsim
+        cause: "Queue wait compounds the slower service rate: the engine is saturated from the first requests"
+        reason: "LLMServingSim gives 60.47 where the model gives 130.2 (+115.3 percent). The measured value is 60.13, so LLMServingSim and the real engine agree with each other here and the cause is the one recorded for vllm-measured. LLMServingSim's step times are per-layer kernel tables profiled on this GPU and its authors validated it against these very runs, so close agreement between it and the measurement is what they report, not independent evidence about the model. Cause, as recorded for vllm-measured: Queue wait compounds the slower service rate: the engine is saturated from the first requests"
+        differences:
+          value: { typescript: 130.2, llmservingsim: 60.47 }
   - id: default-ttft-p99
     claim: 99th-percentile time to first token over all 300 requests, the site's default parameters agrees with the measured run.
     kind: calibrated
@@ -393,11 +440,16 @@ checks:
     subset: all
     tolerance: "30 percent: the same standard as the mean; the tail is set by the longest queue, which a step-cost error compounds."
     known_difference:
-      reference: vllm-measured
-      cause: "Queue wait compounds the slower service rate: the engine is saturated from the first requests"
-      reason: *r_queue
-      differences:
-        value: { typescript: 274.1, vllm-measured: 137.4 }
+      - reference: vllm-measured
+        cause: "Queue wait compounds the slower service rate: the engine is saturated from the first requests"
+        reason: *r_queue
+        differences:
+          value: { typescript: 274.1, vllm-measured: 137.4 }
+      - reference: llmservingsim
+        cause: "Queue wait compounds the slower service rate: the engine is saturated from the first requests"
+        reason: "LLMServingSim gives 137.5 where the model gives 274.1 (+99.3 percent). The measured value is 137.4, so LLMServingSim and the real engine agree with each other here and the cause is the one recorded for vllm-measured. LLMServingSim's step times are per-layer kernel tables profiled on this GPU and its authors validated it against these very runs, so close agreement between it and the measurement is what they report, not independent evidence about the model. Cause, as recorded for vllm-measured: Queue wait compounds the slower service rate: the engine is saturated from the first requests"
+        differences:
+          value: { typescript: 274.1, llmservingsim: 137.5 }
   - id: default-tpot-mean
     claim: Mean time per output token over all 300 requests, the site's default parameters agrees with the measured run.
     kind: calibrated
@@ -407,18 +459,23 @@ checks:
     subset: all
     tolerance: "12 percent: the standard the BLIS timing checks use for time per token (memory-bound decoding, the best-conditioned timing)."
     known_difference:
-      reference: vllm-measured
-      cause: "The model's decode step is slower than the real engine's at default parameters, and the fit goes to a bound"
-      reason: &r_decode >-
-        Default parameters: MBU 0.6, MFU 0.5, host time 1.5 ms plus 0.05 ms per sequence. The model's mean time per output token is 51.4 ms against 32.4 ms
-        measured (+58 percent). The weight read alone is 16.06 GB over 0.6 x 1,008 GB/s = 26.6 ms. At the largest batch the run reached (49 sequences of about
-        1,190 tokens of context, 7.6 GB of KV) the real step moves 23.7 GB in 32.4 ms, 731 GB/s, which is 73 percent of the datasheet bandwidth with no
-        allowance for host time, so no MBU below about 0.73 can reproduce it. The fit to the first 100 requests puts MBU at its upper bound, 1.0, host time at
-        its lower bound, and MFU at 0.8: parameters at their limits say that the structure of the decode cost, not a factor, is off; which part was not
-        isolated here. This card's pool also differs from the engine's (2,274 blocks against 2,588), and the model preempts 184 times at default parameters,
-        188 fitted; the run recorded no preemption count, so the effect of that on the real engine's decode is not known.
-      differences:
-        value: { typescript: 0.05136, vllm-measured: 0.03245 }
+      - reference: vllm-measured
+        cause: "The model's decode step is slower than the real engine's at default parameters, and the fit goes to a bound"
+        reason: &r_decode >-
+          Default parameters: MBU 0.6, MFU 0.5, host time 1.5 ms plus 0.05 ms per sequence. The model's mean time per output token is 51.4 ms against 32.4 ms
+          measured (+58 percent). The weight read alone is 16.06 GB over 0.6 x 1,008 GB/s = 26.6 ms. At the largest batch the run reached (49 sequences of about
+          1,190 tokens of context, 7.6 GB of KV) the real step moves 23.7 GB in 32.4 ms, 731 GB/s, which is 73 percent of the datasheet bandwidth with no
+          allowance for host time, so no MBU below about 0.73 can reproduce it. The fit to the first 100 requests puts MBU at its upper bound, 1.0, host time at
+          its lower bound, and MFU at 0.8: parameters at their limits say that the structure of the decode cost, not a factor, is off; which part was not
+          isolated here. This card's pool also differs from the engine's (2,274 blocks against 2,588), and the model preempts 184 times at default parameters,
+          188 fitted; the run recorded no preemption count, so the effect of that on the real engine's decode is not known.
+        differences:
+          value: { typescript: 0.05136, vllm-measured: 0.03245 }
+      - reference: llmservingsim
+        cause: "The model's decode step is slower than the real engine's at default parameters, and the fit goes to a bound"
+        reason: "LLMServingSim gives 0.0325 where the model gives 0.05136 (+58.0 percent). The measured value is 0.03245, so LLMServingSim and the real engine agree with each other here and the cause is the one recorded for vllm-measured. LLMServingSim's step times are per-layer kernel tables profiled on this GPU and its authors validated it against these very runs, so close agreement between it and the measurement is what they report, not independent evidence about the model. Cause, as recorded for vllm-measured: The model's decode step is slower than the real engine's at default parameters, and the fit goes to a bound"
+        differences:
+          value: { typescript: 0.05136, llmservingsim: 0.0325 }
   - id: default-tpot-p50
     claim: Median time per output token over all 300 requests, the site's default parameters agrees with the measured run.
     kind: calibrated
@@ -428,11 +485,16 @@ checks:
     subset: all
     tolerance: "12 percent: the same standard as the mean."
     known_difference:
-      reference: vllm-measured
-      cause: "The model's decode step is slower than the real engine's at default parameters, and the fit goes to a bound"
-      reason: *r_decode
-      differences:
-        value: { typescript: 0.04924, vllm-measured: 0.03076 }
+      - reference: vllm-measured
+        cause: "The model's decode step is slower than the real engine's at default parameters, and the fit goes to a bound"
+        reason: *r_decode
+        differences:
+          value: { typescript: 0.04924, vllm-measured: 0.03076 }
+      - reference: llmservingsim
+        cause: "The model's decode step is slower than the real engine's at default parameters, and the fit goes to a bound"
+        reason: "LLMServingSim gives 0.03084 where the model gives 0.04924 (+59.7 percent). The measured value is 0.03076, so LLMServingSim and the real engine agree with each other here and the cause is the one recorded for vllm-measured. LLMServingSim's step times are per-layer kernel tables profiled on this GPU and its authors validated it against these very runs, so close agreement between it and the measurement is what they report, not independent evidence about the model. Cause, as recorded for vllm-measured: The model's decode step is slower than the real engine's at default parameters, and the fit goes to a bound"
+        differences:
+          value: { typescript: 0.04924, llmservingsim: 0.03084 }
   - id: default-tpot-p99
     claim: 99th-percentile time per output token over all 300 requests, the site's default parameters agrees with the measured run.
     kind: calibrated
@@ -442,11 +504,16 @@ checks:
     subset: all
     tolerance: "20 percent: the tail of time per token is set by the few steps that carry a long prefill chunk or a large batch, which a mean-fitted model reproduces less closely than the mean."
     known_difference:
-      reference: vllm-measured
-      cause: "The model's decode step is slower than the real engine's at default parameters, and the fit goes to a bound"
-      reason: *r_decode
-      differences:
-        value: { typescript: 0.08653, vllm-measured: 0.056 }
+      - reference: vllm-measured
+        cause: "The model's decode step is slower than the real engine's at default parameters, and the fit goes to a bound"
+        reason: *r_decode
+        differences:
+          value: { typescript: 0.08653, vllm-measured: 0.056 }
+      - reference: llmservingsim
+        cause: "The model's decode step is slower than the real engine's at default parameters, and the fit goes to a bound"
+        reason: "LLMServingSim gives 0.05658 where the model gives 0.08653 (+52.9 percent). The measured value is 0.056, so LLMServingSim and the real engine agree with each other here and the cause is the one recorded for vllm-measured. LLMServingSim's step times are per-layer kernel tables profiled on this GPU and its authors validated it against these very runs, so close agreement between it and the measurement is what they report, not independent evidence about the model. Cause, as recorded for vllm-measured: The model's decode step is slower than the real engine's at default parameters, and the fit goes to a bound"
+        differences:
+          value: { typescript: 0.08653, llmservingsim: 0.05658 }
   - id: default-e2e-mean
     claim: Mean end-to-end time over all 300 requests, the site's default parameters agrees with the measured run.
     kind: calibrated
@@ -456,14 +523,19 @@ checks:
     subset: all
     tolerance: "15 percent: the standard the BLIS timing checks use for end-to-end time."
     known_difference:
-      reference: vllm-measured
-      cause: "End-to-end time is the queue wait plus a decode that is over half again too slow"
-      reason: &r_e2e >-
-        End-to-end time is time to first token plus the decode of about 650 tokens: at default parameters the model's mean is 168.6 s against 86.6 s measured
-        (+95 percent), median +94 percent, 99th percentile +96 percent. About 70 s of it is the queue (135 against 65.5 s) and the rest the slower decode
-        (51.4 against 32.4 ms over about 650 tokens).
-      differences:
-        value: { typescript: 168.6, vllm-measured: 86.61 }
+      - reference: vllm-measured
+        cause: "End-to-end time is the queue wait plus a decode that is over half again too slow"
+        reason: &r_e2e >-
+          End-to-end time is time to first token plus the decode of about 650 tokens: at default parameters the model's mean is 168.6 s against 86.6 s measured
+          (+95 percent), median +94 percent, 99th percentile +96 percent. About 70 s of it is the queue (135 against 65.5 s) and the rest the slower decode
+          (51.4 against 32.4 ms over about 650 tokens).
+        differences:
+          value: { typescript: 168.6, vllm-measured: 86.61 }
+      - reference: llmservingsim
+        cause: "End-to-end time is the queue wait plus a decode that is over half again too slow"
+        reason: "LLMServingSim gives 86.87 where the model gives 168.6 (+94.1 percent). The measured value is 86.61, so LLMServingSim and the real engine agree with each other here and the cause is the one recorded for vllm-measured. LLMServingSim's step times are per-layer kernel tables profiled on this GPU and its authors validated it against these very runs, so close agreement between it and the measurement is what they report, not independent evidence about the model. Cause, as recorded for vllm-measured: End-to-end time is the queue wait plus a decode that is over half again too slow"
+        differences:
+          value: { typescript: 168.6, llmservingsim: 86.87 }
   - id: default-e2e-p50
     claim: Median end-to-end time over all 300 requests, the site's default parameters agrees with the measured run.
     kind: calibrated
@@ -473,11 +545,16 @@ checks:
     subset: all
     tolerance: "15 percent: the same standard as the mean."
     known_difference:
-      reference: vllm-measured
-      cause: "End-to-end time is the queue wait plus a decode that is over half again too slow"
-      reason: *r_e2e
-      differences:
-        value: { typescript: 161.6, vllm-measured: 83.42 }
+      - reference: vllm-measured
+        cause: "End-to-end time is the queue wait plus a decode that is over half again too slow"
+        reason: *r_e2e
+        differences:
+          value: { typescript: 161.6, vllm-measured: 83.42 }
+      - reference: llmservingsim
+        cause: "End-to-end time is the queue wait plus a decode that is over half again too slow"
+        reason: "LLMServingSim gives 83.97 where the model gives 161.6 (+92.4 percent). The measured value is 83.42, so LLMServingSim and the real engine agree with each other here and the cause is the one recorded for vllm-measured. LLMServingSim's step times are per-layer kernel tables profiled on this GPU and its authors validated it against these very runs, so close agreement between it and the measurement is what they report, not independent evidence about the model. Cause, as recorded for vllm-measured: End-to-end time is the queue wait plus a decode that is over half again too slow"
+        differences:
+          value: { typescript: 161.6, llmservingsim: 83.97 }
   - id: default-e2e-p99
     claim: 99th-percentile end-to-end time over all 300 requests, the site's default parameters agrees with the measured run.
     kind: calibrated
@@ -487,11 +564,16 @@ checks:
     subset: all
     tolerance: "20 percent: the tail adds the longest queue to the longest answer."
     known_difference:
-      reference: vllm-measured
-      cause: "End-to-end time is the queue wait plus a decode that is over half again too slow"
-      reason: *r_e2e
-      differences:
-        value: { typescript: 301.4, vllm-measured: 153.6 }
+      - reference: vllm-measured
+        cause: "End-to-end time is the queue wait plus a decode that is over half again too slow"
+        reason: *r_e2e
+        differences:
+          value: { typescript: 301.4, vllm-measured: 153.6 }
+      - reference: llmservingsim
+        cause: "End-to-end time is the queue wait plus a decode that is over half again too slow"
+        reason: "LLMServingSim gives 154.1 where the model gives 301.4 (+95.6 percent). The measured value is 153.6, so LLMServingSim and the real engine agree with each other here and the cause is the one recorded for vllm-measured. LLMServingSim's step times are per-layer kernel tables profiled on this GPU and its authors validated it against these very runs, so close agreement between it and the measurement is what they report, not independent evidence about the model. Cause, as recorded for vllm-measured: End-to-end time is the queue wait plus a decode that is over half again too slow"
+        differences:
+          value: { typescript: 301.4, llmservingsim: 154.1 }
   - id: default-throughput
     claim: Output tokens per second from the first arrival to the last completion over all 300 requests, the site's default parameters agrees with the measured run.
     kind: calibrated
@@ -501,13 +583,18 @@ checks:
     subset: all
     tolerance: "10 percent: the standard the BLIS timing checks use for throughput; the load is open loop, so throughput differs only through how late the last answers finish."
     known_difference:
-      reference: vllm-measured
-      cause: "Throughput follows the slower service rate"
-      reason: &r_tput >-
-        Output tokens per second from the first arrival to the last completion: 590 in the model at default parameters, 1,066 measured (-44.7 percent). The
-        load exceeds the engine's capacity throughout, so throughput is the service rate, which is the decode speed (51.4 against 32.4 ms per token).
-      differences:
-        value: { typescript: 590, vllm-measured: 1066 }
+      - reference: vllm-measured
+        cause: "Throughput follows the slower service rate"
+        reason: &r_tput >-
+          Output tokens per second from the first arrival to the last completion: 590 in the model at default parameters, 1,066 measured (-44.7 percent). The
+          load exceeds the engine's capacity throughout, so throughput is the service rate, which is the decode speed (51.4 against 32.4 ms per token).
+        differences:
+          value: { typescript: 590, vllm-measured: 1066 }
+      - reference: llmservingsim
+        cause: "Throughput follows the slower service rate"
+        reason: "LLMServingSim gives 1066 where the model gives 590 (-44.7 percent). The measured value is 1066, so LLMServingSim and the real engine agree with each other here and the cause is the one recorded for vllm-measured. LLMServingSim's step times are per-layer kernel tables profiled on this GPU and its authors validated it against these very runs, so close agreement between it and the measurement is what they report, not independent evidence about the model. Cause, as recorded for vllm-measured: Throughput follows the slower service rate"
+        differences:
+          value: { typescript: 590, llmservingsim: 1066 }
   - id: fitted-ttft-mean
     claim: Mean time to first token over the 200 held-out requests, parameters fitted to the first 100 agrees with the measured run.
     kind: calibrated
@@ -557,16 +644,21 @@ checks:
     subset: held-out
     tolerance: "20 percent: the tail of time per token is set by the few steps that carry a long prefill chunk or a large batch, which a mean-fitted model reproduces less closely than the mean."
     known_difference:
-      reference: vllm-measured
-      cause: "The real run has a heavier tail of per-token time than the model reproduces; not explained"
-      reason: &r_p99 >-
-        On the 200 held-out requests with the fitted parameters the model's 99th-percentile time per output token is 37.5 ms against 55.0 ms measured (-31.9
-        percent), while its median (28.2 against 30.8 ms) and mean (28.2 against 31.7 ms, -10.9 percent) are inside tolerance. The measured tail is 1.8 times
-        its median, the model's 1.3 times. Candidates, none tested here: stalls from preemption and recompute in the real engine (the run did not record
-        preemptions, so this cannot be checked; the model's own pool is smaller and it preempts 188 times); step-time variance of the real card (clocks, host
-        jitter) that a deterministic model does not have; prefix-cache hits (not representable). Recorded as a miss, not tuned.
-      differences:
-        value: { typescript: 0.03747, vllm-measured: 0.05501 }
+      - reference: vllm-measured
+        cause: "The real run has a heavier tail of per-token time than the model reproduces; not explained"
+        reason: &r_p99 >-
+          On the 200 held-out requests with the fitted parameters the model's 99th-percentile time per output token is 37.5 ms against 55.0 ms measured (-31.9
+          percent), while its median (28.2 against 30.8 ms) and mean (28.2 against 31.7 ms, -10.9 percent) are inside tolerance. The measured tail is 1.8 times
+          its median, the model's 1.3 times. Candidates, none tested here: stalls from preemption and recompute in the real engine (the run did not record
+          preemptions, so this cannot be checked; the model's own pool is smaller and it preempts 188 times); step-time variance of the real card (clocks, host
+          jitter) that a deterministic model does not have; prefix-cache hits (not representable). Recorded as a miss, not tuned.
+        differences:
+          value: { typescript: 0.03747, vllm-measured: 0.05501 }
+      - reference: llmservingsim
+        cause: "The real run has a heavier tail of per-token time than the model reproduces; not explained"
+        reason: "LLMServingSim gives 0.05563 where the model gives 0.03747 (-32.6 percent). The measured value is 0.05501, so LLMServingSim and the real engine agree with each other here and the cause is the one recorded for vllm-measured. LLMServingSim's step times are per-layer kernel tables profiled on this GPU and its authors validated it against these very runs, so close agreement between it and the measurement is what they report, not independent evidence about the model. Cause, as recorded for vllm-measured: The real run has a heavier tail of per-token time than the model reproduces; not explained"
+        differences:
+          value: { typescript: 0.03747, llmservingsim: 0.05563 }
   - id: fitted-e2e-mean
     claim: Mean end-to-end time over the 200 held-out requests, parameters fitted to the first 100 agrees with the measured run.
     kind: calibrated

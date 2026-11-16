@@ -108,7 +108,7 @@ export const vllmMeasured: Reference<MeasuredInput, Measured> = {
     gpus: ["rtx-pro-6000", "rtx-4090"],
     mechanisms: [],
     quantities: ["kv_blocks_per_replica", "preemptions"],
-    metrics: ["ttft_mean_s", "ttft_p50_s", "ttft_p99_s", "tpot_mean_s", "tpot_p50_s", "tpot_p99_s", "e2e_mean_s", "e2e_p50_s", "e2e_p99_s", "throughput_tokens_per_s", "completed"],
+    metrics: ["ttft_mean_s", "ttft_p50_s", "ttft_p99_s", "tpot_mean_s", "tpot_p50_s", "tpot_p99_s", "e2e_mean_s", "e2e_p50_s", "e2e_p99_s", "throughput_tokens_per_s", "prefix_hit_rate", "completed"],
     arms: false
   },
   lock: lockedCommit,

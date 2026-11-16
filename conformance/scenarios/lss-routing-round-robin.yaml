@@ -1,0 +1,35 @@
+id: lss-routing-round-robin
+title: Round robin over two RTX PRO 6000 replicas
+references: [llmservingsim]
+# Eight requests one second apart over two replicas. LLMServingSim's RR policy rotates strictly, and so does the TypeScript policy that stands for Envoy.
+model: llama-3.1-8b
+gpu: rtx-pro-6000
+engine:
+  tp: 1
+  gpu_memory_utilisation: 0.92
+  max_num_seqs: 64
+  max_num_batched_tokens: 8192
+  block_size: 16
+  prefix_caching: true
+replicas: 2
+routing: round-robin
+requests:
+  - { session: 1, at: 1, turns: [[300, 20]] }
+  - { session: 2, at: 2, turns: [[300, 20]] }
+  - { session: 3, at: 3, turns: [[300, 20]] }
+  - { session: 4, at: 4, turns: [[300, 20]] }
+  - { session: 5, at: 5, turns: [[300, 20]] }
+  - { session: 6, at: 6, turns: [[300, 20]] }
+  - { session: 7, at: 7, turns: [[300, 20]] }
+  - { session: 8, at: 8, turns: [[300, 20]] }
+checks:
+  - id: pod-sequence
+    claim: Request i goes to the replica after the one request i-1 went to (replicas are named by first use, since which one starts is arbitrary).
+    kind: exact
+    quantity: routed_pod
+    tolerance: A routing decision is a discrete choice; a request either went to the same replica as the other simulator's or it did not.
+  - id: requests-per-pod
+    claim: Eight requests over two replicas is four each.
+    kind: exact
+    quantity: requests_per_pod
+    tolerance: Counts of discrete decisions.

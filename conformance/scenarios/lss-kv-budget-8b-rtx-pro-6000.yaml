@@ -1,0 +1,36 @@
+id: lss-kv-budget-8b-rtx-pro-6000
+title: KV blocks of one RTX PRO 6000 replica
+references: [llmservingsim]
+# One short request; the check is the size of the pool. LLMServingSim derives its capacity from the configuration as (memory x utilisation - weights) / bytes per block and states that it does not model vLLM's activation peak or CUDA
+# context (`--npu-memory-utilization`: "an upper bound on vLLM's at the same value"). The number is therefore a function of its input, not a measurement of how vLLM sizes its pool at start-up: this
+# check says whether the TypeScript model's own accounting (weights, activation estimate, CUDA graphs) differs from that arithmetic, and by how much; the measured engine's block count (measured-8b-rtx-pro-6000) is the evidence for the real figure.
+model: llama-3.1-8b
+gpu: rtx-pro-6000
+engine:
+  tp: 1
+  gpu_memory_utilisation: 0.92
+  max_num_seqs: 64
+  max_num_batched_tokens: 8192
+  block_size: 16
+  prefix_caching: true
+replicas: 1
+routing: round-robin
+requests:
+  - { session: 1, at: 1.0, turns: [[500, 50]] }
+checks:
+  - id: kv-blocks-per-replica
+    claim: One replica holds the same number of KV blocks as LLMServingSim derives from the same memory utilisation, to within 0.1 percent.
+    kind: capacity
+    quantity: kv_blocks_per_replica
+    rel_tol: 0.001
+    params: defaults
+    tolerance: "0.1 percent: the capacity rule of 2026-11-16 (docs/parity.md), applied unchanged. Both sides are arithmetic on the same memory, weights and block size; a difference is exactly the terms one of them leaves out."
+    known_difference:
+      reference: llmservingsim
+      cause: "LLMServingSim sets nothing aside for activations or CUDA graphs"
+      reason: >-
+        LLMServingSim sizes the pool as (memory x utilisation - weights) / bytes per block, with 94.97 GiB x 0.92 and 16.06 GB of weights, and gets 37,090 blocks; it states that it does not model vLLM's activation peak or CUDA
+        context. The TypeScript model sets aside 735,313,920 bytes of activations (the peak of an 8,192-token step) and 1,159,725,056 bytes for CUDA graphs on top of the weights and gets 36,174 blocks, 916 (2.5 percent) fewer, which is
+        1.895 GB at 2,097,152 bytes per block. The real engine set aside about 0.900 GB for the same things (measured-8b-rtx-pro-6000), so the real figure lies between the two, nearer LLMServingSim's. This is arithmetic on both sides' inputs, not evidence about vLLM's start-up sizing.
+      differences:
+        value: { typescript: 36174, llmservingsim: 37090 }
