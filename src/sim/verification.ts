@@ -23,5 +23,8 @@ export const TIMING_70B_H200 = [...calibration("70b-h200"), "timing-70b-h200-cha
 /** Replays of real vLLM runs on two workstation GPUs: timing under default and fitted parameters, and the KV pool the engine reported. */
 export const MEASURED = ["measured-8b-rtx-pro-6000", "measured-8b-rtx-4090"] as const;
 
+/** LLMServingSim's runs on the RTX PRO 6000: calibration scenarios (and the speculative one) that fit the cost model's timing to it, and held-out loads. */
+export const TIMING_8B_RTX_PRO_6000_LLMSERVINGSIM = [...calibration("lss-8b-rtx-pro-6000"), "timing-lss-8b-rtx-pro-6000-isolated", "timing-lss-8b-rtx-pro-6000-chat", "timing-lss-8b-rtx-pro-6000-burst"] as const;
+
 /** Every scenario that checks time to first token, time per token or throughput after calibration (and, for the measured ones, before it too). */
-export const TIMING = [...TIMING_8B_H100, ...TIMING_8B_B200, ...TIMING_70B_H200, ...MEASURED] as const;
+export const TIMING = [...TIMING_8B_H100, ...TIMING_8B_B200, ...TIMING_70B_H200, ...TIMING_8B_RTX_PRO_6000_LLMSERVINGSIM, ...MEASURED] as const;

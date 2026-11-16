@@ -40,7 +40,7 @@ export function checkoutOf(context: GenerateContext): string {
   const dir = context.settings.LLMSERVINGSIM_DIR;
   if (!dir) throw new Error("name a built LLMServingSim checkout at the commit in conformance/refs/llmservingsim/lock with LLMSERVINGSIM_DIR=<path> (see conformance/README.md)");
   if (!existsSync(path.join(dir, "serving", "__main__.py"))) throw new Error(`${dir} is not an LLMServingSim checkout (serving/__main__.py is missing)`);
-  if (!existsSync(path.join(dir, "astra-sim", "build", "astra_analytical", "build", "bin", "AstraSim_Analytical_Congestion_Unaware"))) throw new Error(`${dir} is not built: the analytical ASTRA-Sim binary is missing (see conformance/README.md)`);
+  if (!existsSync(path.join(dir, "astra-sim", "build", "astra_analytical", "build", "AnalyticalAstra", "bin", "AnalyticalAstra"))) throw new Error(`${dir} is not built: the analytical ASTRA-Sim binary is missing (see conformance/README.md)`);
   return dir;
 }
 

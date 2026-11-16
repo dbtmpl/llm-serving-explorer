@@ -41,3 +41,5 @@
 - **Reference gap:** Two references that both cover a check disagree with each other; the scenario records and explains the gap, asserted exactly, and the model is held against the span the references leave.
 - **Span:** The range between the values of references that disagree with each other, against which the model is held for such a check.
 - **Measured data (as a reference):** Real vLLM runs reduced to the same record as a simulator: per-request times, engine settings and KV block count. Only reduced values are committed, with attribution and the source's hashes (`conformance/refs/vllm-measured/`).
+- **LLMServingSim:** A Python port of vLLM's V1 scheduler and block pool whose step times come from per-layer kernel tables profiled on real GPUs, by CASYS Lab at KAIST (MIT licence). A simulator reference for the RTX PRO 6000 and RTX 4090; the pinned commit is in `conformance/refs/llmservingsim/lock`.
+- **Cross-reference check:** A check covered by more than one reference. The references are compared with each other first; the model is then held against each, or against their span where they disagree.

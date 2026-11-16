@@ -16,7 +16,7 @@ export const continuousBatching: BatchingMode = {
   summary: "Requests join and leave the batch at every engine step.",
   citations: ["yu2022", "vllmScheduler"],
   fidelity: "structural",
-  verification: [...TIMING, "preemption-overflow", "queue-deadline-shedding"],
+  verification: [...TIMING, "preemption-overflow", "lss-preemption-overflow", "lss-max-num-seqs", "queue-deadline-shedding"],
   admitsInto: () => true,
   admissionHonoursTokenBudget: true
 };

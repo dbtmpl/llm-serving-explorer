@@ -29,7 +29,7 @@ export const tieredCache: ApproachMeta = {
   summary: "Idle sessions move down a memory hierarchy instead of being dropped, and are loaded back on return.",
   citations: ["gao2024", "qin2024", "lmcache2025", "llmdKvOffloader", "dynamoKvbm"],
   fidelity: "structural",
-  verification: ["tiers-offload"]
+  verification: ["tiers-offload", "lss-tiers-offload"]
 };
 
 /** The eviction order used in every tier. */

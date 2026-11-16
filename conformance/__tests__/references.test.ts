@@ -133,6 +133,11 @@ describe("what a reference supports", () => {
     const withArms = parseScenario("tiny.yaml", YAML("arms: { a: {}, b: { replicas: 3 } }").replace(/checks:[\s\S]*/, "checks:\n  - { id: d, claim: c, kind: directional, metric: ttft_mean_s, baseline: a, intervention: b, effect: ratio, direction: decrease, band: [0.5, 2], tolerance: t }\n"));
     expect(unsupportedBecause(stub({ arms: false }), withArms)).toMatch(/cannot answer a scenario with arms/);
   });
+  it("honours a scenario's own list of references", () => {
+    const named = parseScenario("tiny.yaml", YAML("").replace("replicas: 2", "references: [somebody-else]\nreplicas: 2"));
+    expect(unsupportedBecause({ ...blis, id: "blis" }, named)).toMatch(/the scenario is for somebody-else, not BLIS/);
+    expect(unsupportedBecause({ ...blis, id: "somebody-else" }, named)).toBeNull();
+  });
   it("tells which checks it can state", () => {
     expect(canState(stub({ quantities: [] }), s.checks[0]!)).toBe(false);
     expect(canState(blis, s.checks[0]!)).toBe(true);

@@ -180,8 +180,8 @@ export function renderCalibration(ref: string): string {
   }
   const name = nameOf(ref);
   const extras = Object.entries(fitted.pairs).flatMap(([key, p]) => [
-    ...(p.specCost ? [`- \`${key}\`: draft cost \`specCost\` ${p.specCost.value} (default ${p.specCost.defaultValue}); time per token ${pctSigned(p.specCost.residualTpot)} from ${name}'s on \`${p.specCost.scenario}\`. BLIS prices its n-gram drafter at nothing, so the fit goes to the lower bound.`] : []),
-    ...(p.linkGbps ? [`- \`${key}\`: link rate \`linkGbps\` ${p.linkGbps.value} Gbit/s (default ${p.linkGbps.defaultValue}); hand-over time ${pctSigned(p.linkGbps.residualKvTransfer)} from ${name}'s on \`${p.linkGbps.scenario}\`. BLIS's fabric is 400 Gbit/s InfiniBand at 0.811 of line rate, which is 324 Gbit/s.`] : [])
+    ...(p.specCost ? [`- \`${key}\`: draft cost \`specCost\` ${p.specCost.value} (default ${p.specCost.defaultValue}); time per token ${pctSigned(p.specCost.residualTpot)} from ${name}'s on \`${p.specCost.scenario}\`. ${ref === "blis" ? "BLIS prices its n-gram drafter at nothing, so the fit goes to the lower bound." : `${name} prices no drafter (it takes an acceptance rate), so the fitted draft cost is close to zero.`}`] : []),
+    ...(p.linkGbps ? [`- \`${key}\`: link rate \`linkGbps\` ${p.linkGbps.value} Gbit/s (default ${p.linkGbps.defaultValue}); hand-over time ${pctSigned(p.linkGbps.residualKvTransfer)} from ${name}'s on \`${p.linkGbps.scenario}\`. ${ref === "blis" ? "BLIS's fabric is 400 Gbit/s InfiniBand at 0.811 of line rate, which is 324 Gbit/s." : ""}`] : [])
   ]);
   return [...rows, "", ...extras].join("\n");
 }
