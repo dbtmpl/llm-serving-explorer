@@ -14,6 +14,8 @@
  *
  * - `capacity`: capacity and KV accounting: KV blocks per replica, prefix and host-tier hit rates.
  * - `decisions`: every `exact` check, and the counts `peak_replicas`, `completed`, `preemptions`.
+ * - `timings_defaults`: the same, for a check that runs the model with the site's default parameters (`params: defaults`), no fit, so that the
+ *   distance of the unfitted model from a reference is not pooled with the distance after a fit.
  * - `timings`: time to first token (mean, percentiles, follow-up), time per token, end to end, throughput, KV hand-over time, tokens per speculative step.
  * - `effects`: directional checks.
  *
@@ -24,13 +26,14 @@
 import { absoluteDeviation, type Comparison, type Deviation, type Outcome } from "./compare.js";
 import type { Check, Metric, Scalar } from "./scenario.js";
 
-export const GROUPS = ["capacity", "decisions", "timings", "effects"] as const;
+export const GROUPS = ["capacity", "decisions", "timings_defaults", "timings", "effects"] as const;
 export type Group = (typeof GROUPS)[number];
 
 export const GROUP_LABEL: Record<Group, string> = {
   capacity: "Capacity and KV accounting",
   decisions: "Decisions",
-  timings: "Timings and rates",
+  timings_defaults: "Timings, default parameters (no fit)",
+  timings: "Timings and rates (fitted, held out)",
   effects: "Directional effects"
 };
 
@@ -49,7 +52,7 @@ export function groupOf(check: Check): Group {
     case "directional":
       return "effects";
     case "calibrated":
-      return KV_METRICS.includes(check.metric) ? "capacity" : DECISION_METRICS.includes(check.metric) ? "decisions" : "timings";
+      return KV_METRICS.includes(check.metric) ? "capacity" : DECISION_METRICS.includes(check.metric) ? "decisions" : check.params === "defaults" ? "timings_defaults" : "timings";
   }
 }
 
@@ -60,6 +63,9 @@ const METRIC_LABEL: Record<Metric, string> = {
   tpot_mean_s: "mean time per output token",
   e2e_mean_s: "mean end-to-end time",
   e2e_p50_s: "median end-to-end time",
+  e2e_p99_s: "99th percentile end-to-end time",
+  tpot_p50_s: "median time per output token",
+  tpot_p99_s: "99th percentile time per output token",
   throughput_tokens_per_s: "throughput",
   kv_transfer_mean_s: "mean KV hand-over time",
   spec_tokens_per_step: "tokens per speculative step",

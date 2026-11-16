@@ -16,7 +16,9 @@ export const MODEL_NAMES: Record<string, string> = {
 export const GPU_NAMES: Record<string, string> = {
   h100: "h100",
   h200: "h200",
-  b200: "b200"
+  b200: "b200",
+  "rtx-pro-6000": "rtx-pro-6000",
+  "rtx-4090": "rtx-4090"
 };
 
 export function typescriptModel(neutral: string): string {

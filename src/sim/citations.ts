@@ -480,6 +480,24 @@ export const CITATIONS = {
     kind: "datasheet",
     url: "https://www.amd.com/en/products/accelerators/instinct/mi300/mi300x.html"
   },
+  nvidiaRtxPro6000: {
+    short: "NVIDIA RTX PRO 6000 Blackwell Server Edition datasheet",
+    title: "NVIDIA RTX PRO 6000 Blackwell Server Edition (96 GB GDDR7, 1597 GB/s, FP16/BF16 Tensor Core 1 PFLOP)",
+    kind: "datasheet",
+    url: "https://www.nvidia.com/en-us/data-center/rtx-pro-6000-blackwell-server-edition/"
+  },
+  nvidiaAda: {
+    short: "NVIDIA Ada GPU architecture whitepaper",
+    title: "NVIDIA Ada GPU Architecture, appendix A: GeForce RTX 4090 full specifications (BF16 Tensor TFLOPS with FP32 accumulate 165.2 dense, 1008 GB/s)",
+    kind: "datasheet",
+    url: "https://images.nvidia.com/aem-dam/Solutions/Data-Center/l4/nvidia-ada-gpu-architecture-whitepaper-v2.1.pdf"
+  },
+  llmservingsimBench: {
+    short: "LLMServingSim, measured vLLM runs",
+    title: "LLMServingSim bench/examples: real vLLM runs whose meta.json records device_total_memory_bytes as the driver reports it (MIT licence)",
+    kind: "source",
+    url: "https://github.com/casys-kaist/LLMServingSim/tree/49df63f2af61230da63dd2136044a2dbf9bd4161/bench/examples"
+  },
   knativeScaleBounds: {
     short: "Knative docs, scale bounds",
     title: "Knative Serving: configuring scale bounds (min-scale, scale-down delay)",

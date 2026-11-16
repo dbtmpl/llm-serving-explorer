@@ -24,14 +24,18 @@ function distributionTable(r: ReferenceSummary): string[] {
     "| Group | Comparisons | Median deviation | Largest deviation | Within 1% | Within 5% | Within 10% | Within 25% |",
     "|---|---|---|---|---|---|---|---|",
     ...GROUPS.filter((g) => d.groups[g].n).map((g) => row(GROUP_LABEL[g], d.groups[g])),
-    row("**All**", d.overall)
+    // pooling a reading before the fit with one after it would answer neither question
+    ...(d.groups.timings_defaults.n ? [] : [row("**All**", d.overall)])
   ];
 }
 
 /** The sentence the READMEs quote: the median deviation and how many comparisons are within 5%. A test keeps them in step with summary.json. */
 export function readmeHeadline(s: Summary, ref: string): string {
-  const o = s.references[ref]!.deviations.overall;
-  return `median deviation ${fmtPct(o.median)} over ${o.n} comparisons, ${o.within["5"]} of them within 5%`;
+  const d = s.references[ref]!.deviations;
+  const g = d.groups;
+  // a reference with a reading before any fit keeps it apart from the one after: the two answer different questions
+  if (g.timings_defaults.n) return `median timing deviation ${fmtPct(g.timings_defaults.median)} over ${g.timings_defaults.n} comparisons with the site's default parameters, ${fmtPct(g.timings.median)} over ${g.timings.n} comparisons on held-out requests after fitting`;
+  return `median deviation ${fmtPct(d.overall.median)} over ${d.overall.n} comparisons, ${d.overall.within["5"]} of them within 5%`;
 }
 
 export function renderHeadline(s: Summary, ref: string): string {
@@ -68,6 +72,7 @@ export function readmeFigure(s: Summary, ref: string): string {
 }
 
 const GROUP_DEFINITION: Record<(typeof GROUPS)[number], string> = {
+  timings_defaults: "the same metrics for checks that run the model with the site's default parameters, before any fit.",
   capacity: "KV blocks per replica, and the prefix-cache and host-tier hit rates; deviation is the relative difference.",
   decisions: "every exact check (pod chosen, requests shed or preempted, cached tokens, requests per pod, discrete counts) and the counts of replicas used, requests completed and preemptions; deviation is the share of the individual values that differ.",
   timings: "time to first token, time per token, end-to-end time, throughput, KV hand-over time and tokens per speculative step; deviation is the relative difference.",

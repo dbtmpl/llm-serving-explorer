@@ -22,6 +22,9 @@ describe("hardware catalog", () => {
     expect(GPUS.h100!.memory / 1e9).toBeCloseTo(85.03, 2); // 79.19 GiB
     expect(GPUS.h200!.memory / 2 ** 30).toBeCloseTo(139.8, 1);
     expect(GPUS.mi300x!.memory).toBe(GPUS.mi300x!.hbm); // no measured figure cited: the datasheet value
+    // measured by real vLLM runs (meta.json device_total_memory_bytes): 94.97 GiB and 23.52 GiB
+    expect(GPUS["rtx-pro-6000"]!.memory / 2 ** 30).toBeCloseTo(94.97, 2);
+    expect(GPUS["rtx-4090"]!.memory / 2 ** 30).toBeCloseTo(23.52, 2);
   });
   it("parameter counts follow from the architecture: embedding and head, then attention and feed-forward per layer", () => {
     for (const m of Object.values(MODELS)) {
@@ -31,6 +34,10 @@ describe("hardware catalog", () => {
       expect(m.N / n, m.id).toBeGreaterThan(0.999);
       expect(m.N / n, m.id).toBeLessThan(1.001);
     }
+  });
+  it("the workstation parts carry their datasheet bandwidth and capacity", () => {
+    expect(GPUS["rtx-4090"]).toMatchObject({ hbm: 24e9, bw: 1.008e12, peak: 165.2e12 }); // 21 Gbps x 384 bit; BF16 tensor, FP32 accumulate, dense
+    expect(GPUS["rtx-pro-6000"]).toMatchObject({ hbm: 96e9, bw: 1.597e12 });
   });
   it("uses decimal gigabytes and dense peak compute", () => {
     expect(GPUS.h100!.hbm).toBe(80e9);

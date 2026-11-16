@@ -66,6 +66,13 @@ export const MODELS: Record<string, ModelSpec> = {
  * BLIS substrate catalogue (from a vLLM start-up log). No measured figure for the MI300X is cited here, so it
  * keeps the datasheet's 192 GB; on a real MI300X the pool would be somewhat different.
  *
+ * The RTX PRO 6000 and RTX 4090 `memory` values are `device_total_memory_bytes` of the `meta.json` of real vLLM runs on those
+ * devices (101.98 GB = 94.97 GiB; 25.25 GB = 23.52 GiB). The RTX 4090's peak is the whitepaper's BF16 tensor figure with FP32
+ * accumulate, dense (165.2; 330.4 with sparsity). NVIDIA's page for the RTX PRO 6000 Server Edition gives one figure,
+ * "FP16 | BF16 Tensor Core 1 PFLOP", without saying whether it assumes sparsity; as for the other Blackwell parts it is read as the sparse
+ * headline and halved, to 500e12. That is probably generous for BF16 with FP32 accumulate (third-party sheets list about half
+ * of it), and a fitted MFU absorbs the difference; it is stated here because the number is not confirmed by a first-party table.
+ *
  * Peak compute is the dense figure. Vendors of Hopper and Blackwell parts headline a number that
  * assumes structured sparsity; it is halved here, because LLM weights are dense.
  */
@@ -73,6 +80,8 @@ export const GPUS: Record<string, GpuSpec> = {
   h100: { id: "h100", label: "H100 SXM", peak: 989.5e12, hbm: 80e9, memory: 85_029_158_912, memorySource: "vllmUsageStats", bw: 3.35e12, source: "nvidiaH100" },
   h200: { id: "h200", label: "H200 SXM", peak: 989.5e12, hbm: 141e9, memory: 150_109_880_320, memorySource: "blisSubstrateCatalog", bw: 4.8e12, source: "nvidiaH200" },
   b200: { id: "b200", label: "B200", peak: 2250e12, hbm: 180e9, memory: 191_503_007_744, memorySource: "blisSubstrateCatalog", bw: 7.7e12, source: "nvidiaB200" },
+  "rtx-pro-6000": { id: "rtx-pro-6000", label: "RTX PRO 6000", peak: 500e12, hbm: 96e9, memory: 101_976_440_832, memorySource: "llmservingsimBench", bw: 1.597e12, source: "nvidiaRtxPro6000" },
+  "rtx-4090": { id: "rtx-4090", label: "RTX 4090", peak: 165.2e12, hbm: 24e9, memory: 25_250_627_584, memorySource: "llmservingsimBench", bw: 1.008e12, source: "nvidiaAda" },
   mi300x: { id: "mi300x", label: "MI300X", peak: 1307.4e12, hbm: 192e9, memory: 192e9, memorySource: "amdMi300x", bw: 5.3e12, source: "amdMi300x" }
 };
 

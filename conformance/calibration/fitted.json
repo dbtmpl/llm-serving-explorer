@@ -236,6 +236,77 @@
           ]
         }
       }
+    },
+    "vllm-measured": {
+      "lock": "49df63f2af61230da63dd2136044a2dbf9bd4161",
+      "pairs": {
+        "llama-3.1-8b/rtx-4090/tp1": {
+          "model": "llama-3.1-8b",
+          "gpu": "rtx-4090",
+          "tp": 1,
+          "timing": {
+            "mbu": 1,
+            "mfu": 0.8,
+            "hostMsBase": 0.01,
+            "hostMsPerSeq": 0.001
+          },
+          "defaults": {
+            "mbu": 0.6,
+            "mfu": 0.5,
+            "hostMsBase": 1.5,
+            "hostMsPerSeq": 0.05
+          },
+          "lossAtDefaults": 0.816898,
+          "lossAtFit": 0.237822,
+          "residuals": [
+            {
+              "scenario": "measured-8b-rtx-4090",
+              "ttftMean": 0.0846178,
+              "tpotMean": -0.0581093
+            }
+          ],
+          "residualsAtDefaults": [
+            {
+              "scenario": "measured-8b-rtx-4090",
+              "ttftMean": 1.10692,
+              "tpotMean": 0.641663
+            }
+          ]
+        },
+        "llama-3.1-8b/rtx-pro-6000/tp1": {
+          "model": "llama-3.1-8b",
+          "gpu": "rtx-pro-6000",
+          "tp": 1,
+          "timing": {
+            "mbu": 1,
+            "mfu": 0.8,
+            "hostMsBase": 4.608,
+            "hostMsPerSeq": 0.00881982
+          },
+          "defaults": {
+            "mbu": 0.6,
+            "mfu": 0.5,
+            "hostMsBase": 1.5,
+            "hostMsPerSeq": 0.05
+          },
+          "lossAtDefaults": 0.372714,
+          "lossAtFit": 0.0228028,
+          "residuals": [
+            {
+              "scenario": "measured-8b-rtx-pro-6000",
+              "ttftMean": 0.0136195,
+              "tpotMean": -0.0512301
+            }
+          ],
+          "residualsAtDefaults": [
+            {
+              "scenario": "measured-8b-rtx-pro-6000",
+              "ttftMean": 0.952689,
+              "tpotMean": 0.563044
+            }
+          ]
+        }
+      }
     }
   }
 }
