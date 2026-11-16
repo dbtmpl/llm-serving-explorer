@@ -7,8 +7,8 @@ How many tokens a sequence gains per engine step, and at what cost.
 <!-- generated:approaches:start -->
 | Concept | Approach | What it does | Fidelity | Verified against | Sources |
 |---|---|---|---|---|---|
-| Decoding | Autoregressive | One token per sequence per step. | Exact | BLIS: 20 scenarios; Measured vLLM: `measured-8b-rtx-pro-6000`, `measured-8b-rtx-4090` | [Vaswani et al., NeurIPS 2017](https://arxiv.org/abs/1706.03762) |
-| Decoding | Speculative decoding | A draft model proposes several tokens; the target verifies them in one pass. | Exact | BLIS: `spec-decoding`, `calib-8b-h100-spec` | [Leviathan et al., ICML 2023](https://arxiv.org/abs/2211.17192) |
+| Decoding | Autoregressive | One token per sequence per step. | Exact | BLIS: 20 scenarios; LLMServingSim: 10 scenarios; Measured vLLM: `measured-8b-rtx-pro-6000`, `measured-8b-rtx-4090` | [Vaswani et al., NeurIPS 2017](https://arxiv.org/abs/1706.03762) |
+| Decoding | Speculative decoding | A draft model proposes several tokens; the target verifies them in one pass. | Exact | BLIS: `spec-decoding`, `calib-8b-h100-spec`; LLMServingSim: `lss-spec-decoding`, `calib-lss-8b-rtx-pro-6000-spec` | [Leviathan et al., ICML 2023](https://arxiv.org/abs/2211.17192) |
 <!-- generated:approaches:end -->
 
 Fidelity: **Exact** reproduces a published formula or rule and is tested against it. **Structural** follows the source's mechanism with our own constants, exposed as parameters. **Simplified** is a stand-in whose docstring says what is left out.
