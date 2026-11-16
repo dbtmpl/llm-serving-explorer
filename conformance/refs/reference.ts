@@ -87,7 +87,8 @@ export function mechanismsOf(d: Deployment): Mechanism[] {
 }
 
 /** Why the reference cannot answer the scenario at all (its model, GPU, mechanisms or arms), or null when it can. */
-export function unsupportedBecause(ref: Pick<Reference, "supports" | "name">, s: Scenario): string | null {
+export function unsupportedBecause(ref: Pick<Reference, "supports" | "name"> & { id?: string }, s: Scenario): string | null {
+  if (s.references && ref.id !== undefined && !s.references.includes(ref.id)) return `the scenario is for ${s.references.join(", ")}, not ${ref.name}`;
   const arms = Object.values(s.arms);
   if (arms.length > 1 && !ref.supports.arms) return `${ref.name} has one deployment and cannot answer a scenario with arms`;
   for (const d of arms) {

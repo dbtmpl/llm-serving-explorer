@@ -25,7 +25,7 @@ function die(msg: string): never {
 
 const settings: Record<string, string | undefined> = { ...process.env };
 if (arg("blis")) settings.BLIS_BIN = arg("blis");
-for (const [flag, name] of [["clone", "LLMSERVINGSIM_DIR"]] as const) if (arg(flag)) settings[name] = arg(flag);
+for (const [flag, name] of [["clone", "LLMSERVINGSIM_DIR"], ["python", "LLMSERVINGSIM_PYTHON"]] as const) if (arg(flag)) settings[name] = arg(flag);
 
 const wanted = arg("ref") ? [referenceById(arg("ref")!)] : REFERENCES;
 const only = arg("only");

@@ -277,6 +277,11 @@ export interface Scenario {
    * data, which has no separate calibration scenarios.
    */
   split?: { calibrationRequests: number };
+  /**
+   * The references allowed to answer this scenario. Unstated: every reference whose `supports` covers its model, GPU, mechanisms and arms.
+   * A scenario that replays one reference's own workload or is built from the inputs of one simulator names the references it is for.
+   */
+  references?: string[];
   /** The deployments to run; one named `main` unless the scenario declares `arms`. */
   arms: Record<string, Deployment>;
   checks: Check[];
@@ -474,9 +479,10 @@ export function parseScenario(file: string, text: string): Scenario {
   if (path.basename(file, ".yaml") !== id) fail(file, `"id" (${id}) must equal the file name`);
   const role = raw.role === undefined ? "check" : raw.role;
   if (role !== "check" && role !== "calibration") fail(file, `role must be "check" or "calibration"`);
-  const { arms: armsRaw, checks: checksRaw, id: _id, title: _title, role: _role, fit_reference: fitRaw, split: splitRaw, ...baseRaw } = raw;
+  const { arms: armsRaw, checks: checksRaw, id: _id, title: _title, role: _role, fit_reference: fitRaw, split: splitRaw, references: referencesRaw, ...baseRaw } = raw;
   const split = splitRaw === undefined ? undefined : { calibrationRequests: num(file, obj(file, splitRaw, `"split"`), "calibration_requests") };
   const fitReference = fitRaw === undefined ? undefined : str(file, { fit_reference: fitRaw }, "fit_reference");
+  const references = referencesRaw === undefined ? undefined : stringList(file, referencesRaw, `"references"`);
   const arms: Record<string, Deployment> = {};
   if (armsRaw === undefined) arms[MAIN_ARM] = deployment(file, baseRaw);
   else
@@ -486,7 +492,7 @@ export function parseScenario(file: string, text: string): Scenario {
   const checks = (checksRaw as unknown[]).map((c) => check(file, c, Object.keys(arms)));
   if (role === "check" && !checks.length) fail(file, `a scenario with role "check" needs at least one check`);
   if (role === "calibration" && checks.length) fail(file, `a calibration scenario states no checks: it is the data the fit uses`);
-  return { id, title: str(file, raw, "title"), role: role as Scenario["role"], ...(fitReference ? { fitReference } : {}), ...(split ? { split } : {}), arms, checks };
+  return { id, title: str(file, raw, "title"), role: role as Scenario["role"], ...(fitReference ? { fitReference } : {}), ...(split ? { split } : {}), ...(references ? { references } : {}), arms, checks };
 }
 
 export function loadScenario(id: string): Scenario {
