@@ -26,6 +26,8 @@ export function calibrationSet(reference: Reference<any, any>): Map<string, Pair
     // calibration scenarios, and scenarios that fit to the first part of a measured run and check on the rest
     if (scenario.role !== "calibration" && !scenario.split) continue;
     if (!referencesOf(scenario).some((r) => r.id === reference.id)) continue;
+    // a split scenario is fitted to the one reference it names (`fit_reference`); another reference that also covers it is only compared with
+    if (scenario.split && scenario.fitReference && scenario.fitReference !== reference.id) continue;
     const d = mainArm(scenario);
     const file = loadReferenceFile(reference.id, id);
     if (!file) throw new Error(`${id}: no ${reference.id} reference; run pnpm conformance:reference --ref ${reference.id}`);

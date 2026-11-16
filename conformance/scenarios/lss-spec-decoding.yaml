@@ -1,0 +1,37 @@
+id: lss-spec-decoding
+title: Speculative decoding on or off, time per token, RTX PRO 6000
+references: [llmservingsim]
+# Five requests 15 s apart with prompts of 300 to 6,000 tokens and answers of 300, each alone on the engine, with 3 draft tokens per step and 2.2 tokens accepted per step on average. LLMServingSim's own input is
+# the marginal acceptance rate (1 + rate x K tokens per step), which the translator sets to (2.2 - 1) / 3. Its authors list the feature as not yet validated against measured vLLM runs; the check is the direction and size of the
+# effect, which is a function of the verify width and the acceptance, not of an absolute time.
+model: llama-3.1-8b
+gpu: rtx-pro-6000
+engine:
+  tp: 1
+  gpu_memory_utilisation: 0.92
+  max_num_seqs: 64
+  max_num_batched_tokens: 8192
+  block_size: 16
+  prefix_caching: true
+replicas: 1
+routing: round-robin
+arms:
+  off: {}
+  on: { speculative: { k: 3, acceptance_length: 2.2 } }
+requests:
+  - { session: 1, at: 1.0, turns: [[300, 300]] }
+  - { session: 2, at: 16.0, turns: [[700, 300]] }
+  - { session: 3, at: 31.0, turns: [[1500, 300]] }
+  - { session: 4, at: 46.0, turns: [[3000, 300]] }
+  - { session: 5, at: 61.0, turns: [[6000, 300]] }
+checks:
+  - id: tpot-falls
+    claim: Speculative decoding lowers the mean time per output token by about the accepted length over the verify cost.
+    kind: directional
+    metric: tpot_mean_s
+    baseline: off
+    intervention: on
+    effect: ratio
+    direction: decrease
+    band: [0.75, 1.33]
+    tolerance: "Within a factor of 1.33 of each other: with 2.2 tokens per step the ratio is near 0.5 to 0.6, and a step that verifies four positions costs a little more than one; a quarter either way allows for the verify cost and the draft cost (fitted on calib-lss-8b-rtx-pro-6000-spec) without admitting a missing speedup."

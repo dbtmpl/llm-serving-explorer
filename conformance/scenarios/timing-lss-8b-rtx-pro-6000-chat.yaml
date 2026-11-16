@@ -1,0 +1,133 @@
+id: timing-lss-8b-rtx-pro-6000-chat
+title: Held-out timing, Llama 3.1 8B on one RTX PRO 6000, chat-like load
+references: [llmservingsim]
+# The request mix of timing-8b-h100-chat (prompts of 300 to 3,500 tokens, answers of 60 to 400) with arrivals three times as far apart (1.2 s), because a decode step on this GPU is about
+# three times as long as on an H100; the batch varies between 1 and about 12 and prompts overlap with decodes. Held out from the calibration scenarios (calib-lss-*). Two readings of
+# timing, kept apart: default-* runs the model with the site's default parameters; fitted-* with the parameters fitted to the calibration scenarios of the same reference.
+model: llama-3.1-8b
+gpu: rtx-pro-6000
+engine:
+  tp: 1
+  gpu_memory_utilisation: 0.92
+  max_num_seqs: 64
+  max_num_batched_tokens: 8192
+  block_size: 16
+  prefix_caching: true
+replicas: 1
+routing: round-robin
+requests:
+  - { session: 1, at: 1.00, turns: [[300, 120]] }
+  - { session: 2, at: 2.20, turns: [[1500, 250]] }
+  - { session: 3, at: 3.40, turns: [[700, 60]] }
+  - { session: 4, at: 4.60, turns: [[3500, 400]] }
+  - { session: 5, at: 5.80, turns: [[900, 180]] }
+  - { session: 6, at: 7.00, turns: [[2200, 90]] }
+  - { session: 7, at: 8.20, turns: [[300, 120]] }
+  - { session: 8, at: 9.40, turns: [[1500, 250]] }
+  - { session: 9, at: 10.60, turns: [[700, 60]] }
+  - { session: 10, at: 11.80, turns: [[3500, 400]] }
+  - { session: 11, at: 13.00, turns: [[900, 180]] }
+  - { session: 12, at: 14.20, turns: [[2200, 90]] }
+  - { session: 13, at: 15.40, turns: [[300, 120]] }
+  - { session: 14, at: 16.60, turns: [[1500, 250]] }
+  - { session: 15, at: 17.80, turns: [[700, 60]] }
+  - { session: 16, at: 19.00, turns: [[3500, 400]] }
+  - { session: 17, at: 20.20, turns: [[900, 180]] }
+  - { session: 18, at: 21.40, turns: [[2200, 90]] }
+  - { session: 19, at: 22.60, turns: [[300, 120]] }
+  - { session: 20, at: 23.80, turns: [[1500, 250]] }
+  - { session: 21, at: 25.00, turns: [[700, 60]] }
+  - { session: 22, at: 26.20, turns: [[3500, 400]] }
+  - { session: 23, at: 27.40, turns: [[900, 180]] }
+  - { session: 24, at: 28.60, turns: [[2200, 90]] }
+  - { session: 25, at: 29.80, turns: [[300, 120]] }
+  - { session: 26, at: 31.00, turns: [[1500, 250]] }
+  - { session: 27, at: 32.20, turns: [[700, 60]] }
+  - { session: 28, at: 33.40, turns: [[3500, 400]] }
+  - { session: 29, at: 34.60, turns: [[900, 180]] }
+  - { session: 30, at: 35.80, turns: [[2200, 90]] }
+  - { session: 31, at: 37.00, turns: [[300, 120]] }
+  - { session: 32, at: 38.20, turns: [[1500, 250]] }
+  - { session: 33, at: 39.40, turns: [[700, 60]] }
+  - { session: 34, at: 40.60, turns: [[3500, 400]] }
+  - { session: 35, at: 41.80, turns: [[900, 180]] }
+  - { session: 36, at: 43.00, turns: [[2200, 90]] }
+  - { session: 37, at: 44.20, turns: [[300, 120]] }
+  - { session: 38, at: 45.40, turns: [[1500, 250]] }
+  - { session: 39, at: 46.60, turns: [[700, 60]] }
+  - { session: 40, at: 47.80, turns: [[3500, 400]] }
+checks:
+  - id: default-ttft-mean
+    claim: "Mean time to first token, the site's default parameters (no fit), agrees with LLMServingSim."
+    kind: calibrated
+    metric: ttft_mean_s
+    rel_tol: 0.3
+    params: defaults
+    tolerance: "30 percent: the standard the BLIS timing checks use for time to first token; queueing amplifies a step-cost error into the wait."
+    known_difference:
+      reference: llmservingsim
+      cause: "Front-end tokenisation LLMServingSim lacks, and prefill priced at default MFU"
+      reason: "At the site's default parameters the model's mean time to first token is 150 ms against LLMServingSim's 85 ms (+76 percent). Two things add up and this check does not separate them: the model's front end assembles and tokenises every prompt (30 ms plus 4 microseconds per token, about 36 ms for the prompts of this scenario), which LLMServingSim does not model at all; and its prefill is priced at MFU 0.5 of the catalogue's peak, where LLMServingSim sums per-layer kernel times profiled on this GPU. With parameters fitted to LLMServingSim's calibration scenarios the same metric holds (the fitted-ttft-mean check of this scenario). A first-token time this short is mostly fixed overhead, so a fixed 36 ms is a large share of it."
+      differences:
+        value: { typescript: 0.1496, llmservingsim: 0.08495 }
+  - id: default-tpot-mean
+    claim: "Mean time per output token, the site's default parameters (no fit), agrees with LLMServingSim."
+    kind: calibrated
+    metric: tpot_mean_s
+    rel_tol: 0.12
+    params: defaults
+    tolerance: "12 percent: the standard the BLIS timing checks use for time per token (memory-bound decoding, the best-conditioned timing)."
+    known_difference:
+      reference: llmservingsim
+      cause: "Default memory-bandwidth utilisation makes the model's decode step 60 percent slower than profiled kernels"
+      reason: "At the site's default parameters (MBU 0.6) the model's decode step reads the weights at 0.6 of 1,597 GB/s and adds host time; its mean time per output token is 20.1 ms against LLMServingSim's 12.0 ms (+67 percent), whose step is the sum of per-layer kernel times profiled on this GPU. The same shape, +51 percent, is in the measured-8b-rtx-pro-6000 scenario against the real engine, so the default MBU is too low for this GPU, not an artefact of this simulator. Fitted to the calibration scenarios (MBU 0.94) the check holds."
+      differences:
+        value: { typescript: 0.02006, llmservingsim: 0.01201 }
+  - id: default-e2e-mean
+    claim: "Mean end-to-end time, the site's default parameters (no fit), agrees with LLMServingSim."
+    kind: calibrated
+    metric: e2e_mean_s
+    rel_tol: 0.15
+    params: defaults
+    tolerance: "15 percent: the standard the BLIS timing checks use for end-to-end time."
+    known_difference:
+      reference: llmservingsim
+      cause: "End-to-end time follows the slower default decode step"
+      reason: "End-to-end time is the first token plus the decode of about 200 tokens: the model's 3.91 s against LLMServingSim's 2.32 s (+68 percent) is the slower decode step (and, for a short answer, the extra time to first token) at the site's default parameters, as in the time per token check of this scenario. Fitted to the calibration scenarios the check holds."
+      differences:
+        value: { typescript: 3.91, llmservingsim: 2.323 }
+  - id: default-throughput
+    claim: "Output tokens per second over the run, the site's default parameters (no fit), agrees with LLMServingSim."
+    kind: calibrated
+    metric: throughput_tokens_per_s
+    rel_tol: 0.1
+    params: defaults
+    tolerance: "10 percent: the standard the BLIS timing checks use for throughput; the load is open loop, so throughput differs only through how late the last answers finish."
+  - id: fitted-ttft-mean
+    claim: "Mean time to first token, parameters fitted to the calibration scenarios calib-lss-8b-rtx-pro-6000-*, agrees with LLMServingSim."
+    kind: calibrated
+    metric: ttft_mean_s
+    rel_tol: 0.3
+    params: fitted
+    tolerance: "30 percent: the standard the BLIS timing checks use for time to first token; queueing amplifies a step-cost error into the wait."
+  - id: fitted-tpot-mean
+    claim: "Mean time per output token, parameters fitted to the calibration scenarios calib-lss-8b-rtx-pro-6000-*, agrees with LLMServingSim."
+    kind: calibrated
+    metric: tpot_mean_s
+    rel_tol: 0.12
+    params: fitted
+    tolerance: "12 percent: the standard the BLIS timing checks use for time per token (memory-bound decoding, the best-conditioned timing)."
+  - id: fitted-e2e-mean
+    claim: "Mean end-to-end time, parameters fitted to the calibration scenarios calib-lss-8b-rtx-pro-6000-*, agrees with LLMServingSim."
+    kind: calibrated
+    metric: e2e_mean_s
+    rel_tol: 0.15
+    params: fitted
+    tolerance: "15 percent: the standard the BLIS timing checks use for end-to-end time."
+  - id: fitted-throughput
+    claim: "Output tokens per second over the run, parameters fitted to the calibration scenarios calib-lss-8b-rtx-pro-6000-*, agrees with LLMServingSim."
+    kind: calibrated
+    metric: throughput_tokens_per_s
+    rel_tol: 0.1
+    params: fitted
+    tolerance: "10 percent: the standard the BLIS timing checks use for throughput; the load is open loop, so throughput differs only through how late the last answers finish."

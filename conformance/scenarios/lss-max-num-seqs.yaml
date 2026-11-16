@@ -1,0 +1,55 @@
+id: lss-max-num-seqs
+title: A tight max_num_seqs holds requests back, RTX PRO 6000
+references: [llmservingsim]
+# Sixteen identical requests (500 prompt tokens, 300 answer tokens) at the same instant, on an engine that may run 64 sequences at once or only 4. With 4, twelve of them wait for a slot: the mean time to first token rises
+# a lot and the time per token falls (smaller batches). Both are effects of admission under max_num_seqs, checked as directions with the factor band both simulators' effects must lie in.
+model: llama-3.1-8b
+gpu: rtx-pro-6000
+engine:
+  tp: 1
+  gpu_memory_utilisation: 0.92
+  max_num_seqs: 64
+  max_num_batched_tokens: 8192
+  block_size: 16
+  prefix_caching: true
+replicas: 1
+routing: round-robin
+arms:
+  wide: {}
+  narrow: { engine: { max_num_seqs: 4 } }
+requests:
+  - { session: 1, at: 1.0, turns: [[500, 300]] }
+  - { session: 2, at: 1.0, turns: [[500, 300]] }
+  - { session: 3, at: 1.0, turns: [[500, 300]] }
+  - { session: 4, at: 1.0, turns: [[500, 300]] }
+  - { session: 5, at: 1.0, turns: [[500, 300]] }
+  - { session: 6, at: 1.0, turns: [[500, 300]] }
+  - { session: 7, at: 1.0, turns: [[500, 300]] }
+  - { session: 8, at: 1.0, turns: [[500, 300]] }
+  - { session: 9, at: 1.0, turns: [[500, 300]] }
+  - { session: 10, at: 1.0, turns: [[500, 300]] }
+  - { session: 11, at: 1.0, turns: [[500, 300]] }
+  - { session: 12, at: 1.0, turns: [[500, 300]] }
+  - { session: 13, at: 1.0, turns: [[500, 300]] }
+  - { session: 14, at: 1.0, turns: [[500, 300]] }
+  - { session: 15, at: 1.0, turns: [[500, 300]] }
+  - { session: 16, at: 1.0, turns: [[500, 300]] }
+checks:
+  - id: ttft-rises
+    claim: Holding requests back to 4 at a time raises the mean time to first token.
+    kind: directional
+    metric: ttft_mean_s
+    baseline: wide
+    intervention: narrow
+    effect: ratio
+    direction: increase
+    band: [0.5, 2]
+    tolerance: "Within a factor of 2 of each other: the effect is a ratio of about 5 to 8 set by how long the first four take (a prefill plus a few hundred decode steps), so a step-cost error moves both arms the same way and largely cancels; a factor of 2 admits a different step cost at batch 4 against batch 16 without admitting a missing queue."
+  - id: all-complete
+    claim: All sixteen requests complete in both arms.
+    kind: calibrated
+    metric: completed
+    arm: narrow
+    rel_tol: 0.001
+    params: defaults
+    tolerance: A count of completions; equal.

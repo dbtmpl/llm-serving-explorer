@@ -307,6 +307,90 @@
           ]
         }
       }
+    },
+    "llmservingsim": {
+      "lock": "49df63f2af61230da63dd2136044a2dbf9bd4161",
+      "pairs": {
+        "llama-3.1-8b/rtx-pro-6000/tp1": {
+          "model": "llama-3.1-8b",
+          "gpu": "rtx-pro-6000",
+          "tp": 1,
+          "timing": {
+            "mbu": 0.942322,
+            "mfu": 0.833333,
+            "hostMsBase": 0.0260873,
+            "hostMsPerSeq": 0.0480584
+          },
+          "defaults": {
+            "mbu": 0.6,
+            "mfu": 0.5,
+            "hostMsBase": 1.5,
+            "hostMsPerSeq": 0.05
+          },
+          "lossAtDefaults": 0.39408,
+          "lossAtFit": 0.0736104,
+          "residuals": [
+            {
+              "scenario": "calib-lss-8b-rtx-pro-6000-batch16",
+              "ttftMean": 0.272251,
+              "tpotMean": -0.0111631
+            },
+            {
+              "scenario": "calib-lss-8b-rtx-pro-6000-batch16-long",
+              "ttftMean": -0.126416,
+              "tpotMean": -0.0167339
+            },
+            {
+              "scenario": "calib-lss-8b-rtx-pro-6000-batch4",
+              "ttftMean": 0.287537,
+              "tpotMean": -0.0278214
+            },
+            {
+              "scenario": "calib-lss-8b-rtx-pro-6000-batch48",
+              "ttftMean": 0.220796,
+              "tpotMean": -0.0304986
+            },
+            {
+              "scenario": "calib-lss-8b-rtx-pro-6000-isolated",
+              "ttftMean": 0.257796,
+              "tpotMean": -0.0492411
+            }
+          ],
+          "residualsAtDefaults": [
+            {
+              "scenario": "calib-lss-8b-rtx-pro-6000-batch16",
+              "ttftMean": 0.804136,
+              "tpotMean": 0.646243
+            },
+            {
+              "scenario": "calib-lss-8b-rtx-pro-6000-batch16-long",
+              "ttftMean": 1.54062,
+              "tpotMean": 0.598413
+            },
+            {
+              "scenario": "calib-lss-8b-rtx-pro-6000-batch4",
+              "ttftMean": 0.872811,
+              "tpotMean": 0.64492
+            },
+            {
+              "scenario": "calib-lss-8b-rtx-pro-6000-batch48",
+              "ttftMean": 0.679196,
+              "tpotMean": 0.585002
+            },
+            {
+              "scenario": "calib-lss-8b-rtx-pro-6000-isolated",
+              "ttftMean": 0.882351,
+              "tpotMean": 0.617035
+            }
+          ],
+          "specCost": {
+            "value": 0.00284091,
+            "defaultValue": 0.04,
+            "scenario": "calib-lss-8b-rtx-pro-6000-spec",
+            "residualTpot": -0.0000961823
+          }
+        }
+      }
     }
   }
 }

@@ -1,0 +1,77 @@
+id: lss-pd-disaggregation
+title: Prefill/decode split against three colocated replicas, RTX PRO 6000
+references: [llmservingsim]
+# Twenty-four requests (3,000 prompt tokens, 150 answer tokens) 0.5 s apart. Colocated: three replicas, round robin, so each decode batch absorbs a prefill every 1.5 s. Split: one prefill replica and two decode
+# replicas, every request prefilled on the prefill replica and its KV cache handed over (threshold 0: LLMServingSim has no routing threshold, every request takes the split path). The split removes prefill from the decode
+# batches (time per token falls) and adds the hand-over and a second queue to the first token (time to first token rises). The TypeScript model prices the hand-over at its default link rate (100 Gbit/s): LLMServingSim reports
+# no hand-over times, so the link cannot be fitted to it, and the effect is compared, not the time.
+model: llama-3.1-8b
+gpu: rtx-pro-6000
+engine:
+  tp: 1
+  gpu_memory_utilisation: 0.92
+  max_num_seqs: 64
+  max_num_batched_tokens: 8192
+  block_size: 16
+  prefix_caching: true
+replicas: 3
+routing: round-robin
+arms:
+  colocated: {}
+  split: { disagg: { prefill_replicas: 1, decode_replicas: 2, threshold_tokens: 0 } }
+requests:
+  - { session: 1, at: 0.5, turns: [[3000, 150]] }
+  - { session: 2, at: 1.0, turns: [[3000, 150]] }
+  - { session: 3, at: 1.5, turns: [[3000, 150]] }
+  - { session: 4, at: 2.0, turns: [[3000, 150]] }
+  - { session: 5, at: 2.5, turns: [[3000, 150]] }
+  - { session: 6, at: 3.0, turns: [[3000, 150]] }
+  - { session: 7, at: 3.5, turns: [[3000, 150]] }
+  - { session: 8, at: 4.0, turns: [[3000, 150]] }
+  - { session: 9, at: 4.5, turns: [[3000, 150]] }
+  - { session: 10, at: 5.0, turns: [[3000, 150]] }
+  - { session: 11, at: 5.5, turns: [[3000, 150]] }
+  - { session: 12, at: 6.0, turns: [[3000, 150]] }
+  - { session: 13, at: 6.5, turns: [[3000, 150]] }
+  - { session: 14, at: 7.0, turns: [[3000, 150]] }
+  - { session: 15, at: 7.5, turns: [[3000, 150]] }
+  - { session: 16, at: 8.0, turns: [[3000, 150]] }
+  - { session: 17, at: 8.5, turns: [[3000, 150]] }
+  - { session: 18, at: 9.0, turns: [[3000, 150]] }
+  - { session: 19, at: 9.5, turns: [[3000, 150]] }
+  - { session: 20, at: 10.0, turns: [[3000, 150]] }
+  - { session: 21, at: 10.5, turns: [[3000, 150]] }
+  - { session: 22, at: 11.0, turns: [[3000, 150]] }
+  - { session: 23, at: 11.5, turns: [[3000, 150]] }
+  - { session: 24, at: 12.0, turns: [[3000, 150]] }
+checks:
+  - id: tpot-falls
+    claim: Splitting prefill from decode lowers the mean time per output token.
+    kind: directional
+    metric: tpot_mean_s
+    baseline: colocated
+    intervention: split
+    effect: ratio
+    direction: decrease
+    band: [0.67, 1.5]
+    tolerance: "Within a factor of 1.5 of each other: the effect is the removal of prefill chunks from decode steps, a ratio near 0.7 to 0.9, so a factor of 1.5 admits a different weight of the prefill's interference without admitting an effect of the wrong sign."
+  - id: ttft-rises
+    claim: Splitting prefill from decode raises the mean time to first token (the hand-over and a second queue).
+    kind: directional
+    metric: ttft_mean_s
+    baseline: colocated
+    intervention: split
+    effect: ratio
+    direction: increase
+    band: [0.67, 1.5]
+    tolerance: "Within a factor of 1.5 of each other: the first token waits for the prefill replica's queue and the hand-over; the sizes differ with the link rate, so the band is the same factor as for time per token."
+    known_difference:
+      reference: llmservingsim
+      cause: "LLMServingSim's time to first token ends at the prefill replica, before the hand-over"
+      reason: >-
+        The effect has the opposite direction. The model's split arm has a mean time to first token of 217 ms against 169 ms colocated (x1.28): its first token is delivered after the KV cache has crossed to a decode replica, so it includes the hand-over
+        and the wait for a decode slot. LLMServingSim's is 129 ms against 146 ms (x0.89): its time to first token is "the time when the computation of the first token is completed" (a comment in its main loop), on the prefill replica, so it
+        excludes the hand-over, and the dedicated prefill replica is not delayed by decode steps, which makes it lower than colocated. The two define the first token differently; the hand-over itself is not reported by LLMServingSim, so the link cannot be fitted to it either.
+        Neither is wrong, and neither is measured here: vLLM's disaggregated deployments differ in which instance returns the first token.
+      differences:
+        effect: { typescript: 1.279, llmservingsim: 0.8865 }

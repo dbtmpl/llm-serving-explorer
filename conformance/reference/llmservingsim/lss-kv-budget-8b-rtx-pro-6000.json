@@ -1,0 +1,43 @@
+{
+  "scenario": "lss-kv-budget-8b-rtx-pro-6000",
+  "reference": "llmservingsim",
+  "inputHash": "68f70a454d20ceb826fd917bcded9417076b6506b59bdb43f707f92e6ce11871",
+  "provenance": {
+    "lock": "49df63f2af61230da63dd2136044a2dbf9bd4161",
+    "replay": "no"
+  },
+  "records": {
+    "main": {
+      "source": "llmservingsim",
+      "scenario": "lss-kv-budget-8b-rtx-pro-6000",
+      "kvBlocksPerReplica": 37090,
+      "requests": [
+        {
+          "session": 1,
+          "round": 0,
+          "inputTokens": 500,
+          "outputTokens": 50,
+          "cachedTokens": 0,
+          "pod": 0,
+          "arrivalS": 1,
+          "firstTokenS": 1.024741,
+          "lastTokenS": 1.5782,
+          "fate": "completed",
+          "preemptions": null
+        }
+      ],
+      "preemptions": 0,
+      "requestsPerPod": [
+        1
+      ],
+      "aggregates": {
+        "prefixHitRate": 0,
+        "cpuTierHitRate": 0,
+        "kvTransferMeanS": null,
+        "specTokensPerStep": null,
+        "prefillPoolRequests": null,
+        "peakReplicas": 1
+      }
+    }
+  }
+}
