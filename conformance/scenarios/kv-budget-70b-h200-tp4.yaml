@@ -22,6 +22,7 @@ checks:
     quantity: kv_blocks_per_replica
     tolerance: Same reason as for one GPU, and tensor parallelism multiplies any per-GPU error by the degree.
     known_difference:
+      reference: blis
       reason: >-
         The same accounting as kv-budget-8b-h100, per GPU, and the same device memory (an H200's 150,109,880,320 bytes,
         139.80 GiB) and CUDA-graph estimate (1,159,725,056 bytes). Two terms remain. The activation peak: BLIS charges 5

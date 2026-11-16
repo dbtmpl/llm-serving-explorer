@@ -22,6 +22,7 @@ checks:
     quantity: kv_blocks_per_replica
     tolerance: A block count is an integer set by memory arithmetic that both simulators state; a few percent of drift would already change when preemption starts, so it is not given any.
     known_difference:
+      reference: blis
       reason: >-
         Both now follow vLLM's start-up sizing: pool = (ceil(device memory x utilisation) - weights - activation peak -
         CUDA-graph estimate) / block size (vllm/v1/worker/utils.py request_memory; vllm/v1/worker/gpu_worker.py

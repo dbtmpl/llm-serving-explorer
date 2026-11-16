@@ -1,8 +1,9 @@
 /**
- * The one comparable record both simulators are reduced to.
+ * The one comparable record the TypeScript model and every reference are reduced to.
  *
- * Per-request rows keyed by (session, round), plus the few numbers that belong to a whole run. Times
- * are carried for the record and for later phases; phase 1 compares none of them.
+ * Per-request rows keyed by (session, round), plus the few numbers that belong to a whole run. A
+ * reference that is measured data rather than a simulator fills the same record: what it did not
+ * measure is null.
  */
 import type { Metric, Scalar } from "./scenario.js";
 
@@ -27,7 +28,8 @@ export interface RequestRow {
 }
 
 export interface Reduced {
-  simulator: "typescript" | "blis";
+  /** `"typescript"` or the id of the reference this record was reduced from (`refs/`). */
+  source: string;
   scenario: string;
   /** KV blocks one replica holds, of 16 tokens each. */
   kvBlocksPerReplica: number;
@@ -57,25 +59,21 @@ export interface Aggregates {
 
 export const NO_AGGREGATES: Aggregates = { prefixHitRate: null, cpuTierHitRate: null, kvTransferMeanS: null, specTokensPerStep: null, prefillPoolRequests: null, peakReplicas: null };
 
-export interface BlisProvenance {
-  /** Commit of inference-sim named by `conformance/blis.lock`. */
-  commit: string;
-  /** `data.catalog.hash` and `data.registry.hash` of the BLIS Result. */
-  catalogHash: string;
-  registryHash: string;
-  /** `engine.version` of the Result: the vLLM release BLIS follows. */
-  engineVersion: string;
-  /** Router fork version printed by `blis router-configs`. */
-  routerModule: string;
+/** How a committed reference record was produced. `lock` is what the reference pins (a commit, a dataset revision); the rest is the reference's own detail. */
+export interface Provenance {
+  lock: string;
+  [detail: string]: string;
 }
 
-/** What is committed under `conformance/reference/`. */
-export interface Reference {
+/** What is committed under `conformance/reference/<reference id>/<scenario id>.json`. */
+export interface ReferenceFile {
   scenario: string;
-  /** Hash of the BLIS input the translators produced for every arm; a mismatch means the scenario changed since. */
+  /** The id of the reference (`conformance/refs/`). */
+  reference: string;
+  /** Hash of everything the reference was given for every arm of the scenario; a mismatch means the scenario changed since. */
   inputHash: string;
-  blis: BlisProvenance;
-  /** The reduced BLIS record of each arm of the scenario. */
+  provenance: Provenance;
+  /** The reduced record of each arm of the scenario. */
   records: Record<string, Reduced>;
 }
 

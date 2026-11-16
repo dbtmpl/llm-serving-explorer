@@ -1,8 +1,9 @@
 {
   "scenario": "calib-8b-h100-batch16",
+  "reference": "blis",
   "inputHash": "2833f8a56fbbfaa76ecac85d30fc11c562b02d5e3b3112b3279902efbb514062",
-  "blis": {
-    "commit": "c79c745619b16a8019339e3bbc79ee5e2923b258",
+  "provenance": {
+    "lock": "c79c745619b16a8019339e3bbc79ee5e2923b258",
     "catalogHash": "db74e4bb49f75d658e5d0850934da60daf513274b937a03b7ab994760bd6d21f",
     "registryHash": "8dbcf3b85eed842f2bc798b34d2b95716fc58117750f4164d869b26770353fe0",
     "engineVersion": "0.32.0",
@@ -10,7 +11,7 @@
   },
   "records": {
     "main": {
-      "simulator": "blis",
+      "source": "blis",
       "scenario": "calib-8b-h100-batch16",
       "kvBlocksPerReplica": 27926,
       "requests": [

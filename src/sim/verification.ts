@@ -1,13 +1,13 @@
 /**
- * How each approach is checked against BLIS, the discrete-event simulator that embeds the llm-d
- * router and a translation of vLLM's scheduler (`conformance/`, `docs/blis-parity.md`).
+ * How each approach is checked against the references of the conformance suite (BLIS, which embeds
+ * the llm-d router and a translation of vLLM's scheduler; measured data): `conformance/`, `docs/parity.md`.
  *
  * An approach names the conformance scenarios that check it, or says why none can. The registry test
  * enforces that every approach does one or the other, that every scenario named exists in
  * `conformance/scenarios/`, and that every scenario is named by at least one approach.
  */
 
-/** Scenario ids (file names in `conformance/scenarios/` without `.yaml`), or the reason BLIS cannot check this. */
+/** Scenario ids (file names in `conformance/scenarios/` without `.yaml`), or the reason no reference can check this. */
 export type Verification = readonly string[] | { readonly notVerifiable: string };
 
 export const isVerifiable = (v: Verification): v is readonly string[] => Array.isArray(v);

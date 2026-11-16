@@ -1,25 +1,34 @@
 /**
- * Fit every (model, GPU, tp) pair that has calibration scenarios, from the committed BLIS references.
- * Needs neither Go nor BLIS. Used by `pnpm conformance:calibrate` (writes `fitted.json`) and by the test
- * that checks the committed file is what this produces.
+ * Fit every (model, GPU, tp) pair that has calibration scenarios, per reference, from the committed
+ * reference records. Needs neither Go nor BLIS. Used by `pnpm conformance:calibrate` (writes
+ * `fitted.json`) and by the test that checks the committed file is what this produces.
  */
-import { existsSync, readFileSync } from "node:fs";
-import path from "node:path";
-import type { Reference } from "../record.js";
-import { REFERENCE_DIR, loadScenario, mainArm, scenarioIds } from "../scenario.js";
-import { lockedCommit } from "../run/blis.js";
+import type { Reference } from "../refs/reference.js";
+import { REFERENCES, loadReferenceFile, referencesOf } from "../refs/index.js";
+import { loadScenario, mainArm, scenarioIds } from "../scenario.js";
 import { DEFAULT_TIMING, METHOD, fitLink, fitSpecCost, fitTiming, residualsOf, type Calibration } from "./fit.js";
-import { pairKey, type FittedFile, type FittedPair } from "./fitted.js";
+import { pairKey, type FittedFile, type FittedPair, type FittedReference } from "./fitted.js";
 
-export function calibrationSet(): Map<string, { model: string; gpu: string; tp: number; timing: Calibration[]; spec: Calibration[]; pd: Calibration[] }> {
-  const pairs = new Map<string, { model: string; gpu: string; tp: number; timing: Calibration[]; spec: Calibration[]; pd: Calibration[] }>();
+interface PairSet {
+  model: string;
+  gpu: string;
+  tp: number;
+  timing: Calibration[];
+  spec: Calibration[];
+  pd: Calibration[];
+}
+
+/** The calibration scenarios a reference answers, grouped by (model, GPU, tp). */
+export function calibrationSet(reference: Reference<any, any>): Map<string, PairSet> {
+  const pairs = new Map<string, PairSet>();
   for (const id of scenarioIds()) {
     const scenario = loadScenario(id);
     if (scenario.role !== "calibration") continue;
+    if (!referencesOf(scenario).some((r) => r.id === reference.id)) continue;
     const d = mainArm(scenario);
-    const file = path.join(REFERENCE_DIR, `${id}.json`);
-    if (!existsSync(file)) throw new Error(`${id}: no reference; run pnpm conformance:reference`);
-    const c: Calibration = { scenario, blis: (JSON.parse(readFileSync(file, "utf8")) as Reference).records.main! };
+    const file = loadReferenceFile(reference.id, id);
+    if (!file) throw new Error(`${id}: no ${reference.id} reference; run pnpm conformance:reference --ref ${reference.id}`);
+    const c: Calibration = { scenario, reference: file.records.main! };
     const k = pairKey(d.model, d.gpu, d.engine.tp);
     const p = pairs.get(k) ?? { model: d.model, gpu: d.gpu, tp: d.engine.tp, timing: [], spec: [], pd: [] };
     (d.speculative ? p.spec : d.disagg ? p.pd : p.timing).push(c);
@@ -30,10 +39,10 @@ export function calibrationSet(): Map<string, { model: string; gpu: string; tp: 
 
 const sig = (x: number): number => Number(x.toPrecision(6));
 
-export function calibrateAll(): FittedFile {
+function calibrateReference(reference: Reference<any, any>): FittedReference | null {
   const pairs: Record<string, FittedPair> = {};
-  for (const [k, p] of [...calibrationSet()].sort(([a], [b]) => a.localeCompare(b))) {
-    if (!p.timing.length) throw new Error(`${k}: calibration scenarios for speculation or prefill/decode need plain timing scenarios too`);
+  for (const [k, p] of [...calibrationSet(reference)].sort(([a], [b]) => a.localeCompare(b))) {
+    if (!p.timing.length) throw new Error(`${reference.id}/${k}: calibration scenarios for speculation or prefill/decode need plain timing scenarios too`);
     const fit = fitTiming(p.timing);
     const timing = { mbu: sig(fit.timing.mbu), mfu: sig(fit.timing.mfu), hostMsBase: sig(fit.timing.hostMsBase), hostMsPerSeq: sig(fit.timing.hostMsPerSeq) };
     const out: FittedPair = {
@@ -57,5 +66,14 @@ export function calibrateAll(): FittedFile {
     }
     pairs[k] = out;
   }
-  return { method: METHOD, blisCommit: lockedCommit(), pairs };
+  return Object.keys(pairs).length ? { lock: reference.lock(), pairs } : null;
+}
+
+export function calibrateAll(): FittedFile {
+  const references: Record<string, FittedReference> = {};
+  for (const r of REFERENCES) {
+    const fitted = calibrateReference(r);
+    if (fitted) references[r.id] = fitted;
+  }
+  return { method: METHOD, references };
 }

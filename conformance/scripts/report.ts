@@ -1,32 +1,47 @@
 /**
- * Print, for every scenario, each check's outcome from the TypeScript model and the committed BLIS
- * reference. Needs no BLIS binary. Used when writing a scenario: the printed differences are what
- * goes into its `known_difference` once they have been investigated.
+ * Print, for every scenario, each check's outcome from the TypeScript model and the committed
+ * reference records. Needs no external tool. Used when writing a scenario: the printed differences are
+ * what goes into its `known_difference` once they have been investigated.
  *
- *     pnpm conformance:report [<id>]
+ *     pnpm conformance:report [<scenario id>] [--ref <reference id>]
+ *
+ * With several references covering a check, each is printed, then how they stand with each other.
  */
-import { existsSync, readFileSync } from "node:fs";
-import path from "node:path";
-import { evaluate } from "../compare.js";
-import type { Reference } from "../record.js";
-import { runTypescriptArms } from "../run/typescript.js";
-import { REFERENCE_DIR, loadScenario, scenarioIds } from "../scenario.js";
+import { referencesOf } from "../refs/index.js";
+import { loadScenario, scenarioIds } from "../scenario.js";
+import { compareScenario } from "../suite.js";
+import { loadReferenceFile } from "../refs/index.js";
 
-const ids = process.argv[2] ? [process.argv[2]] : scenarioIds();
+const args = process.argv.slice(2);
+const refFlag = args.indexOf("--ref");
+const only = refFlag >= 0 ? args[refFlag + 1] : undefined;
+const positional = args.filter((a, i) => !a.startsWith("--") && args[i - 1] !== "--ref");
+const ids = positional[0] ? [positional[0]] : scenarioIds();
 for (const id of ids) {
   const scenario = loadScenario(id);
-  const file = path.join(REFERENCE_DIR, `${id}.json`);
-  if (!existsSync(file)) {
-    console.log(`${id}: no reference yet`);
+  const refs = referencesOf(scenario).filter((r) => !only || r.id === only);
+  if (!refs.length) {
+    console.log(`${id}: no reference covers it${only ? ` (${only})` : ""}`);
     continue;
   }
-  const ts = runTypescriptArms(scenario);
-  const ref = JSON.parse(readFileSync(file, "utf8")) as Reference;
-  for (const check of scenario.checks) {
-    const o = evaluate(check, ts, ref.records);
-    const n = Object.keys(o.differences).length;
-    const note = check.kind === "exact" ? "" : ` ${JSON.stringify({ typescript: o.typescript, blis: o.blis, ...o.detail })}`;
-    console.log(`${id} / ${check.id} [${check.kind}]: ${n === 0 ? "agrees" : `${n} difference(s)`}${note}`);
-    if (n) console.log(JSON.stringify(o.differences, null, 1));
+  const missing = refs.filter((r) => scenario.checks.length && !loadReferenceFile(r.id, id));
+  if (missing.length) {
+    console.log(`${id}: no reference yet (${missing.map((r) => r.id).join(", ")})`);
+    continue;
+  }
+  if (!scenario.checks.length) continue;
+  for (const c of compareScenario(scenario, undefined, only).comparisons) {
+    const several = Object.keys(c.perReference).length > 1;
+    for (const [ref, o] of Object.entries(c.perReference)) {
+      const n = Object.keys(o.differences).length;
+      const note = c.check.kind === "exact" ? "" : ` ${JSON.stringify({ typescript: o.typescript, [ref]: o.referenceValues, ...o.detail })}`;
+      console.log(`${id} / ${c.check.id} [${c.check.kind}]${several ? ` vs ${ref}` : ""}: ${n === 0 ? "agrees" : `${n} difference(s)`}${note}`);
+      if (n) console.log(JSON.stringify(o.differences, null, 1));
+    }
+    if (several) {
+      console.log(`${id} / ${c.check.id}: ${c.agreement.replace(/_/g, " ")}`);
+      if (Object.keys(c.gap).length) console.log(`  gap between references: ${JSON.stringify(c.gap)}`);
+      if (Object.keys(c.span).length) console.log(`  against their span: ${JSON.stringify(c.span)}`);
+    }
   }
 }

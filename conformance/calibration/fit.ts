@@ -1,5 +1,5 @@
 /**
- * Fit the TypeScript model's free timing parameters to BLIS.
+ * Fit the TypeScript model's free timing parameters to a reference.
  *
  * What is fitted, per (model, GPU, tensor-parallel degree):
  *
@@ -11,7 +11,7 @@
  * - `linkGbps`: the link rate between prefill and decode pods, on the pair's prefill/decode
  *   calibration scenario, with the four parameters held.
  *
- * The loss. For each calibration scenario s, with BLIS's value b and the TypeScript model's t:
+ * The loss. For each calibration scenario s, with the reference's value b and the TypeScript model's t:
  *
  *     L_s = ( mean over requests r of ln(t_ttft,r / b_ttft,r)^2  +  ln(t_tpot / b_tpot)^2 ) / 2
  *     L   = mean over scenarios of L_s
@@ -30,13 +30,13 @@
  * Bounds: mbu, mfu in [0.05, 1]; hostMsBase in [0.01, 50]; hostMsPerSeq in [0.001, 5].
  */
 import { DEFAULT_PARAMS } from "../../src/sim/index.js";
-import { metricOf, type Reduced, type Reference } from "../record.js";
+import { metricOf, type Reduced } from "../record.js";
 import { runTypescript } from "../run/typescript.js";
 import { MAIN_ARM, type Scenario } from "../scenario.js";
 import type { TimingParams, ScenarioResidual } from "./fitted.js";
 
 export const METHOD =
-  "Coordinate search in log space from the site's defaults. Loss: mean over calibration scenarios of (mean over requests of ln(ttft_ts/ttft_blis)^2 + ln(tpot_ts/tpot_blis)^2) / 2. " +
+  "Coordinate search in log space from the site's defaults. Loss: mean over calibration scenarios of (mean over requests of ln(ttft_ts/ttft_ref)^2 + ln(tpot_ts/tpot_ref)^2) / 2. " +
   "Step ratios 2, 1.5, 1.25, 1.1, 1.05, 1.02; at each ratio, per parameter in the order mbu, mfu, hostMsBase, hostMsPerSeq, try value * ratio^j for j = -3..3 within bounds, keep the best, repeat until a sweep gains less than 1e-6. " +
   "Bounds: mbu, mfu in [0.05, 1]; hostMsBase in [0.01, 50]; hostMsPerSeq in [0.001, 5]. specCost and linkGbps are then fitted alone by the same search (bounds [0, 1] and [1, 2000]), with the four parameters held.";
 
@@ -49,7 +49,8 @@ const MIN_GAIN = 1e-6;
 
 export interface Calibration {
   scenario: Scenario;
-  blis: Reduced;
+  /** What the model is fitted to: the reference's record of the scenario. */
+  reference: Reduced;
 }
 
 const key = (r: { session: number; round: number }) => `${r.session}/${r.round}`;
@@ -64,14 +65,14 @@ export interface ScenarioScore {
   /** mean over requests of ln(ttft ratio)^2 and ln(tpot ratio)^2. */
   ttftLogSq: number;
   tpotLogSq: number;
-  /** Signed relative errors of the means (TypeScript - BLIS) / BLIS: the quantities a held-out check compares. */
+  /** Signed relative errors of the means (TypeScript - reference) / reference: the quantities a held-out check compares. */
   ttftMeanError: number;
   tpotMeanError: number;
 }
 
 export function score(c: Calibration, ts: Reduced): ScenarioScore {
   const a = ttfts(ts);
-  const b = ttfts(c.blis);
+  const b = ttfts(c.reference);
   let sum = 0;
   for (const [k, y] of b) {
     const x = a.get(k);
@@ -79,12 +80,12 @@ export function score(c: Calibration, ts: Reduced): ScenarioScore {
     sum += Math.log(x / y) ** 2;
   }
   const tTpot = metricOf(ts, "tpot_mean_s")!;
-  const bTpot = metricOf(c.blis, "tpot_mean_s")!;
+  const bTpot = metricOf(c.reference, "tpot_mean_s")!;
   return {
     scenario: c.scenario.id,
     ttftLogSq: sum / b.size,
     tpotLogSq: Math.log(tTpot / bTpot) ** 2,
-    ttftMeanError: metricOf(ts, "ttft_mean_s")! / metricOf(c.blis, "ttft_mean_s")! - 1,
+    ttftMeanError: metricOf(ts, "ttft_mean_s")! / metricOf(c.reference, "ttft_mean_s")! - 1,
     tpotMeanError: tTpot / bTpot - 1
   };
 }
@@ -136,17 +137,16 @@ export function fitTiming(cs: Calibration[]): { timing: TimingParams; loss: numb
 
 export function fitSpecCost(c: Calibration, timing: TimingParams): { value: number; residualTpot: number } {
   const run = (specCost: number) => runTypescript(c.scenario, MAIN_ARM, { ...timing, specCost }).reduced;
-  const loss = (x: { specCost: number }) => Math.log(metricOf(run(x.specCost), "tpot_mean_s")! / metricOf(c.blis, "tpot_mean_s")!) ** 2;
-  // a zero draft cost is a legitimate answer (BLIS does not price its n-gram drafter), so the search starts away from it and may end at the bound
+  const loss = (x: { specCost: number }) => Math.log(metricOf(run(x.specCost), "tpot_mean_s")! / metricOf(c.reference, "tpot_mean_s")!) ** 2;
+  // a zero draft cost is a legitimate answer (BLIS, for one, does not price its n-gram drafter), so the search starts away from it and may end at the bound
   const { x } = coordinateSearch({ specCost: DEFAULT_PARAMS.specCost }, ["specCost"], { specCost: [1e-4, 1] }, loss);
-  return { value: x.specCost, residualTpot: metricOf(run(x.specCost), "tpot_mean_s")! / metricOf(c.blis, "tpot_mean_s")! - 1 };
+  return { value: x.specCost, residualTpot: metricOf(run(x.specCost), "tpot_mean_s")! / metricOf(c.reference, "tpot_mean_s")! - 1 };
 }
 
 export function fitLink(c: Calibration, timing: TimingParams): { value: number; residualKvTransfer: number } {
   const run = (linkGbps: number) => runTypescript(c.scenario, MAIN_ARM, { ...timing, linkGbps }).reduced;
-  const loss = (x: { linkGbps: number }) => Math.log(metricOf(run(x.linkGbps), "kv_transfer_mean_s")! / metricOf(c.blis, "kv_transfer_mean_s")!) ** 2;
+  const loss = (x: { linkGbps: number }) => Math.log(metricOf(run(x.linkGbps), "kv_transfer_mean_s")! / metricOf(c.reference, "kv_transfer_mean_s")!) ** 2;
   const { x } = coordinateSearch({ linkGbps: DEFAULT_PARAMS.linkGbps }, ["linkGbps"], { linkGbps: [1, 2000] }, loss);
-  return { value: x.linkGbps, residualKvTransfer: metricOf(run(x.linkGbps), "kv_transfer_mean_s")! / metricOf(c.blis, "kv_transfer_mean_s")! - 1 };
+  return { value: x.linkGbps, residualKvTransfer: metricOf(run(x.linkGbps), "kv_transfer_mean_s")! / metricOf(c.reference, "kv_transfer_mean_s")! - 1 };
 }
 
-export type { Reference };

@@ -1,17 +1,17 @@
 /**
- * Regenerate `conformance/reference/<id>.json` by running the real BLIS binary.
+ * Produce the committed reference records, `conformance/reference/<ref>/<scenario>.json`.
  *
- *     BLIS_BIN=/path/to/blis pnpm conformance:reference [--blis /path/to/blis] [--only <id>] [--keep <dir>]
+ *     BLIS_BIN=/path/to/blis pnpm conformance:reference [--ref <id>] [--only <scenario>] [--keep <dir>] [--blis /path/to/blis]
  *
- * Fails with a clear message when the binary is missing. When `BLIS_SRC` names a checkout of
- * inference-sim, its HEAD must equal the commit in `conformance/blis.lock`.
+ * A reference is a simulator that is run (BLIS) or measured data that is reduced; each one's
+ * `prepare` says what it needs and fails with a clear message when it is missing. Without `--ref`
+ * every reference is regenerated. Settings come from the environment (`BLIS_BIN`, `BLIS_SRC`,
+ * `BLIS_UPSTREAM`, and the measured references' own, documented in their modules).
  */
-import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { lockedCommit, runBlis } from "../run/blis.js";
-import { CONFORMANCE_DIR, REFERENCE_DIR, loadScenario, scenarioIds } from "../scenario.js";
-import { ALL_EPP_FILES } from "../translate/toBlis.js";
+import { REFERENCES, referenceById, referencesOf } from "../refs/index.js";
+import { loadScenario, referenceFile, scenarioIds } from "../scenario.js";
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -23,31 +23,28 @@ function die(msg: string): never {
   process.exit(1);
 }
 
-const binary = arg("blis") ?? process.env.BLIS_BIN;
-if (!binary) die("name the BLIS binary with --blis <path> or BLIS_BIN=<path>. Build it from the commit in conformance/blis.lock (see conformance/README.md).");
-if (!existsSync(binary)) die(`the BLIS binary ${binary} does not exist. Build it from the commit in conformance/blis.lock (see conformance/README.md).`);
+const settings: Record<string, string | undefined> = { ...process.env };
+if (arg("blis")) settings.BLIS_BIN = arg("blis");
+for (const [flag, name] of [["clone", "LLMSERVINGSIM_DIR"]] as const) if (arg(flag)) settings[name] = arg(flag);
 
-const src = process.env.BLIS_SRC;
-if (src) {
-  const head = execFileSync("git", ["-C", src, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
-  // the weekly upstream job builds a newer commit on purpose (BLIS_UPSTREAM=1) and the references it writes name that commit
-  if (process.env.BLIS_UPSTREAM) process.env.BLIS_COMMIT = head;
-  else if (head !== lockedCommit()) die(`BLIS_SRC is at ${head} but conformance/blis.lock names ${lockedCommit()}`);
-}
-
-// the router configurations the translators ship must be the ones this binary's llm-d router ships
-for (const file of ALL_EPP_FILES) {
-  const shipped = execFileSync(binary, ["router-configs", "--file", file], { encoding: "utf8" });
-  const ours = readFileSync(path.join(CONFORMANCE_DIR, "translate", "epp", file), "utf8");
-  if (shipped !== ours) die(`conformance/translate/epp/${file} differs from the file this BLIS ships (blis router-configs --file ${file}); copy the new one and re-run`);
-}
-
+const wanted = arg("ref") ? [referenceById(arg("ref")!)] : REFERENCES;
 const only = arg("only");
-const ids = only ? [only] : scenarioIds();
-for (const id of ids) {
-  const scenario = loadScenario(id);
-  const { reference } = runBlis(scenario, binary, arg("keep") ? path.join(arg("keep")!, id) : undefined);
-  const out = path.join(REFERENCE_DIR, `${id}.json`);
-  writeFileSync(out, JSON.stringify(reference, null, 2) + "\n");
-  console.log(`wrote ${path.relative(process.cwd(), out)}`);
+for (const ref of wanted) {
+  try {
+    ref.prepare({ settings });
+  } catch (e) {
+    die(`${ref.id}: ${(e as Error).message}`);
+  }
+  for (const id of only ? [only] : scenarioIds()) {
+    const scenario = loadScenario(id);
+    if (!referencesOf(scenario).some((r) => r.id === ref.id)) {
+      if (only) die(`${ref.id} cannot answer ${id}`);
+      continue;
+    }
+    const file = ref.generate(scenario, { settings, ...(arg("keep") ? { keep: path.join(arg("keep")!, ref.id, id) } : {}) });
+    const out = referenceFile(ref.id, id);
+    mkdirSync(path.dirname(out), { recursive: true });
+    writeFileSync(out, JSON.stringify(file, null, 2) + "\n");
+    console.log(`wrote ${path.relative(process.cwd(), out)}`);
+  }
 }

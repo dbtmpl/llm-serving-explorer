@@ -14,19 +14,29 @@ const FIDELITY_LABEL: Record<Fidelity, string> = {
 
 const escapeCell = (text: string): string => text.replace(/\|/g, "\\|");
 
-/** The "Verified against BLIS" cell: the scenarios that check the approach (named when there are few), or that none can. */
-export function verificationCell(v: Verification): string {
+/** The reference names that cover a scenario (`conformance/refs`); the registry cannot import the conformance suite, so the caller supplies this. */
+export type ReferencesOfScenario = (scenario: string) => readonly string[];
+
+/**
+ * The "Verified against" cell: for each reference, the scenarios it covers that check the approach
+ * (named when there are few), or that none can.
+ */
+export function verificationCell(v: Verification, referencesOf: ReferencesOfScenario): string {
   if (!isVerifiable(v)) return "Not verifiable";
-  return v.length <= 3 ? `Yes: ${v.map((id) => `\`${id}\``).join(", ")}` : `Yes: ${v.length} scenarios`;
+  const byReference = new Map<string, string[]>();
+  for (const id of v) for (const r of referencesOf(id)) byReference.set(r, [...(byReference.get(r) ?? []), id]);
+  return [...byReference]
+    .map(([r, ids]) => `${r}: ${ids.length <= 3 ? ids.map((id) => `\`${id}\``).join(", ") : `${ids.length} scenarios`}`)
+    .join("; ");
 }
 
 /** One row per approach. `linkPrefix` is the path from the README to `src/sim/`. */
-export function renderApproachTable(concepts: readonly Concept[], linkPrefix: string | null): string {
-  const rows = ["| Concept | Approach | What it does | Fidelity | Verified against BLIS | Sources |", "|---|---|---|---|---|---|"];
+export function renderApproachTable(concepts: readonly Concept[], linkPrefix: string | null, referencesOf: ReferencesOfScenario): string {
+  const rows = ["| Concept | Approach | What it does | Fidelity | Verified against | Sources |", "|---|---|---|---|---|---|"];
   for (const concept of concepts) {
     const title = linkPrefix === null ? concept.title : `[${concept.title}](${linkPrefix}${concept.module}/)`;
     for (const a of concept.approaches) {
-      rows.push(`| ${title} | ${escapeCell(a.name)} | ${escapeCell(a.summary)} | ${FIDELITY_LABEL[a.fidelity]} | ${verificationCell(a.verification)} | ${a.citations.map(citeMarkdown).join("; ")} |`);
+      rows.push(`| ${title} | ${escapeCell(a.name)} | ${escapeCell(a.summary)} | ${FIDELITY_LABEL[a.fidelity]} | ${verificationCell(a.verification, referencesOf)} | ${a.citations.map(citeMarkdown).join("; ")} |`);
     }
   }
   return rows.join("\n");
