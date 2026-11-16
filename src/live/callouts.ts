@@ -7,7 +7,7 @@
 import { diveConcepts, stepText, type DiveConcept } from "../content/index.js";
 import { fmtGB, fmtInt, fmtMs } from "./format.js";
 import type { Scene, Target } from "./render.js";
-import { POD_QUEUE_SLACK, SCORER_WEIGHTS, TIER_AFFINITY, prefixAwareTerms, type SimEvent, type World } from "../sim/index.js";
+import { POD_QUEUE_SLACK, SCORER_WEIGHTS, TIER_AFFINITY, fitOf, prefixAwareTerms, replicaSpec, type SimEvent, type World } from "../sim/index.js";
 
 export interface Callout {
   key: string;
@@ -217,8 +217,21 @@ export function calloutFor(e: SimEvent, w: World): Callout[] {
       return [make("req.failed", { key: "failed", target: e.podId !== undefined ? pod() : { type: "gateway" }, tone: "evict" }, { sid: e.sid!, why: e.why as string })];
     case "scale.down":
       return [make("scale.down", { key: `down${e.podId}`, target: pod(), tone: "info" }, { idle: (e.idle as number).toFixed(0) })];
-    case "fleet.restart":
-      return [make("fleet.restart", { key: "restart", target: { type: "gateway" }, tone: "info" })];
+    case "fleet.restart": {
+      const requeued = (e.requeued as number | undefined) ?? 0;
+      const inFlight = (e.inFlight as number | undefined) ?? 0;
+      const fit = fitOf(w.params);
+      const spec = replicaSpec(w.params);
+      if (!fit.fits) return [make("fleet.restart", { key: "restart", every: 0, target: { type: "gateway" }, tone: "evict" }, { model: spec.model.label, precision: spec.precision === "fp8" ? "FP8" : "BF16", gpu: spec.gpu.label }, { body: "body-nofit" })];
+      return [
+        make(
+          "fleet.restart",
+          { key: "restart", every: 0, target: { type: "gateway" }, tone: "info" },
+          { cold: w.params.coldStartS, ...(requeued > 1 ? { requeued: fmtInt(requeued) } : requeued === 0 && inFlight > 0 ? { inFlight: fmtInt(inFlight) } : {}) },
+          { body: requeued > 1 ? "body-requests-many" : requeued === 1 ? "body-requests-one" : inFlight > 0 ? "body-queued" : "body-idle" }
+        )
+      ];
+    }
     default:
       return [];
   }

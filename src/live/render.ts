@@ -195,15 +195,18 @@ export class Scene {
   detail: RunDetail = "blocks";
   /** Text drawn where an aggregate pod has no per-step detail to show; set by the interface (src/content/panels.md). */
   aggregateNote = "";
+  /** What the router says under its queue count while requests wait for a pod that cannot start (src/content/panels.md); empty otherwise. */
+  gatewayNote = "";
   /** Pods whose engine just preempted a request without a block map to flash: pod id and the time on the animation clock. */
   private pulses: { podId: number; t0: number }[] = [];
 
   /** Forget everything animated and go back to the state of a new scene (a new run replaces the old one). */
   reset(detail: RunDetail): void {
-    const { panels, aggregateNote } = this;
+    const { panels, aggregateNote, gatewayNote } = this;
     Object.assign(this, new Scene());
     this.panels = panels;
     this.aggregateNote = aggregateNote;
+    this.gatewayNote = gatewayNote;
     this.detail = detail;
   }
 
@@ -950,7 +953,8 @@ export class Scene {
     this.text(ctx, `hop 3 · ${w.params.routing}`, GW.x + 14, GW.y + 36, { size: 9.5, color: C.mute });
     const q = w.gatewayQueue.length;
     this.text(ctx, fmtInt(q), GW.x + 14, GW.y + 70, { size: 24, weight: 650, color: q ? C.ink : C.mute, mono: true });
-    this.text(ctx, "queued, waiting for a pod", GW.x + 14, GW.y + 84, { size: 9.5, color: C.mute });
+    if (q && this.gatewayNote) this.text(ctx, this.gatewayNote, GW.x + 14, GW.y + 84, { size: 9.5, weight: 650, color: C.evict });
+    else this.text(ctx, "queued, waiting for a pod", GW.x + 14, GW.y + 84, { size: 9.5, color: C.mute });
     const lr = w.lastRoute;
     if (lr) this.text(ctx, `last → pod-${lr.chosen}${lr.policy === "prefix-aware" ? ` · cache ${(100 * (lr.candidates.find((c) => c.podId === lr.chosen)?.cache ?? 0)).toFixed(0)}%` : ""}`, GW.x + 14, GW.y + 102, { size: 9.5, color: C.sub });
     // queue stack above the node

@@ -127,3 +127,57 @@ Headroom
 
 ### text
 The part of the GPU's memory above `gpu_memory_utilization`, which the engine leaves unused as a safety margin.
+
+## `fit.blocked` A configuration that cannot serve
+_Where:_ The box at the top of the graph while the chosen model, precision, GPU, tensor parallelism and memory utilisation leave no room for a KV cache, so no pod can start. It stays until a configuration fits; the buttons under it apply a change that makes it fit.
+
+### title
+This configuration cannot serve requests
+
+### body
+{model} in {precision} needs {need} of each GPU for weights, working space and CUDA graphs, but the engine may use only {usable} of a {gpu} (gpu_memory_utilization {util}). No pod can start, so requests wait at the router. Pick a way out, or change the settings yourself.
+
+## `fit.tight` A KV pool that holds only a few requests
+_Where:_ The box at the top of the graph while the configuration fits but one pod's KV pool holds fewer than four requests of the current length; the buttons under it are changes that leave more room.
+
+### title
+The KV pool is very small
+
+### body
+One pod's pool holds only about {tokens} tokens of KV, roughly {requests} requests of the current length. Requests queue at the pod and running ones may be preempted and recomputed, so expect it to be slow and uneven. Pick more room, or change the settings yourself.
+
+## `fit.fix` The buttons that make a configuration fit
+_Where:_ Buttons in the box at the top of the graph (see the two entries above); each applies one change of settings and restarts the fleet. The `pool` line is the small print on each button.
+
+### util
+Raise gpu_memory_utilization to {value}
+
+### precision
+Use FP8 weights
+
+### tp
+Use {value} GPUs per pod (tensor parallel {value})
+
+### gpu
+Switch to {value}
+
+### model
+Use {value}
+
+### pool
+KV pool of about {tokens} tokens per pod
+
+## `fit.option` Menu options that would not fit
+_Where:_ Right menu, group "Model and GPU": the `title` is the hover text of an option that would not fit with the other settings as they are now, and the `note` appears under the controls while any option is marked.
+
+### title
+Does not fit with the other settings as they are: no room is left for a KV cache, so no pod could start.
+
+### note
+Dimmed options do not fit with the other settings as they are. You can still pick one; the graph then shows why nothing starts and offers a way out.
+
+## `fit.gateway` The router's reason for holding requests
+_Where:_ On the router node, under its queue count, while requests wait and the configuration cannot serve.
+
+### text
+waiting: the model does not fit
