@@ -46,6 +46,7 @@ export function translate(s: Scenario, arm: string): MeasuredInput {
     same("max_num_seqs", d.engine.maxNumSeqs, e.maxNumSeqs),
     same("max_num_batched_tokens", d.engine.maxNumBatchedTokens, e.maxNumBatchedTokens),
     same("prefix caching", d.engine.prefixCaching, e.enablePrefixCaching),
+    same("async scheduling", d.engine.asyncScheduling === true, e.asyncScheduling === true),
     same("block size", BLOCK_TOKENS, e.blockSize),
     same("number of requests", d.requests.length, measured.requests.length)
   ].filter((x): x is string => x !== null);

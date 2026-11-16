@@ -6,8 +6,8 @@
 import type { Reference } from "../refs/reference.js";
 import { REFERENCES, loadReferenceFile, referencesOf } from "../refs/index.js";
 import { loadScenario, mainArm, scenarioIds, subsetKeys } from "../scenario.js";
-import { DEFAULT_TIMING, METHOD, fitLink, fitSpecCost, fitTiming, residualsOf, type Calibration } from "./fit.js";
-import { pairKey, type FittedFile, type FittedPair, type FittedReference } from "./fitted.js";
+import { DEFAULT_TIMING, METHOD, fitLink, fitSpecCost, fitTiming, residualsOf, type Calibration, type ScenarioScore, type TimingFit } from "./fit.js";
+import { pairKey, type TimingParams, type FittedFile, type FittedPair, type FittedReference } from "./fitted.js";
 
 interface PairSet {
   model: string;
@@ -39,24 +39,49 @@ export function calibrationSet(reference: Reference<any, any>): Map<string, Pair
 }
 
 const sig = (x: number): number => Number(x.toPrecision(6));
+const sigAll = (o: TimingParams): TimingParams => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, sig(v as number)])) as unknown as TimingParams;
 
-/** Fit one (model, GPU, tp) pair of a reference. Exported so a test can check each fit on its own: together they take over a minute. */
+/** The group of a pair: (model, GPU), all tensor-parallel degrees. */
+const groupOf = (p: PairSet): string => `${p.model}/${p.gpu}`;
+
+/** One group's joint fit, made once however many of its pairs are asked for (a fit is the slow part). */
+const groupFits = new Map<string, TimingFit>();
+
+function fitGroup(reference: Reference<any, any>, group: string): { fit: TimingFit; tps: number[]; pairs: PairSet[] } {
+  const pairs = [...calibrationSet(reference).values()].filter((p) => groupOf(p) === group && p.timing.length);
+  const tps = pairs.map((p) => p.tp).sort((a, b) => a - b);
+  const id = `${reference.id}/${group}`;
+  let fit = groupFits.get(id);
+  if (!fit) {
+    fit = fitTiming(pairs.flatMap((p) => p.timing), tps.length > 1);
+    groupFits.set(id, fit);
+  }
+  return { fit, tps, pairs };
+}
+
+/** Fit one (model, GPU, tp) pair of a reference (jointly with the other degrees of its group). Exported so a test can check each fit on its own: together they take a while. */
 export function calibratePair(reference: Reference<any, any>, key: string): FittedPair {
   const p = calibrationSet(reference).get(key);
   if (!p) throw new Error(`${reference.id}: no calibration data for ${key}`);
   if (!p.timing.length) throw new Error(`${reference.id}/${key}: calibration scenarios for speculation or prefill/decode need plain timing scenarios too`);
-  const fit = fitTiming(p.timing);
-  const timing = { mbu: sig(fit.timing.mbu), mfu: sig(fit.timing.mfu), hostMsBase: sig(fit.timing.hostMsBase), hostMsPerSeq: sig(fit.timing.hostMsPerSeq) };
+  const { fit, tps } = fitGroup(reference, groupOf(p));
+  const timing = sigAll(fit.timing);
+  const own = new Set(p.timing.map((c) => c.scenario.id));
+  const mine = (rs: ScenarioScore[]) => rs.filter((s) => own.has(s.scenario));
   const out: FittedPair = {
     model: p.model,
     gpu: p.gpu,
     tp: p.tp,
     timing,
+    group: groupOf(p),
+    groupTps: tps,
+    atBound: fit.atBound,
+    identifiability: fit.identifiability.map((i) => ({ ...i, fitted: { value: sig(i.fitted.value), loss: sig(i.fitted.loss) }, held: i.held.map((h) => ({ value: h.value, loss: sig(h.loss) })), spread: sig(i.spread) })),
     defaults: DEFAULT_TIMING,
     lossAtDefaults: sig(fit.lossAtDefaults),
     lossAtFit: sig(fit.loss),
-    residuals: residualsOf(fit.scores).map((r) => ({ ...r, ttftMean: sig(r.ttftMean), tpotMean: sig(r.tpotMean) })),
-    residualsAtDefaults: residualsOf(fit.scoresAtDefaults).map((r) => ({ ...r, ttftMean: sig(r.ttftMean), tpotMean: sig(r.tpotMean) }))
+    residuals: residualsOf(mine(fit.scores)).map((r) => ({ ...r, ttftMean: sig(r.ttftMean), tpotMean: sig(r.tpotMean) })),
+    residualsAtDefaults: residualsOf(mine(fit.scoresAtDefaults)).map((r) => ({ ...r, ttftMean: sig(r.ttftMean), tpotMean: sig(r.tpotMean) }))
   };
   if (p.spec[0]) {
     const s = fitSpecCost(p.spec[0], timing);

@@ -13,11 +13,12 @@
  * direction and a similar effect on both sides. Where several references cover a check, see `compare.ts`.
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { execFile } from "node:child_process";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import type { Reduced } from "../record.js";
 import { DEFAULT_PARAMS } from "../../src/sim/index.js";
-import { calibratePair, calibrationPairs } from "../calibration/calibrate.js";
+import { calibrationPairs } from "../calibration/calibrate.js";
 import { METHOD } from "../calibration/fit.js";
 import { loadFitted, pairKey } from "../calibration/fitted.js";
 import { REFERENCES, checkReferences, fitReferenceOf, loadReferenceFile, referencesOf } from "../refs/index.js";
@@ -112,12 +113,25 @@ describe("calibration", () => {
     expect(Object.fromEntries(Object.entries(fitted.references).map(([id, f]) => [id, Object.keys(f.pairs).sort((a, b) => a.localeCompare(b))]))).toEqual(expected);
     for (const r of REFERENCES) if (fitted.references[r.id]) expect(fitted.references[r.id]!.lock).toBe(r.lock());
   });
+  // A group's fit (all its tensor-parallel degrees together) runs once, in a child process: it is minutes of synchronous work.
+  const groupFits = new Map<string, Promise<Record<string, unknown>>>();
+  const fitGroup = (ref: string, group: string): Promise<Record<string, unknown>> => {
+    const id = `${ref}/${group}`;
+    if (!groupFits.has(id))
+      groupFits.set(
+        id,
+        new Promise((resolve, reject) =>
+          execFile(path.join(process.cwd(), "node_modules", ".bin", "tsx"), ["conformance/scripts/calibrate-group.ts", ref, group], { maxBuffer: 64 * 1024 * 1024 }, (err, stdout) => (err ? reject(err) : resolve(JSON.parse(stdout))))
+        )
+      );
+    return groupFits.get(id)!;
+  };
   for (const r of REFERENCES) {
     for (const key of calibrationPairs(r)) {
       it(`fitted.json holds what the fit to ${r.id} produces for ${key} (run pnpm conformance:calibrate)`, async () => {
-        await new Promise((done) => setTimeout(done, 50)); // let the runner report the previous test: a fit is a long synchronous computation
-        expect(calibratePair(r, key)).toEqual(loadFitted().references[r.id]!.pairs[key]);
-      }, 120_000);
+        const fit = await fitGroup(r.id, key.replace(/\/tp\d+$/, ""));
+        expect(fit[key]).toEqual(loadFitted().references[r.id]!.pairs[key]);
+      }, 900_000); // the first pair of a group waits for the group's joint fit and its loss profile
     }
   }
   it("has a fit for every pair that a calibrated or directional check uses", () => {

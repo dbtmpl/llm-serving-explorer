@@ -170,20 +170,25 @@ export function renderCalibration(ref: string): string {
   const fitted = loadFitted().references[ref];
   if (!fitted) return "No timing parameters are fitted to this reference.";
   const pctSigned = (x: number): string => `${x >= 0 ? "+" : ""}${(x * 100).toFixed(1)}%`;
-  const rows = ["| Pair | MBU | MFU | Host ms, fixed | Host ms, per sequence | Loss at defaults, at fit | Worst residual, time to first token | Worst residual, time per token |", "|---|---|---|---|---|---|---|---|"];
+  const rows = ["| Pair | MBU | MFU | Host ms, fixed | Host ms, per sequence | All-reduce efficiency, fixed microseconds | Loss at defaults, at fit | Worst residual, time to first token | Worst residual, time per token |", "|---|---|---|---|---|---|---|---|---|"];
   for (const [key, p] of Object.entries(fitted.pairs)) {
     const worst = (f: (r: (typeof p.residuals)[number]) => number): string => pctSigned(p.residuals.map(f).reduce((a, b) => (Math.abs(b) > Math.abs(a) ? b : a)));
     const cell = (v: number, d: number): string => `${v} (default ${d})`;
     rows.push(
-      `| \`${key}\` | ${cell(p.timing.mbu, p.defaults.mbu)} | ${cell(p.timing.mfu, p.defaults.mfu)} | ${cell(p.timing.hostMsBase, p.defaults.hostMsBase)} | ${cell(p.timing.hostMsPerSeq, p.defaults.hostMsPerSeq)} | ${p.lossAtDefaults}, ${p.lossAtFit} | ${worst((r) => r.ttftMean)} | ${worst((r) => r.tpotMean)} |`
+      `| \`${key}\` | ${cell(p.timing.mbu, p.defaults.mbu)}${p.atBound.includes("mbu") ? " **at its bound**" : ""} | ${cell(p.timing.mfu, p.defaults.mfu)} | ${cell(p.timing.hostMsBase, p.defaults.hostMsBase)} | ${cell(p.timing.hostMsPerSeq, p.defaults.hostMsPerSeq)} | ${p.timing.commEff === undefined ? "none (one degree)" : `${p.timing.commEff}, ${p.timing.commLatencyUs}`} | ${p.lossAtDefaults}, ${p.lossAtFit} | ${worst((r) => r.ttftMean)} | ${worst((r) => r.tpotMean)} |`
     );
   }
   const name = nameOf(ref);
+  const groups = new Map<string, (typeof fitted.pairs)[string]>();
+  for (const p of Object.values(fitted.pairs)) if (!groups.has(p.group)) groups.set(p.group, p);
+  const profiles = [...groups.entries()].flatMap(([g, p]) =>
+    p.identifiability.map((i) => `- \`${g}\` (tensor-parallel degrees ${p.groupTps.join(", ")}): loss with ${i.parameter} held at ${i.held.map((h) => `${h.value}: ${h.loss}`).join(", ")}; at the fit (${i.fitted.value}): ${i.fitted.loss}; spread ${(i.spread * 100).toFixed(0)}%${i.flat ? " **flat: the data does not identify this parameter, and its fitted value is a label, not a measurement**" : ""}.`)
+  );
   const extras = Object.entries(fitted.pairs).flatMap(([key, p]) => [
     ...(p.specCost ? [`- \`${key}\`: draft cost \`specCost\` ${p.specCost.value} (default ${p.specCost.defaultValue}); time per token ${pctSigned(p.specCost.residualTpot)} from ${name}'s on \`${p.specCost.scenario}\`. BLIS prices its n-gram drafter at nothing, so the fit goes to the lower bound.`] : []),
     ...(p.linkGbps ? [`- \`${key}\`: link rate \`linkGbps\` ${p.linkGbps.value} Gbit/s (default ${p.linkGbps.defaultValue}); hand-over time ${pctSigned(p.linkGbps.residualKvTransfer)} from ${name}'s on \`${p.linkGbps.scenario}\`. BLIS's fabric is 400 Gbit/s InfiniBand at 0.811 of line rate, which is 324 Gbit/s.`] : [])
   ]);
-  return [...rows, "", ...extras].join("\n");
+  return [...rows, "", "Loss profiles (the loss when a parameter is held at fixed values and the others are refitted; a profile within 25 percent of the best loss marks a parameter the data does not tell from the others):", "", ...profiles, "", ...extras].join("\n");
 }
 
 export type { ReferenceSummary };

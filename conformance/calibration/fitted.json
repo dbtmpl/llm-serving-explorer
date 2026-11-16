@@ -1,5 +1,5 @@
 {
-  "method": "Coordinate search in log space from the site's defaults. Loss: mean over calibration scenarios of (mean over requests of ln(ttft_ts/ttft_ref)^2 + ln(tpot_ts/tpot_ref)^2) / 2. Step ratios 2, 1.5, 1.25, 1.1, 1.05, 1.02; at each ratio, per parameter in the order mbu, mfu, hostMsBase, hostMsPerSeq, try value * ratio^j for j = -3..3 within bounds, keep the best, repeat until a sweep gains less than 1e-6. Bounds: mbu, mfu in [0.05, 1]; hostMsBase in [0.01, 50]; hostMsPerSeq in [0.001, 5]. specCost and linkGbps are then fitted alone by the same search (bounds [0, 1] and [1, 2000]), with the four parameters held.",
+  "method": "Coordinate search in log space from the site's defaults, one parameter set per (model, GPU) shared by all its tensor-parallel degrees. Loss: mean over calibration scenarios of (mean over requests of ln(ttft_ts/ttft_ref)^2 + ln(tpot_ts/tpot_ref)^2) / 2. Step ratios 2, 1.5, 1.25, 1.1, 1.05, 1.02; at each ratio, per parameter in the order mbu, mfu, hostMsBase, hostMsPerSeq, commEff, commLatencyUs, try value * ratio^j for j = -3..3 within bounds, keep the best, repeat until a sweep gains less than 1e-6. Bounds (decided 2026-11-16 from the measured vLLM runs and BLIS's range, before the refit): mbu [0.4, 0.95]; mfu [0.2, 0.9]; commEff [0.05, 1]; commLatencyUs [0.5, 50]; hostMsBase [0.01, 50]; hostMsPerSeq [0.001, 5]. commEff and commLatencyUs are fitted only for a group with several tensor-parallel degrees. specCost and linkGbps are then fitted alone by the same search (bounds [0, 1] and [1, 2000]), with the timing parameters held. Each group also reports the loss profile of mbu and mfu (the loss with the parameter held at three values and the others refitted); a profile within 25 percent of the best loss marks a parameter the data does not identify (the profile's refits use step ratios 2, 1.25, 1.05 only).",
   "references": {
     "blis": {
       "lock": "c79c745619b16a8019339e3bbc79ee5e2923b258",
@@ -9,71 +9,126 @@
           "gpu": "b200",
           "tp": 1,
           "timing": {
-            "mbu": 0.6,
-            "mfu": 0.681818,
-            "hostMsBase": 1.16219,
-            "hostMsPerSeq": 0.00713199
+            "mbu": 0.95,
+            "mfu": 0.83349,
+            "hostMsBase": 1.875,
+            "hostMsPerSeq": 0.0158118
           },
+          "group": "llama-3.1-8b/b200",
+          "groupTps": [
+            1
+          ],
+          "atBound": [
+            "mbu"
+          ],
+          "identifiability": [
+            {
+              "parameter": "mbu",
+              "fitted": {
+                "value": 0.95,
+                "loss": 0.014801
+              },
+              "held": [
+                {
+                  "value": 0.5,
+                  "loss": 0.0245465
+                },
+                {
+                  "value": 0.7,
+                  "loss": 0.0161162
+                },
+                {
+                  "value": 0.9,
+                  "loss": 0.0145379
+                }
+              ],
+              "spread": 0.688442,
+              "flat": false
+            },
+            {
+              "parameter": "mfu",
+              "fitted": {
+                "value": 0.83349,
+                "loss": 0.014801
+              },
+              "held": [
+                {
+                  "value": 0.3,
+                  "loss": 0.0764754
+                },
+                {
+                  "value": 0.5,
+                  "loss": 0.0238618
+                },
+                {
+                  "value": 0.8,
+                  "loss": 0.0137856
+                }
+              ],
+              "spread": 4.54747,
+              "flat": false
+            }
+          ],
           "defaults": {
-            "mbu": 0.6,
-            "mfu": 0.5,
+            "mbu": 0.85,
+            "mfu": 0.7,
             "hostMsBase": 1.5,
             "hostMsPerSeq": 0.05
           },
-          "lossAtDefaults": 0.0438953,
-          "lossAtFit": 0.0229969,
+          "lossAtDefaults": 0.0242528,
+          "lossAtFit": 0.014801,
           "residuals": [
             {
               "scenario": "calib-8b-b200-batch16",
-              "ttftMean": -0.215098,
-              "tpotMean": -0.0256742
+              "ttftMean": -0.174312,
+              "tpotMean": 0.0571263
             },
             {
               "scenario": "calib-8b-b200-batch16-long",
-              "ttftMean": 0.153737,
-              "tpotMean": 0.0870304
+              "ttftMean": 0.0786555,
+              "tpotMean": 0.0312188
             },
             {
               "scenario": "calib-8b-b200-batch4",
-              "ttftMean": -0.223732,
-              "tpotMean": -0.0394001
+              "ttftMean": -0.186842,
+              "tpotMean": 0.0507564
             },
             {
               "scenario": "calib-8b-b200-batch48",
-              "ttftMean": -0.170765,
-              "tpotMean": 0.0000805834
+              "ttftMean": -0.130118,
+              "tpotMean": 0.06983
             },
             {
               "scenario": "calib-8b-b200-isolated",
-              "ttftMean": 0.0921439,
-              "tpotMean": -0.0400311
+              "ttftMean": 0.053979,
+              "tpotMean": 0.0479496
             }
           ],
           "residualsAtDefaults": [
             {
               "scenario": "calib-8b-b200-batch16",
-              "ttftMean": -0.144313,
-              "tpotMean": 0.159261
+              "ttftMean": -0.164916,
+              "tpotMean": 0.13125
             },
             {
               "scenario": "calib-8b-b200-batch16-long",
-              "ttftMean": 0.385227,
-              "tpotMean": 0.281061
+              "ttftMean": 0.176629,
+              "tpotMean": 0.125104
             },
             {
               "scenario": "calib-8b-b200-batch4",
-              "ttftMean": -0.172284,
-              "tpotMean": 0.0643597
+              "ttftMean": -0.170386,
+              "tpotMean": 0.056481
             },
             {
               "scenario": "calib-8b-b200-batch48",
-              "ttftMean": -0.0749174,
-              "tpotMean": 0.346053
+              "ttftMean": -0.105398,
+              "tpotMean": 0.274717
             },
             {
               "scenario": "calib-8b-b200-isolated",
-              "ttftMean": 0.261879,
-              "tpotMean": 0.0372235
+              "ttftMean": 0.120695,
+              "tpotMean": 0.0324831
             }
           ]
         },
@@ -82,78 +137,131 @@
           "gpu": "h100",
           "tp": 1,
           "timing": {
-            "mbu": 0.6,
-            "mfu": 0.666667,
-            "hostMsBase": 1.44,
-            "hostMsPerSeq": 0.00569372
+            "mbu": 0.85,
+            "mfu": 0.714,
+            "hostMsBase": 3,
+            "hostMsPerSeq": 0.00831875
           },
+          "group": "llama-3.1-8b/h100",
+          "groupTps": [
+            1
+          ],
+          "atBound": [],
+          "identifiability": [
+            {
+              "parameter": "mbu",
+              "fitted": {
+                "value": 0.85,
+                "loss": 0.0152603
+              },
+              "held": [
+                {
+                  "value": 0.5,
+                  "loss": 0.0275041
+                },
+                {
+                  "value": 0.7,
+                  "loss": 0.0169555
+                },
+                {
+                  "value": 0.9,
+                  "loss": 0.0153237
+                }
+              ],
+              "spread": 0.802325,
+              "flat": false
+            },
+            {
+              "parameter": "mfu",
+              "fitted": {
+                "value": 0.714,
+                "loss": 0.0152603
+              },
+              "held": [
+                {
+                  "value": 0.3,
+                  "loss": 0.552117
+                },
+                {
+                  "value": 0.5,
+                  "loss": 0.0932844
+                },
+                {
+                  "value": 0.8,
+                  "loss": 0.0150356
+                }
+              ],
+              "spread": 35.7206,
+              "flat": false
+            }
+          ],
           "defaults": {
-            "mbu": 0.6,
-            "mfu": 0.5,
+            "mbu": 0.85,
+            "mfu": 0.7,
             "hostMsBase": 1.5,
             "hostMsPerSeq": 0.05
           },
-          "lossAtDefaults": 0.0793852,
-          "lossAtFit": 0.0228158,
+          "lossAtDefaults": 0.0230457,
+          "lossAtFit": 0.0152603,
           "residuals": [
             {
               "scenario": "calib-8b-h100-batch16",
-              "ttftMean": -0.191384,
-              "tpotMean": -0.00564993
+              "ttftMean": -0.163007,
+              "tpotMean": -0.00564955
             },
             {
               "scenario": "calib-8b-h100-batch16-long",
-              "ttftMean": 0.226102,
-              "tpotMean": 0.0867166
+              "ttftMean": 0.196373,
+              "tpotMean": -0.0162084
             },
             {
               "scenario": "calib-8b-h100-batch4",
-              "ttftMean": -0.195497,
-              "tpotMean": -0.00829372
+              "ttftMean": -0.133128,
+              "tpotMean": 0.00924384
             },
             {
               "scenario": "calib-8b-h100-batch48",
-              "ttftMean": -0.158259,
-              "tpotMean": -0.000520809
+              "ttftMean": -0.126388,
+              "tpotMean": -0.0379898
             },
             {
               "scenario": "calib-8b-h100-isolated",
-              "ttftMean": 0.188296,
-              "tpotMean": -0.00696281
+              "ttftMean": 0.176376,
+              "tpotMean": 0.0115217
             }
           ],
           "residualsAtDefaults": [
             {
               "scenario": "calib-8b-h100-batch16",
-              "ttftMean": -0.105688,
-              "tpotMean": 0.0754871
+              "ttftMean": -0.1813,
+              "tpotMean": -0.086682
             },
             {
               "scenario": "calib-8b-h100-batch16-long",
-              "ttftMean": 1.13125,
-              "tpotMean": 0.185569
+              "ttftMean": 0.201646,
+              "tpotMean": -0.0674737
             },
             {
               "scenario": "calib-8b-h100-batch4",
-              "ttftMean": -0.0980178,
-              "tpotMean": 0.0195628
+              "ttftMean": -0.155068,
+              "tpotMean": -0.125659
             },
             {
               "scenario": "calib-8b-h100-batch48",
-              "ttftMean": -0.0473615,
-              "tpotMean": 0.174381
+              "ttftMean": -0.135348,
+              "tpotMean": -0.0242765
             },
             {
               "scenario": "calib-8b-h100-isolated",
-              "ttftMean": 0.43339,
-              "tpotMean": 0.00379287
+              "ttftMean": 0.176383,
+              "tpotMean": -0.138848
             }
           ],
           "specCost": {
             "value": 0.0001,
             "defaultValue": 0.04,
             "scenario": "calib-8b-h100-spec",
-            "residualTpot": 0.0170449
+            "residualTpot": 0.0384078
           },
           "linkGbps": {
             "value": 323.81,
@@ -162,76 +270,393 @@
             "residualKvTransfer": 0.00125206
           }
         },
+        "llama-70b/h200/tp2": {
+          "model": "llama-70b",
+          "gpu": "h200",
+          "tp": 2,
+          "timing": {
+            "mbu": 0.516071,
+            "mfu": 0.7,
+            "hostMsBase": 0.124523,
+            "hostMsPerSeq": 0.00520906,
+            "commEff": 0.34125,
+            "commLatencyUs": 2.81802
+          },
+          "group": "llama-70b/h200",
+          "groupTps": [
+            2,
+            4,
+            8
+          ],
+          "atBound": [],
+          "identifiability": [
+            {
+              "parameter": "mbu",
+              "fitted": {
+                "value": 0.516071,
+                "loss": 0.0316665
+              },
+              "held": [
+                {
+                  "value": 0.5,
+                  "loss": 0.0319134
+                },
+                {
+                  "value": 0.7,
+                  "loss": 0.0292579
+                },
+                {
+                  "value": 0.9,
+                  "loss": 0.0338878
+                }
+              ],
+              "spread": 0.158245,
+              "flat": true
+            },
+            {
+              "parameter": "mfu",
+              "fitted": {
+                "value": 0.7,
+                "loss": 0.0316665
+              },
+              "held": [
+                {
+                  "value": 0.3,
+                  "loss": 0.44858
+                },
+                {
+                  "value": 0.5,
+                  "loss": 0.0641826
+                },
+                {
+                  "value": 0.8,
+                  "loss": 0.0295762
+                }
+              ],
+              "spread": 14.1669,
+              "flat": false
+            }
+          ],
+          "defaults": {
+            "mbu": 0.85,
+            "mfu": 0.7,
+            "hostMsBase": 1.5,
+            "hostMsPerSeq": 0.05
+          },
+          "lossAtDefaults": 0.0778014,
+          "lossAtFit": 0.0316665,
+          "residuals": [
+            {
+              "scenario": "calib-70b-h200-tp2-batch16",
+              "ttftMean": 0.173768,
+              "tpotMean": 0.0180372
+            },
+            {
+              "scenario": "calib-70b-h200-tp2-batch16-long",
+              "ttftMean": 0.231192,
+              "tpotMean": 0.0451213
+            },
+            {
+              "scenario": "calib-70b-h200-tp2-batch4",
+              "ttftMean": -0.113057,
+              "tpotMean": 0.0436903
+            },
+            {
+              "scenario": "calib-70b-h200-tp2-batch48",
+              "ttftMean": 0.448733,
+              "tpotMean": -0.0260865
+            },
+            {
+              "scenario": "calib-70b-h200-tp2-isolated",
+              "ttftMean": 0.125474,
+              "tpotMean": 0.0504719
+            }
+          ],
+          "residualsAtDefaults": [
+            {
+              "scenario": "calib-70b-h200-tp2-batch16",
+              "ttftMean": 0.0463567,
+              "tpotMean": -0.252229
+            },
+            {
+              "scenario": "calib-70b-h200-tp2-batch16-long",
+              "ttftMean": 0.133938,
+              "tpotMean": -0.216746
+            },
+            {
+              "scenario": "calib-70b-h200-tp2-batch4",
+              "ttftMean": -0.173204,
+              "tpotMean": -0.254848
+            },
+            {
+              "scenario": "calib-70b-h200-tp2-batch48",
+              "ttftMean": 0.24715,
+              "tpotMean": -0.249832
+            },
+            {
+              "scenario": "calib-70b-h200-tp2-isolated",
+              "ttftMean": 0.0610248,
+              "tpotMean": -0.257885
+            }
+          ]
+        },
         "llama-70b/h200/tp4": {
           "model": "llama-70b",
           "gpu": "h200",
           "tp": 4,
           "timing": {
-            "mbu": 0.980392,
-            "mfu": 0.463636,
-            "hostMsBase": 9.91736,
-            "hostMsPerSeq": 0.0589457
+            "mbu": 0.516071,
+            "mfu": 0.7,
+            "hostMsBase": 0.124523,
+            "hostMsPerSeq": 0.00520906,
+            "commEff": 0.34125,
+            "commLatencyUs": 2.81802
           },
+          "group": "llama-70b/h200",
+          "groupTps": [
+            2,
+            4,
+            8
+          ],
+          "atBound": [],
+          "identifiability": [
+            {
+              "parameter": "mbu",
+              "fitted": {
+                "value": 0.516071,
+                "loss": 0.0316665
+              },
+              "held": [
+                {
+                  "value": 0.5,
+                  "loss": 0.0319134
+                },
+                {
+                  "value": 0.7,
+                  "loss": 0.0292579
+                },
+                {
+                  "value": 0.9,
+                  "loss": 0.0338878
+                }
+              ],
+              "spread": 0.158245,
+              "flat": true
+            },
+            {
+              "parameter": "mfu",
+              "fitted": {
+                "value": 0.7,
+                "loss": 0.0316665
+              },
+              "held": [
+                {
+                  "value": 0.3,
+                  "loss": 0.44858
+                },
+                {
+                  "value": 0.5,
+                  "loss": 0.0641826
+                },
+                {
+                  "value": 0.8,
+                  "loss": 0.0295762
+                }
+              ],
+              "spread": 14.1669,
+              "flat": false
+            }
+          ],
           "defaults": {
-            "mbu": 0.6,
-            "mfu": 0.5,
+            "mbu": 0.85,
+            "mfu": 0.7,
             "hostMsBase": 1.5,
             "hostMsPerSeq": 0.05
           },
-          "lossAtDefaults": 0.149187,
-          "lossAtFit": 0.0254718,
+          "lossAtDefaults": 0.0778014,
+          "lossAtFit": 0.0316665,
           "residuals": [
             {
               "scenario": "calib-70b-h200-batch16",
-              "ttftMean": -0.138453,
-              "tpotMean": 0.00325498
+              "ttftMean": -0.244279,
+              "tpotMean": -0.00835979
             },
             {
               "scenario": "calib-70b-h200-batch16-long",
-              "ttftMean": 0.343883,
-              "tpotMean": -0.00956102
+              "ttftMean": 0.296358,
+              "tpotMean": 0.0265963
             },
             {
               "scenario": "calib-70b-h200-batch4",
-              "ttftMean": -0.152643,
-              "tpotMean": 0.0140883
+              "ttftMean": -0.182655,
+              "tpotMean": 0.0091842
             },
             {
               "scenario": "calib-70b-h200-batch48",
-              "ttftMean": 0.0590938,
-              "tpotMean": -0.0149565
+              "ttftMean": -0.086131,
+              "tpotMean": -0.0347209
             },
             {
               "scenario": "calib-70b-h200-isolated",
-              "ttftMean": 0.152348,
-              "tpotMean": 0.0154831
+              "ttftMean": 0.128996,
+              "tpotMean": 0.0143825
             }
           ],
           "residualsAtDefaults": [
             {
               "scenario": "calib-70b-h200-batch16",
-              "ttftMean": -0.472348,
-              "tpotMean": -0.187718
+              "ttftMean": -0.461512,
+              "tpotMean": -0.187213
             },
             {
               "scenario": "calib-70b-h200-batch16-long",
-              "ttftMean": 0.176286,
-              "tpotMean": -0.13147
+              "ttftMean": 0.0107818,
+              "tpotMean": -0.177251
             },
             {
               "scenario": "calib-70b-h200-batch4",
-              "ttftMean": -0.288338,
-              "tpotMean": -0.193618
+              "ttftMean": -0.279217,
+              "tpotMean": -0.196789
             },
             {
               "scenario": "calib-70b-h200-batch48",
-              "ttftMean": -0.558163,
-              "tpotMean": -0.176917
+              "ttftMean": -0.551703,
+              "tpotMean": -0.172156
             },
             {
               "scenario": "calib-70b-h200-isolated",
-              "ttftMean": 0.0538525,
-              "tpotMean": -0.195501
+              "ttftMean": -0.00827203,
+              "tpotMean": -0.200948
+            }
+          ]
+        },
+        "llama-70b/h200/tp8": {
+          "model": "llama-70b",
+          "gpu": "h200",
+          "tp": 8,
+          "timing": {
+            "mbu": 0.516071,
+            "mfu": 0.7,
+            "hostMsBase": 0.124523,
+            "hostMsPerSeq": 0.00520906,
+            "commEff": 0.34125,
+            "commLatencyUs": 2.81802
+          },
+          "group": "llama-70b/h200",
+          "groupTps": [
+            2,
+            4,
+            8
+          ],
+          "atBound": [],
+          "identifiability": [
+            {
+              "parameter": "mbu",
+              "fitted": {
+                "value": 0.516071,
+                "loss": 0.0316665
+              },
+              "held": [
+                {
+                  "value": 0.5,
+                  "loss": 0.0319134
+                },
+                {
+                  "value": 0.7,
+                  "loss": 0.0292579
+                },
+                {
+                  "value": 0.9,
+                  "loss": 0.0338878
+                }
+              ],
+              "spread": 0.158245,
+              "flat": true
+            },
+            {
+              "parameter": "mfu",
+              "fitted": {
+                "value": 0.7,
+                "loss": 0.0316665
+              },
+              "held": [
+                {
+                  "value": 0.3,
+                  "loss": 0.44858
+                },
+                {
+                  "value": 0.5,
+                  "loss": 0.0641826
+                },
+                {
+                  "value": 0.8,
+                  "loss": 0.0295762
+                }
+              ],
+              "spread": 14.1669,
+              "flat": false
+            }
+          ],
+          "defaults": {
+            "mbu": 0.85,
+            "mfu": 0.7,
+            "hostMsBase": 1.5,
+            "hostMsPerSeq": 0.05
+          },
+          "lossAtDefaults": 0.0778014,
+          "lossAtFit": 0.0316665,
+          "residuals": [
+            {
+              "scenario": "calib-70b-h200-tp8-batch16",
+              "ttftMean": -0.10284,
+              "tpotMean": -0.0308932
+            },
+            {
+              "scenario": "calib-70b-h200-tp8-batch16-long",
+              "ttftMean": 0.666193,
+              "tpotMean": 0.0194107
+            },
+            {
+              "scenario": "calib-70b-h200-tp8-batch4",
+              "ttftMean": -0.113837,
+              "tpotMean": -0.0363868
+            },
+            {
+              "scenario": "calib-70b-h200-tp8-batch48",
+              "ttftMean": -0.0707509,
+              "tpotMean": -0.0268081
+            },
+            {
+              "scenario": "calib-70b-h200-tp8-isolated",
+              "ttftMean": 0.198725,
+              "tpotMean": -0.0388831
+            }
+          ],
+          "residualsAtDefaults": [
+            {
+              "scenario": "calib-70b-h200-tp8-batch16",
+              "ttftMean": -0.204219,
+              "tpotMean": -0.0943864
+            },
+            {
+              "scenario": "calib-70b-h200-tp8-batch16-long",
+              "ttftMean": -0.0903418,
+              "tpotMean": -0.10509
+            },
+            {
+              "scenario": "calib-70b-h200-tp8-batch4",
+              "ttftMean": -0.235259,
+              "tpotMean": -0.115314
+            },
+            {
+              "scenario": "calib-70b-h200-tp8-batch48",
+              "ttftMean": -0.172785,
+              "tpotMean": -0.0567951
+            },
+            {
+              "scenario": "calib-70b-h200-tp8-isolated",
+              "ttftMean": -0.0207816,
+              "tpotMean": -0.12267
             }
           ]
         }
@@ -245,31 +670,86 @@
           "gpu": "rtx-4090",
           "tp": 1,
           "timing": {
-            "mbu": 1,
-            "mfu": 0.8,
-            "hostMsBase": 0.01,
-            "hostMsPerSeq": 0.001
-          },
-          "defaults": {
-            "mbu": 0.6,
-            "mfu": 0.5,
+            "mbu": 0.95,
+            "mfu": 0.748,
             "hostMsBase": 1.5,
             "hostMsPerSeq": 0.05
           },
-          "lossAtDefaults": 0.816898,
-          "lossAtFit": 0.237822,
+          "group": "llama-3.1-8b/rtx-4090",
+          "groupTps": [
+            1
+          ],
+          "atBound": [
+            "mbu"
+          ],
+          "identifiability": [
+            {
+              "parameter": "mbu",
+              "fitted": {
+                "value": 0.95,
+                "loss": 0.293182
+              },
+              "held": [
+                {
+                  "value": 0.5,
+                  "loss": 0.500377
+                },
+                {
+                  "value": 0.7,
+                  "loss": 0.349811
+                },
+                {
+                  "value": 0.9,
+                  "loss": 0.297764
+                }
+              ],
+              "spread": 0.706714,
+              "flat": false
+            },
+            {
+              "parameter": "mfu",
+              "fitted": {
+                "value": 0.748,
+                "loss": 0.293182
+              },
+              "held": [
+                {
+                  "value": 0.3,
+                  "loss": 0.98659
+                },
+                {
+                  "value": 0.5,
+                  "loss": 0.454557
+                },
+                {
+                  "value": 0.8,
+                  "loss": 0.304674
+                }
+              ],
+              "spread": 2.36512,
+              "flat": false
+            }
+          ],
+          "defaults": {
+            "mbu": 0.85,
+            "mfu": 0.7,
+            "hostMsBase": 1.5,
+            "hostMsPerSeq": 0.05
+          },
+          "lossAtDefaults": 0.319325,
+          "lossAtFit": 0.293182,
           "residuals": [
             {
               "scenario": "measured-8b-rtx-4090",
-              "ttftMean": 0.0846178,
-              "tpotMean": -0.0581093
+              "ttftMean": -0.131084,
+              "tpotMean": 0.137085
             }
           ],
           "residualsAtDefaults": [
             {
               "scenario": "measured-8b-rtx-4090",
-              "ttftMean": 1.10692,
-              "tpotMean": 0.641663
+              "ttftMean": -0.0273658,
+              "tpotMean": 0.247424
             }
           ]
         },
@@ -278,31 +758,84 @@
           "gpu": "rtx-pro-6000",
           "tp": 1,
           "timing": {
-            "mbu": 1,
-            "mfu": 0.8,
-            "hostMsBase": 4.608,
-            "hostMsPerSeq": 0.00881982
+            "mbu": 0.935,
+            "mfu": 0.754902,
+            "hostMsBase": 4.75779,
+            "hostMsPerSeq": 0.2
           },
+          "group": "llama-3.1-8b/rtx-pro-6000",
+          "groupTps": [
+            1
+          ],
+          "atBound": [],
+          "identifiability": [
+            {
+              "parameter": "mbu",
+              "fitted": {
+                "value": 0.935,
+                "loss": 0.0196397
+              },
+              "held": [
+                {
+                  "value": 0.5,
+                  "loss": 0.0956162
+                },
+                {
+                  "value": 0.7,
+                  "loss": 0.0270851
+                },
+                {
+                  "value": 0.9,
+                  "loss": 0.0212073
+                }
+              ],
+              "spread": 3.86852,
+              "flat": false
+            },
+            {
+              "parameter": "mfu",
+              "fitted": {
+                "value": 0.754902,
+                "loss": 0.0196397
+              },
+              "held": [
+                {
+                  "value": 0.3,
+                  "loss": 2.11781
+                },
+                {
+                  "value": 0.5,
+                  "loss": 0.246933
+                },
+                {
+                  "value": 0.8,
+                  "loss": 0.022148
+                }
+              ],
+              "spread": 106.833,
+              "flat": false
+            }
+          ],
           "defaults": {
-            "mbu": 0.6,
-            "mfu": 0.5,
+            "mbu": 0.85,
+            "mfu": 0.7,
             "hostMsBase": 1.5,
             "hostMsPerSeq": 0.05
           },
-          "lossAtDefaults": 0.372714,
-          "lossAtFit": 0.0228028,
+          "lossAtDefaults": 0.0395944,
+          "lossAtFit": 0.0196397,
           "residuals": [
             {
               "scenario": "measured-8b-rtx-pro-6000",
-              "ttftMean": 0.0136195,
-              "tpotMean": -0.0512301
+              "ttftMean": 0.0424463,
+              "tpotMean": -0.0208732
             }
           ],
           "residualsAtDefaults": [
             {
               "scenario": "measured-8b-rtx-pro-6000",
-              "ttftMean": 0.952689,
-              "tpotMean": 0.563044
+              "ttftMean": 0.128982,
+              "tpotMean": -0.0568157
             }
           ]
         }
