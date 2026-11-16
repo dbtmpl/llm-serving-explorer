@@ -1,8 +1,8 @@
 {
   "scenarios": {
-    "total": 38,
-    "calibration": 17,
-    "withChecks": 21
+    "total": 55,
+    "calibration": 23,
+    "withChecks": 32
   },
   "references": {
     "blis": {
@@ -1173,12 +1173,12 @@
             "exact": 1
           },
           "capacity": {
-            "total": 2,
-            "known_difference": 2
+            "total": 1,
+            "known_difference": 1
           },
           "calibrated": {
-            "total": 40,
-            "known_difference": 21,
+            "total": 41,
+            "known_difference": 22,
             "within_tolerance": 19
           },
           "directional": {
@@ -1187,7 +1187,7 @@
         },
         "agree": 20,
         "knownDifferences": 23,
-        "disputed": 0
+        "disputed": 1
       },
       "headline": {
         "definition": "share of the checks Measured vLLM covers that agree (exact, within tolerance or directionally)",
@@ -1201,14 +1201,14 @@
         "groups": {
           "capacity": {
             "n": 2,
-            "median": 0.06713,
-            "max": 0.1213,
+            "median": 0.5606,
+            "max": 1,
             "unbounded": 0,
             "within": {
               "1": 0,
-              "5": 1,
-              "10": 1,
-              "25": 2
+              "5": 0,
+              "10": 0,
+              "25": 1
             }
           },
           "decisions": {
@@ -1262,14 +1262,14 @@
         },
         "overall": {
           "n": 43,
-          "median": 0.1526,
+          "median": 0.3189,
           "max": 1.355,
           "unbounded": 0,
           "within": {
             "1": 1,
-            "5": 5,
-            "10": 17,
-            "25": 22
+            "5": 4,
+            "10": 16,
+            "25": 21
           }
         },
         "directionMismatches": 0
@@ -1697,26 +1697,6 @@
         },
         {
           "scenario": "measured-8b-rtx-pro-6000",
-          "check": "kv-blocks-per-replica",
-          "reference": "vllm-measured",
-          "kind": "capacity",
-          "group": "capacity",
-          "what": "KV blocks per replica",
-          "ours": "36,174 blocks",
-          "theirs": "36,649 blocks",
-          "deviation": {
-            "kind": "relative",
-            "value": -0.012960790198914022
-          },
-          "absDeviation": 0.01296,
-          "deviationText": "-1.3%",
-          "tolerance": "0.1%",
-          "holds": false,
-          "cause": "The activation and graph terms of the model's memory budget are not the real engine's",
-          "byDesign": false
-        },
-        {
-          "scenario": "measured-8b-rtx-pro-6000",
           "check": "preemptions",
           "reference": "vllm-measured",
           "kind": "exact",
@@ -1736,6 +1716,26 @@
           "tolerance": "equal",
           "holds": true,
           "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "prefix-hit-rate",
+          "reference": "vllm-measured",
+          "kind": "calibrated",
+          "group": "capacity",
+          "what": "prefix-cache hit rate",
+          "ours": "0.0%",
+          "theirs": "7.6%",
+          "deviation": {
+            "kind": "relative",
+            "value": -1
+          },
+          "absDeviation": 1,
+          "deviationText": "-100.0%",
+          "tolerance": "5%",
+          "holds": false,
+          "cause": "The model has no token content, so it sees no prefix sharing",
           "byDesign": false
         },
         {
@@ -2224,9 +2224,9 @@
         },
         {
           "scenario": "measured-8b-rtx-pro-6000",
-          "check": "kv-blocks-per-replica",
-          "kind": "capacity",
-          "claim": "One replica holds the same number of KV blocks as the real engine reported, to within 0.1 percent."
+          "check": "prefix-hit-rate",
+          "kind": "calibrated",
+          "claim": "The share of prompt tokens served from the prefix cache agrees with the real engine's."
         },
         {
           "scenario": "measured-8b-rtx-pro-6000",
@@ -2289,12 +2289,2417 @@
           "claim": "Output tokens per second from the first arrival to the last completion over all 300 requests, the site's default parameters agrees with the measured run."
         }
       ]
+    },
+    "llmservingsim": {
+      "id": "llmservingsim",
+      "name": "LLMServingSim",
+      "kind": "simulator",
+      "lock": "49df63f2af61230da63dd2136044a2dbf9bd4161",
+      "scenarios": {
+        "total": 19,
+        "calibration": 6,
+        "withChecks": 13
+      },
+      "checks": {
+        "total": 81,
+        "byKind": {
+          "exact": {
+            "total": 7,
+            "exact": 6,
+            "known_difference": 1
+          },
+          "capacity": {
+            "total": 1,
+            "known_difference": 1
+          },
+          "calibrated": {
+            "total": 67,
+            "within_tolerance": 34,
+            "known_difference": 33
+          },
+          "directional": {
+            "total": 6,
+            "directional_agree": 4,
+            "known_difference": 2
+          }
+        },
+        "agree": 44,
+        "knownDifferences": 37,
+        "disputed": 1
+      },
+      "headline": {
+        "definition": "share of the checks LLMServingSim covers that agree (exact, within tolerance or directionally)",
+        "agree": 44,
+        "total": 81,
+        "share": 0.5432,
+        "knownDifferences": 37
+      },
+      "deviations": {
+        "definition": "One deviation per check the reference covers: |model - reference| / reference for a quantity or metric, the share of individual decisions that differ for exact checks, |effect ratio - 1| for directional checks. Medians and maxima are over those numbers; 'within x%' counts the checks at or below x%.",
+        "groups": {
+          "capacity": {
+            "n": 3,
+            "median": 1,
+            "max": 1,
+            "unbounded": 0,
+            "within": {
+              "1": 0,
+              "5": 1,
+              "10": 1,
+              "25": 1
+            }
+          },
+          "decisions": {
+            "n": 8,
+            "median": 0,
+            "max": 1,
+            "unbounded": 0,
+            "within": {
+              "1": 7,
+              "5": 7,
+              "10": 7,
+              "25": 7
+            }
+          },
+          "timings_defaults": {
+            "n": 32,
+            "median": 0.6538,
+            "max": 1.347,
+            "unbounded": 0,
+            "within": {
+              "1": 0,
+              "5": 1,
+              "10": 2,
+              "25": 2
+            }
+          },
+          "timings": {
+            "n": 32,
+            "median": 0.0541,
+            "max": 0.3265,
+            "unbounded": 0,
+            "within": {
+              "1": 5,
+              "5": 15,
+              "10": 25,
+              "25": 30
+            }
+          },
+          "effects": {
+            "n": 6,
+            "median": 0.08488,
+            "max": 1.865,
+            "unbounded": 0,
+            "within": {
+              "1": 1,
+              "5": 2,
+              "10": 4,
+              "25": 4
+            }
+          }
+        },
+        "overall": {
+          "n": 81,
+          "median": 0.1304,
+          "max": 1.865,
+          "unbounded": 0,
+          "within": {
+            "1": 13,
+            "5": 26,
+            "10": 39,
+            "25": 44
+          }
+        },
+        "directionMismatches": 1
+      },
+      "rows": [
+        {
+          "scenario": "lss-kv-budget-8b-rtx-pro-6000",
+          "check": "kv-blocks-per-replica",
+          "reference": "llmservingsim",
+          "kind": "capacity",
+          "group": "capacity",
+          "what": "KV blocks per replica",
+          "ours": "36,174 blocks",
+          "theirs": "37,090 blocks",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.024696683742248586
+          },
+          "absDeviation": 0.0247,
+          "deviationText": "-2.5%",
+          "tolerance": "0.1%",
+          "holds": false,
+          "cause": "LLMServingSim sets nothing aside for activations or CUDA graphs",
+          "byDesign": false
+        },
+        {
+          "scenario": "lss-max-num-seqs",
+          "check": "ttft-rises",
+          "reference": "llmservingsim",
+          "kind": "directional",
+          "group": "effects",
+          "what": "mean time to first token, wide to narrow",
+          "ours": "1500% of baseline",
+          "theirs": "1700% of baseline",
+          "deviation": {
+            "kind": "effect",
+            "ratio": 0.9098032476987122,
+            "directionMatches": true
+          },
+          "absDeviation": 0.0902,
+          "deviationText": "ratio 0.91",
+          "tolerance": "effect ratio 0.5 to 2",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "lss-max-num-seqs",
+          "check": "all-complete",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "decisions",
+          "what": "requests completed",
+          "ours": "16",
+          "theirs": "16",
+          "deviation": {
+            "kind": "relative",
+            "value": 0
+          },
+          "absDeviation": 0,
+          "deviationText": "+0.0%",
+          "tolerance": "0.1%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "lss-pd-disaggregation",
+          "check": "tpot-falls",
+          "reference": "llmservingsim",
+          "kind": "directional",
+          "group": "effects",
+          "what": "mean time per output token, colocated to split",
+          "ours": "96% of baseline",
+          "theirs": "96% of baseline",
+          "deviation": {
+            "kind": "effect",
+            "ratio": 1.0007342350928439,
+            "directionMatches": true
+          },
+          "absDeviation": 0.0007342,
+          "deviationText": "ratio 1",
+          "tolerance": "effect ratio 0.67 to 1.5",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "lss-pd-disaggregation",
+          "check": "ttft-rises",
+          "reference": "llmservingsim",
+          "kind": "directional",
+          "group": "effects",
+          "what": "mean time to first token, colocated to split",
+          "ours": "130% of baseline",
+          "theirs": "89% of baseline",
+          "deviation": {
+            "kind": "effect",
+            "ratio": 1.4425664714211248,
+            "directionMatches": false
+          },
+          "absDeviation": 0.4426,
+          "deviationText": "ratio 1.44, direction differs",
+          "tolerance": "effect ratio 0.67 to 1.5",
+          "holds": false,
+          "cause": "LLMServingSim's time to first token ends at the prefill replica, before the hand-over",
+          "byDesign": false
+        },
+        {
+          "scenario": "lss-preemption-overflow",
+          "check": "preemption-count",
+          "reference": "llmservingsim",
+          "kind": "exact",
+          "group": "decisions",
+          "what": "preemptions",
+          "ours": "1",
+          "theirs": "1",
+          "deviation": {
+            "kind": "decisions",
+            "differing": 0,
+            "total": 1,
+            "share": 0,
+            "maxRelative": 0
+          },
+          "absDeviation": 0,
+          "deviationText": "0 of 1 differ (0%)",
+          "tolerance": "equal",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "lss-preemption-overflow",
+          "check": "both-complete",
+          "reference": "llmservingsim",
+          "kind": "exact",
+          "group": "decisions",
+          "what": "fate of each request",
+          "ours": "per request",
+          "theirs": "per request",
+          "deviation": {
+            "kind": "decisions",
+            "differing": 0,
+            "total": 2,
+            "share": 0,
+            "maxRelative": null
+          },
+          "absDeviation": 0,
+          "deviationText": "0 of 2 differ (0%)",
+          "tolerance": "equal",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "lss-prefix-cache",
+          "check": "cached-prefix-tokens",
+          "reference": "llmservingsim",
+          "kind": "exact",
+          "group": "decisions",
+          "what": "cached prefix tokens per request",
+          "ours": "per request",
+          "theirs": "per request",
+          "deviation": {
+            "kind": "decisions",
+            "differing": 0,
+            "total": 11,
+            "share": 0,
+            "maxRelative": 0
+          },
+          "absDeviation": 0,
+          "deviationText": "0 of 11 differ (0%)",
+          "tolerance": "equal",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "lss-routing-round-robin",
+          "check": "pod-sequence",
+          "reference": "llmservingsim",
+          "kind": "exact",
+          "group": "decisions",
+          "what": "pod chosen per request",
+          "ours": "per request",
+          "theirs": "per request",
+          "deviation": {
+            "kind": "decisions",
+            "differing": 0,
+            "total": 8,
+            "share": 0,
+            "maxRelative": null
+          },
+          "absDeviation": 0,
+          "deviationText": "0 of 8 differ (0%)",
+          "tolerance": "equal",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "lss-routing-round-robin",
+          "check": "requests-per-pod",
+          "reference": "llmservingsim",
+          "kind": "exact",
+          "group": "decisions",
+          "what": "requests per pod",
+          "ours": "4/4",
+          "theirs": "4/4",
+          "deviation": {
+            "kind": "decisions",
+            "differing": 0,
+            "total": 2,
+            "share": 0,
+            "maxRelative": 0
+          },
+          "absDeviation": 0,
+          "deviationText": "0 of 2 differ (0%)",
+          "tolerance": "equal",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "lss-spec-decoding",
+          "check": "tpot-falls",
+          "reference": "llmservingsim",
+          "kind": "directional",
+          "group": "effects",
+          "what": "mean time per output token, off to on",
+          "ours": "47% of baseline",
+          "theirs": "46% of baseline",
+          "deviation": {
+            "kind": "effect",
+            "ratio": 1.01878640975886,
+            "directionMatches": true
+          },
+          "absDeviation": 0.01879,
+          "deviationText": "ratio 1.02",
+          "tolerance": "effect ratio 0.75 to 1.33",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "lss-tiers-offload",
+          "check": "host-tier-hit-rate",
+          "reference": "llmservingsim",
+          "kind": "directional",
+          "group": "effects",
+          "what": "host-tier hit rate, gpu-only to with-dram",
+          "ours": "49.8%",
+          "theirs": "46.2%",
+          "deviation": {
+            "kind": "effect",
+            "ratio": 1.0795454545454546,
+            "directionMatches": true
+          },
+          "absDeviation": 0.07955,
+          "deviationText": "ratio 1.08",
+          "tolerance": "effect ratio 0.67 to 1.5",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "lss-tiers-offload",
+          "check": "follow-up-time-to-first-token",
+          "reference": "llmservingsim",
+          "kind": "directional",
+          "group": "effects",
+          "what": "mean time to first token of follow-up turns, gpu-only to with-dram",
+          "ours": "47% of baseline",
+          "theirs": "16% of baseline",
+          "deviation": {
+            "kind": "effect",
+            "ratio": 2.8652764777168165,
+            "directionMatches": true
+          },
+          "absDeviation": 1.865,
+          "deviationText": "ratio 2.87",
+          "tolerance": "effect ratio 0.75 to 1.33",
+          "holds": false,
+          "cause": "The model's fixed front-end tokenisation and slower host copy dominate a short reload",
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "prefix-hit-rate",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "capacity",
+          "what": "prefix-cache hit rate",
+          "ours": "0.0%",
+          "theirs": "1.9%",
+          "deviation": {
+            "kind": "relative",
+            "value": -1
+          },
+          "absDeviation": 1,
+          "deviationText": "-100.0%",
+          "tolerance": "5%",
+          "holds": false,
+          "cause": "The model has no token content, so it sees no prefix sharing",
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "preemptions",
+          "reference": "llmservingsim",
+          "kind": "exact",
+          "group": "decisions",
+          "what": "preemptions",
+          "ours": "184",
+          "theirs": "191",
+          "deviation": {
+            "kind": "decisions",
+            "differing": 1,
+            "total": 1,
+            "share": 1,
+            "maxRelative": 0.03664921465968586
+          },
+          "absDeviation": 1,
+          "deviationText": "1 of 1 differ (100%); largest 4%",
+          "tolerance": "equal",
+          "holds": false,
+          "cause": "Pool size, step speed and prefix hits all differ; not isolated",
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "default-ttft-mean",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings_defaults",
+          "what": "mean time to first token",
+          "ours": "135.1 s",
+          "theirs": "65.71 s",
+          "deviation": {
+            "kind": "relative",
+            "value": 1.0560143627547975
+          },
+          "absDeviation": 1.056,
+          "deviationText": "+105.6%",
+          "tolerance": "30%",
+          "holds": false,
+          "cause": "Queue wait compounds the slower service rate: the engine is saturated from the first requests",
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "default-ttft-p50",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings_defaults",
+          "what": "median time to first token",
+          "ours": "130.2 s",
+          "theirs": "60.47 s",
+          "deviation": {
+            "kind": "relative",
+            "value": 1.1525247345123393
+          },
+          "absDeviation": 1.153,
+          "deviationText": "+115.3%",
+          "tolerance": "30%",
+          "holds": false,
+          "cause": "Queue wait compounds the slower service rate: the engine is saturated from the first requests",
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "default-ttft-p99",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings_defaults",
+          "what": "99th percentile time to first token",
+          "ours": "274.1 s",
+          "theirs": "137.5 s",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.9924330638240095
+          },
+          "absDeviation": 0.9924,
+          "deviationText": "+99.2%",
+          "tolerance": "30%",
+          "holds": false,
+          "cause": "Queue wait compounds the slower service rate: the engine is saturated from the first requests",
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "default-tpot-mean",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings_defaults",
+          "what": "mean time per output token",
+          "ours": "51 ms",
+          "theirs": "33 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.5801461475935685
+          },
+          "absDeviation": 0.5801,
+          "deviationText": "+58.0%",
+          "tolerance": "12%",
+          "holds": false,
+          "cause": "The model's decode step is slower than the real engine's at default parameters, and the fit goes to a bound",
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "default-tpot-p50",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings_defaults",
+          "what": "median time per output token",
+          "ours": "49 ms",
+          "theirs": "31 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.5969495126446442
+          },
+          "absDeviation": 0.5969,
+          "deviationText": "+59.7%",
+          "tolerance": "12%",
+          "holds": false,
+          "cause": "The model's decode step is slower than the real engine's at default parameters, and the fit goes to a bound",
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "default-tpot-p99",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings_defaults",
+          "what": "99th percentile time per output token",
+          "ours": "87 ms",
+          "theirs": "57 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.5294362180184295
+          },
+          "absDeviation": 0.5294,
+          "deviationText": "+52.9%",
+          "tolerance": "20%",
+          "holds": false,
+          "cause": "The model's decode step is slower than the real engine's at default parameters, and the fit goes to a bound",
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "default-e2e-mean",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings_defaults",
+          "what": "mean end-to-end time",
+          "ours": "168.6 s",
+          "theirs": "86.87 s",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.9407190843485772
+          },
+          "absDeviation": 0.9407,
+          "deviationText": "+94.1%",
+          "tolerance": "15%",
+          "holds": false,
+          "cause": "End-to-end time is the queue wait plus a decode that is over half again too slow",
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "default-e2e-p50",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings_defaults",
+          "what": "median end-to-end time",
+          "ours": "161.6 s",
+          "theirs": "83.97 s",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.9247888511059419
+          },
+          "absDeviation": 0.9248,
+          "deviationText": "+92.5%",
+          "tolerance": "15%",
+          "holds": false,
+          "cause": "End-to-end time is the queue wait plus a decode that is over half again too slow",
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "default-e2e-p99",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings_defaults",
+          "what": "99th percentile end-to-end time",
+          "ours": "301.4 s",
+          "theirs": "154.1 s",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.9551482258492916
+          },
+          "absDeviation": 0.9551,
+          "deviationText": "+95.5%",
+          "tolerance": "20%",
+          "holds": false,
+          "cause": "End-to-end time is the queue wait plus a decode that is over half again too slow",
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "default-throughput",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings_defaults",
+          "what": "throughput",
+          "ours": "590 tok/s",
+          "theirs": "1,066 tok/s",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.44662034754517815
+          },
+          "absDeviation": 0.4466,
+          "deviationText": "-44.7%",
+          "tolerance": "10%",
+          "holds": false,
+          "cause": "Throughput follows the slower service rate",
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "fitted-ttft-mean",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "mean time to first token",
+          "ours": "97.29 s",
+          "theirs": "89.71 s",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.08453070249643568
+          },
+          "absDeviation": 0.08453,
+          "deviationText": "+8.5%",
+          "tolerance": "30%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "fitted-ttft-p50",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "median time to first token",
+          "ours": "98.88 s",
+          "theirs": "90.81 s",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.08884831364092233
+          },
+          "absDeviation": 0.08885,
+          "deviationText": "+8.9%",
+          "tolerance": "30%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "fitted-ttft-p99",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "99th percentile time to first token",
+          "ours": "145.1 s",
+          "theirs": "137.8 s",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.05340697178932026
+          },
+          "absDeviation": 0.05341,
+          "deviationText": "+5.3%",
+          "tolerance": "30%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "fitted-tpot-mean",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "mean time per output token",
+          "ours": "28 ms",
+          "theirs": "32 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.10983839460136553
+          },
+          "absDeviation": 0.1098,
+          "deviationText": "-11.0%",
+          "tolerance": "12%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "fitted-tpot-p50",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "median time per output token",
+          "ours": "28 ms",
+          "theirs": "31 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.08169109821080783
+          },
+          "absDeviation": 0.08169,
+          "deviationText": "-8.2%",
+          "tolerance": "12%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "fitted-tpot-p99",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "99th percentile time per output token",
+          "ours": "38 ms",
+          "theirs": "56 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.32646597974397806
+          },
+          "absDeviation": 0.3265,
+          "deviationText": "-32.6%",
+          "tolerance": "20%",
+          "holds": false,
+          "cause": "The real run has a heavier tail of per-token time than the model reproduces; not explained",
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "fitted-e2e-mean",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "mean end-to-end time",
+          "ours": "115.2 s",
+          "theirs": "109.8 s",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.049166323483079054
+          },
+          "absDeviation": 0.04917,
+          "deviationText": "+4.9%",
+          "tolerance": "15%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "fitted-e2e-p50",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "median end-to-end time",
+          "ours": "116 s",
+          "theirs": "110.6 s",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.049075590900576664
+          },
+          "absDeviation": 0.04908,
+          "deviationText": "+4.9%",
+          "tolerance": "15%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "fitted-e2e-p99",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "99th percentile end-to-end time",
+          "ours": "160.7 s",
+          "theirs": "154.2 s",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.0419980636059076
+          },
+          "absDeviation": 0.042,
+          "deviationText": "+4.2%",
+          "tolerance": "20%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "fitted-throughput",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "throughput",
+          "ours": "702 tok/s",
+          "theirs": "729 tok/s",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.03758722379493505
+          },
+          "absDeviation": 0.03759,
+          "deviationText": "-3.8%",
+          "tolerance": "10%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "preemptions",
+          "reference": "llmservingsim",
+          "kind": "exact",
+          "group": "decisions",
+          "what": "preemptions",
+          "ours": "0",
+          "theirs": "0",
+          "deviation": {
+            "kind": "decisions",
+            "differing": 0,
+            "total": 1,
+            "share": 0,
+            "maxRelative": null
+          },
+          "absDeviation": 0,
+          "deviationText": "0 of 1 differ (0%)",
+          "tolerance": "equal",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "prefix-hit-rate",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "capacity",
+          "what": "prefix-cache hit rate",
+          "ours": "0.0%",
+          "theirs": "7.6%",
+          "deviation": {
+            "kind": "relative",
+            "value": -1
+          },
+          "absDeviation": 1,
+          "deviationText": "-100.0%",
+          "tolerance": "5%",
+          "holds": false,
+          "cause": "The model has no token content, so it sees no prefix sharing",
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "default-ttft-mean",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings_defaults",
+          "what": "mean time to first token",
+          "ours": "14.58 s",
+          "theirs": "6,560 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 1.2242303938916101
+          },
+          "absDeviation": 1.224,
+          "deviationText": "+122.4%",
+          "tolerance": "30%",
+          "holds": false,
+          "cause": "Queue wait compounds the slower service rate: the engine is saturated after the first 100 requests",
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "default-ttft-p50",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings_defaults",
+          "what": "median time to first token",
+          "ours": "19.7 s",
+          "theirs": "8,390 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 1.3473545700207894
+          },
+          "absDeviation": 1.347,
+          "deviationText": "+134.7%",
+          "tolerance": "30%",
+          "holds": false,
+          "cause": "Queue wait compounds the slower service rate: the engine is saturated after the first 100 requests",
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "default-ttft-p99",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings_defaults",
+          "what": "99th percentile time to first token",
+          "ours": "39.75 s",
+          "theirs": "18.49 s",
+          "deviation": {
+            "kind": "relative",
+            "value": 1.150083032504316
+          },
+          "absDeviation": 1.15,
+          "deviationText": "+115.0%",
+          "tolerance": "30%",
+          "holds": false,
+          "cause": "Queue wait compounds the slower service rate: the engine is saturated after the first 100 requests",
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "default-tpot-mean",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings_defaults",
+          "what": "mean time per output token",
+          "ours": "48 ms",
+          "theirs": "32 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.5067378774203894
+          },
+          "absDeviation": 0.5067,
+          "deviationText": "+50.7%",
+          "tolerance": "12%",
+          "holds": false,
+          "cause": "The model's decode step is slower than the real engine's at default parameters, and the fit goes to a bound",
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "default-tpot-p50",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings_defaults",
+          "what": "median time per output token",
+          "ours": "49 ms",
+          "theirs": "33 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.5008584932376426
+          },
+          "absDeviation": 0.5009,
+          "deviationText": "+50.1%",
+          "tolerance": "12%",
+          "holds": false,
+          "cause": "The model's decode step is slower than the real engine's at default parameters, and the fit goes to a bound",
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "default-tpot-p99",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings_defaults",
+          "what": "99th percentile time per output token",
+          "ours": "53 ms",
+          "theirs": "37 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.4511228337695294
+          },
+          "absDeviation": 0.4511,
+          "deviationText": "+45.1%",
+          "tolerance": "20%",
+          "holds": false,
+          "cause": "The model's decode step is slower than the real engine's at default parameters, and the fit goes to a bound",
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "default-e2e-mean",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings_defaults",
+          "what": "mean end-to-end time",
+          "ours": "45.48 s",
+          "theirs": "27.03 s",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.6823096768217134
+          },
+          "absDeviation": 0.6823,
+          "deviationText": "+68.2%",
+          "tolerance": "15%",
+          "holds": false,
+          "cause": "End-to-end time is the queue wait plus a decode that is half again too slow",
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "default-e2e-p50",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings_defaults",
+          "what": "median end-to-end time",
+          "ours": "49.25 s",
+          "theirs": "28.43 s",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.7320624947938327
+          },
+          "absDeviation": 0.7321,
+          "deviationText": "+73.2%",
+          "tolerance": "15%",
+          "holds": false,
+          "cause": "End-to-end time is the queue wait plus a decode that is half again too slow",
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "default-e2e-p99",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings_defaults",
+          "what": "99th percentile end-to-end time",
+          "ours": "62.34 s",
+          "theirs": "36.09 s",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.7271868587878622
+          },
+          "absDeviation": 0.7272,
+          "deviationText": "+72.7%",
+          "tolerance": "20%",
+          "holds": false,
+          "cause": "End-to-end time is the queue wait plus a decode that is half again too slow",
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "default-throughput",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings_defaults",
+          "what": "throughput",
+          "ours": "2,067 tok/s",
+          "theirs": "3,070 tok/s",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.3268220996554746
+          },
+          "absDeviation": 0.3268,
+          "deviationText": "-32.7%",
+          "tolerance": "10%",
+          "holds": false,
+          "cause": "Throughput follows the slower service rate",
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "fitted-ttft-mean",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "mean time to first token",
+          "ours": "8,360 ms",
+          "theirs": "9,760 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.1433092713818969
+          },
+          "absDeviation": 0.1433,
+          "deviationText": "-14.3%",
+          "tolerance": "30%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "fitted-ttft-p50",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "median time to first token",
+          "ours": "8,960 ms",
+          "theirs": "10.3 s",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.13038451332987178
+          },
+          "absDeviation": 0.1304,
+          "deviationText": "-13.0%",
+          "tolerance": "30%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "fitted-ttft-p99",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "99th percentile time to first token",
+          "ours": "15.67 s",
+          "theirs": "18.52 s",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.1537862343031766
+          },
+          "absDeviation": 0.1538,
+          "deviationText": "-15.4%",
+          "tolerance": "30%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "fitted-tpot-mean",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "mean time per output token",
+          "ours": "30 ms",
+          "theirs": "32 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.054778694559703855
+          },
+          "absDeviation": 0.05478,
+          "deviationText": "-5.5%",
+          "tolerance": "12%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "fitted-tpot-p50",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "median time per output token",
+          "ours": "31 ms",
+          "theirs": "33 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.06363534344356404
+          },
+          "absDeviation": 0.06364,
+          "deviationText": "-6.4%",
+          "tolerance": "12%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "fitted-tpot-p99",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "99th percentile time per output token",
+          "ours": "33 ms",
+          "theirs": "37 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.09256162017280047
+          },
+          "absDeviation": 0.09256,
+          "deviationText": "-9.3%",
+          "tolerance": "20%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "fitted-e2e-mean",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "mean end-to-end time",
+          "ours": "27.18 s",
+          "theirs": "29.64 s",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.08308808254951223
+          },
+          "absDeviation": 0.08309,
+          "deviationText": "-8.3%",
+          "tolerance": "15%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "fitted-e2e-p50",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "median end-to-end time",
+          "ours": "27.31 s",
+          "theirs": "30.17 s",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.09480766153137327
+          },
+          "absDeviation": 0.09481,
+          "deviationText": "-9.5%",
+          "tolerance": "15%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "fitted-e2e-p99",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "99th percentile end-to-end time",
+          "ours": "33.3 s",
+          "theirs": "36.13 s",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.07833049334686457
+          },
+          "absDeviation": 0.07833,
+          "deviationText": "-7.8%",
+          "tolerance": "20%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "fitted-throughput",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "throughput",
+          "ours": "2,376 tok/s",
+          "theirs": "2,329 tok/s",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.0203127988281151
+          },
+          "absDeviation": 0.02031,
+          "deviationText": "+2.0%",
+          "tolerance": "10%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-burst",
+          "check": "default-ttft-mean",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings_defaults",
+          "what": "mean time to first token",
+          "ours": "1,940 ms",
+          "theirs": "1,180 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.6381375958824127
+          },
+          "absDeviation": 0.6381,
+          "deviationText": "+63.8%",
+          "tolerance": "30%",
+          "holds": false,
+          "cause": "Front-end tokenisation LLMServingSim lacks, and prefill priced at default MFU",
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-burst",
+          "check": "default-tpot-mean",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings_defaults",
+          "what": "mean time per output token",
+          "ours": "33 ms",
+          "theirs": "21 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.6033320335395609
+          },
+          "absDeviation": 0.6033,
+          "deviationText": "+60.3%",
+          "tolerance": "12%",
+          "holds": false,
+          "cause": "Default memory-bandwidth utilisation makes the model's decode step 60 percent slower than profiled kernels",
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-burst",
+          "check": "default-e2e-mean",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings_defaults",
+          "what": "mean end-to-end time",
+          "ours": "8,490 ms",
+          "theirs": "5,270 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.6111415408085855
+          },
+          "absDeviation": 0.6111,
+          "deviationText": "+61.1%",
+          "tolerance": "15%",
+          "holds": false,
+          "cause": "End-to-end time follows the slower default decode step",
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-burst",
+          "check": "default-throughput",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings_defaults",
+          "what": "throughput",
+          "ours": "749 tok/s",
+          "theirs": "1,207 tok/s",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.37937226713182753
+          },
+          "absDeviation": 0.3794,
+          "deviationText": "-37.9%",
+          "tolerance": "10%",
+          "holds": false,
+          "cause": "Throughput follows the slower default decode step",
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-burst",
+          "check": "fitted-ttft-mean",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "mean time to first token",
+          "ours": "1,170 ms",
+          "theirs": "1,180 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.0067425568690754325
+          },
+          "absDeviation": 0.006743,
+          "deviationText": "-0.7%",
+          "tolerance": "30%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-burst",
+          "check": "fitted-tpot-mean",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "mean time per output token",
+          "ours": "20 ms",
+          "theirs": "21 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.010693530767389737
+          },
+          "absDeviation": 0.01069,
+          "deviationText": "-1.1%",
+          "tolerance": "12%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-burst",
+          "check": "fitted-e2e-mean",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "mean end-to-end time",
+          "ours": "5,220 ms",
+          "theirs": "5,270 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.009807029952530345
+          },
+          "absDeviation": 0.009807,
+          "deviationText": "-1.0%",
+          "tolerance": "15%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-burst",
+          "check": "fitted-throughput",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "throughput",
+          "ours": "1,219 tok/s",
+          "theirs": "1,207 tok/s",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.009939734821019952
+          },
+          "absDeviation": 0.00994,
+          "deviationText": "+1.0%",
+          "tolerance": "10%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-chat",
+          "check": "default-ttft-mean",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings_defaults",
+          "what": "mean time to first token",
+          "ours": "150 ms",
+          "theirs": "85 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.7610524277376409
+          },
+          "absDeviation": 0.7611,
+          "deviationText": "+76.1%",
+          "tolerance": "30%",
+          "holds": false,
+          "cause": "Front-end tokenisation LLMServingSim lacks, and prefill priced at default MFU",
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-chat",
+          "check": "default-tpot-mean",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings_defaults",
+          "what": "mean time per output token",
+          "ours": "20 ms",
+          "theirs": "12 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.669484285253536
+          },
+          "absDeviation": 0.6695,
+          "deviationText": "+66.9%",
+          "tolerance": "12%",
+          "holds": false,
+          "cause": "Default memory-bandwidth utilisation makes the model's decode step 60 percent slower than profiled kernels",
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-chat",
+          "check": "default-e2e-mean",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings_defaults",
+          "what": "mean end-to-end time",
+          "ours": "3,910 ms",
+          "theirs": "2,320 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.6832882160372966
+          },
+          "absDeviation": 0.6833,
+          "deviationText": "+68.3%",
+          "tolerance": "15%",
+          "holds": false,
+          "cause": "End-to-end time follows the slower default decode step",
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-chat",
+          "check": "default-throughput",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings_defaults",
+          "what": "throughput",
+          "ours": "136 tok/s",
+          "theirs": "144 tok/s",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.055264443385344586
+          },
+          "absDeviation": 0.05526,
+          "deviationText": "-5.5%",
+          "tolerance": "10%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-chat",
+          "check": "fitted-ttft-mean",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "mean time to first token",
+          "ours": "104 ms",
+          "theirs": "85 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.22060063050782555
+          },
+          "absDeviation": 0.2206,
+          "deviationText": "+22.1%",
+          "tolerance": "30%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-chat",
+          "check": "fitted-tpot-mean",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "mean time per output token",
+          "ours": "11 ms",
+          "theirs": "12 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.04865262740906494
+          },
+          "absDeviation": 0.04865,
+          "deviationText": "-4.9%",
+          "tolerance": "12%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-chat",
+          "check": "fitted-e2e-mean",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "mean end-to-end time",
+          "ours": "2,230 ms",
+          "theirs": "2,320 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.04208239078425449
+          },
+          "absDeviation": 0.04208,
+          "deviationText": "-4.2%",
+          "tolerance": "15%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-chat",
+          "check": "fitted-throughput",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "throughput",
+          "ours": "145 tok/s",
+          "theirs": "144 tok/s",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.004395406518649406
+          },
+          "absDeviation": 0.004395,
+          "deviationText": "+0.4%",
+          "tolerance": "10%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-isolated",
+          "check": "default-ttft-mean",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings_defaults",
+          "what": "mean time to first token",
+          "ours": "232 ms",
+          "theirs": "121 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.915442956601643
+          },
+          "absDeviation": 0.9154,
+          "deviationText": "+91.5%",
+          "tolerance": "30%",
+          "holds": false,
+          "cause": "Front-end tokenisation LLMServingSim lacks, and prefill priced at default MFU",
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-isolated",
+          "check": "default-tpot-mean",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings_defaults",
+          "what": "mean time per output token",
+          "ours": "19 ms",
+          "theirs": "12 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.6170890127141773
+          },
+          "absDeviation": 0.6171,
+          "deviationText": "+61.7%",
+          "tolerance": "12%",
+          "holds": false,
+          "cause": "Default memory-bandwidth utilisation makes the model's decode step 60 percent slower than profiled kernels",
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-isolated",
+          "check": "default-e2e-mean",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings_defaults",
+          "what": "mean end-to-end time",
+          "ours": "3,950 ms",
+          "theirs": "2,420 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.6320369312272545
+          },
+          "absDeviation": 0.632,
+          "deviationText": "+63.2%",
+          "tolerance": "15%",
+          "holds": false,
+          "cause": "End-to-end time follows the slower default decode step",
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-isolated",
+          "check": "default-throughput",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings_defaults",
+          "what": "throughput",
+          "ours": "16 tok/s",
+          "theirs": "17 tok/s",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.03334121953361707
+          },
+          "absDeviation": 0.03334,
+          "deviationText": "-3.3%",
+          "tolerance": "10%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-isolated",
+          "check": "fitted-ttft-mean",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "mean time to first token",
+          "ours": "157 ms",
+          "theirs": "121 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.290560657352262
+          },
+          "absDeviation": 0.2906,
+          "deviationText": "+29.1%",
+          "tolerance": "30%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-isolated",
+          "check": "fitted-tpot-mean",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "mean time per output token",
+          "ours": "11 ms",
+          "theirs": "12 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.04931810480800996
+          },
+          "absDeviation": 0.04932,
+          "deviationText": "-4.9%",
+          "tolerance": "12%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-isolated",
+          "check": "fitted-e2e-mean",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "mean end-to-end time",
+          "ours": "2,340 ms",
+          "theirs": "2,420 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.032289739186627454
+          },
+          "absDeviation": 0.03229,
+          "deviationText": "-3.2%",
+          "tolerance": "15%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-isolated",
+          "check": "fitted-throughput",
+          "reference": "llmservingsim",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "throughput",
+          "ours": "17 tok/s",
+          "theirs": "17 tok/s",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.00195761722639222
+          },
+          "absDeviation": 0.001958,
+          "deviationText": "+0.2%",
+          "tolerance": "10%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        }
+      ],
+      "verified": [
+        "admission/on-demand",
+        "batching/continuous",
+        "cost/flops-per-token",
+        "cost/host-overhead",
+        "cost/kv-bytes-per-token",
+        "cost/roofline",
+        "decoding/autoregressive",
+        "decoding/speculative",
+        "disaggregation/decode-first-threshold",
+        "engine/chunked-prefill",
+        "kvcache/block-hash",
+        "kvcache/hbm-dram-ssd-remote",
+        "kvcache/paged-blocks",
+        "kvcache/recompute-newest",
+        "routing/round-robin"
+      ],
+      "knownDifferences": [
+        {
+          "scenario": "lss-kv-budget-8b-rtx-pro-6000",
+          "check": "kv-blocks-per-replica",
+          "kind": "capacity",
+          "claim": "One replica holds the same number of KV blocks as LLMServingSim derives from the same memory utilisation, to within 0.1 percent."
+        },
+        {
+          "scenario": "lss-pd-disaggregation",
+          "check": "ttft-rises",
+          "kind": "directional",
+          "claim": "Splitting prefill from decode raises the mean time to first token (the hand-over and a second queue)."
+        },
+        {
+          "scenario": "lss-tiers-offload",
+          "check": "follow-up-time-to-first-token",
+          "kind": "directional",
+          "claim": "A follow-up's time to first token falls when its history is reloaded from host memory instead of recomputed."
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "prefix-hit-rate",
+          "kind": "calibrated",
+          "claim": "The share of prompt tokens served from the prefix cache agrees with the real engine's."
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "preemptions",
+          "kind": "exact",
+          "claim": "LLMServingSim and the model preempt the same number of times in this run (the real engine did not record its preemptions)."
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "default-ttft-mean",
+          "kind": "calibrated",
+          "claim": "Mean time to first token over all 300 requests, the site's default parameters agrees with the measured run."
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "default-ttft-p50",
+          "kind": "calibrated",
+          "claim": "Median time to first token over all 300 requests, the site's default parameters agrees with the measured run."
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "default-ttft-p99",
+          "kind": "calibrated",
+          "claim": "99th-percentile time to first token over all 300 requests, the site's default parameters agrees with the measured run."
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "default-tpot-mean",
+          "kind": "calibrated",
+          "claim": "Mean time per output token over all 300 requests, the site's default parameters agrees with the measured run."
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "default-tpot-p50",
+          "kind": "calibrated",
+          "claim": "Median time per output token over all 300 requests, the site's default parameters agrees with the measured run."
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "default-tpot-p99",
+          "kind": "calibrated",
+          "claim": "99th-percentile time per output token over all 300 requests, the site's default parameters agrees with the measured run."
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "default-e2e-mean",
+          "kind": "calibrated",
+          "claim": "Mean end-to-end time over all 300 requests, the site's default parameters agrees with the measured run."
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "default-e2e-p50",
+          "kind": "calibrated",
+          "claim": "Median end-to-end time over all 300 requests, the site's default parameters agrees with the measured run."
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "default-e2e-p99",
+          "kind": "calibrated",
+          "claim": "99th-percentile end-to-end time over all 300 requests, the site's default parameters agrees with the measured run."
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "default-throughput",
+          "kind": "calibrated",
+          "claim": "Output tokens per second from the first arrival to the last completion over all 300 requests, the site's default parameters agrees with the measured run."
+        },
+        {
+          "scenario": "measured-8b-rtx-4090",
+          "check": "fitted-tpot-p99",
+          "kind": "calibrated",
+          "claim": "99th-percentile time per output token over the 200 held-out requests, parameters fitted to the first 100 agrees with the measured run."
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "prefix-hit-rate",
+          "kind": "calibrated",
+          "claim": "The share of prompt tokens served from the prefix cache agrees with the real engine's."
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "default-ttft-mean",
+          "kind": "calibrated",
+          "claim": "Mean time to first token over all 300 requests, the site's default parameters agrees with the measured run."
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "default-ttft-p50",
+          "kind": "calibrated",
+          "claim": "Median time to first token over all 300 requests, the site's default parameters agrees with the measured run."
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "default-ttft-p99",
+          "kind": "calibrated",
+          "claim": "99th-percentile time to first token over all 300 requests, the site's default parameters agrees with the measured run."
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "default-tpot-mean",
+          "kind": "calibrated",
+          "claim": "Mean time per output token over all 300 requests, the site's default parameters agrees with the measured run."
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "default-tpot-p50",
+          "kind": "calibrated",
+          "claim": "Median time per output token over all 300 requests, the site's default parameters agrees with the measured run."
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "default-tpot-p99",
+          "kind": "calibrated",
+          "claim": "99th-percentile time per output token over all 300 requests, the site's default parameters agrees with the measured run."
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "default-e2e-mean",
+          "kind": "calibrated",
+          "claim": "Mean end-to-end time over all 300 requests, the site's default parameters agrees with the measured run."
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "default-e2e-p50",
+          "kind": "calibrated",
+          "claim": "Median end-to-end time over all 300 requests, the site's default parameters agrees with the measured run."
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "default-e2e-p99",
+          "kind": "calibrated",
+          "claim": "99th-percentile end-to-end time over all 300 requests, the site's default parameters agrees with the measured run."
+        },
+        {
+          "scenario": "measured-8b-rtx-pro-6000",
+          "check": "default-throughput",
+          "kind": "calibrated",
+          "claim": "Output tokens per second from the first arrival to the last completion over all 300 requests, the site's default parameters agrees with the measured run."
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-burst",
+          "check": "default-ttft-mean",
+          "kind": "calibrated",
+          "claim": "Mean time to first token, the site's default parameters (no fit), agrees with LLMServingSim."
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-burst",
+          "check": "default-tpot-mean",
+          "kind": "calibrated",
+          "claim": "Mean time per output token, the site's default parameters (no fit), agrees with LLMServingSim."
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-burst",
+          "check": "default-e2e-mean",
+          "kind": "calibrated",
+          "claim": "Mean end-to-end time, the site's default parameters (no fit), agrees with LLMServingSim."
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-burst",
+          "check": "default-throughput",
+          "kind": "calibrated",
+          "claim": "Output tokens per second over the run, the site's default parameters (no fit), agrees with LLMServingSim."
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-chat",
+          "check": "default-ttft-mean",
+          "kind": "calibrated",
+          "claim": "Mean time to first token, the site's default parameters (no fit), agrees with LLMServingSim."
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-chat",
+          "check": "default-tpot-mean",
+          "kind": "calibrated",
+          "claim": "Mean time per output token, the site's default parameters (no fit), agrees with LLMServingSim."
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-chat",
+          "check": "default-e2e-mean",
+          "kind": "calibrated",
+          "claim": "Mean end-to-end time, the site's default parameters (no fit), agrees with LLMServingSim."
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-isolated",
+          "check": "default-ttft-mean",
+          "kind": "calibrated",
+          "claim": "Mean time to first token, the site's default parameters (no fit), agrees with LLMServingSim."
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-isolated",
+          "check": "default-tpot-mean",
+          "kind": "calibrated",
+          "claim": "Mean time per output token, the site's default parameters (no fit), agrees with LLMServingSim."
+        },
+        {
+          "scenario": "timing-lss-8b-rtx-pro-6000-isolated",
+          "check": "default-e2e-mean",
+          "kind": "calibrated",
+          "claim": "Mean end-to-end time, the site's default parameters (no fit), agrees with LLMServingSim."
+        }
+      ]
     }
   },
   "crossReference": {
-    "checks": 0,
-    "byAgreement": {},
-    "entries": []
+    "checks": 43,
+    "byAgreement": {
+      "typescript_differs": 22,
+      "all_agree": 20,
+      "references_disagree_outside": 1
+    },
+    "entries": [
+      {
+        "scenario": "measured-8b-rtx-4090",
+        "check": "default-ttft-mean",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "typescript_differs"
+      },
+      {
+        "scenario": "measured-8b-rtx-4090",
+        "check": "default-ttft-p50",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "typescript_differs"
+      },
+      {
+        "scenario": "measured-8b-rtx-4090",
+        "check": "default-ttft-p99",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "typescript_differs"
+      },
+      {
+        "scenario": "measured-8b-rtx-4090",
+        "check": "default-tpot-mean",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "typescript_differs"
+      },
+      {
+        "scenario": "measured-8b-rtx-4090",
+        "check": "default-tpot-p50",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "typescript_differs"
+      },
+      {
+        "scenario": "measured-8b-rtx-4090",
+        "check": "default-tpot-p99",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "typescript_differs"
+      },
+      {
+        "scenario": "measured-8b-rtx-4090",
+        "check": "default-e2e-mean",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "typescript_differs"
+      },
+      {
+        "scenario": "measured-8b-rtx-4090",
+        "check": "default-e2e-p50",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "typescript_differs"
+      },
+      {
+        "scenario": "measured-8b-rtx-4090",
+        "check": "default-e2e-p99",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "typescript_differs"
+      },
+      {
+        "scenario": "measured-8b-rtx-4090",
+        "check": "default-throughput",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "typescript_differs"
+      },
+      {
+        "scenario": "measured-8b-rtx-4090",
+        "check": "fitted-ttft-mean",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "all_agree"
+      },
+      {
+        "scenario": "measured-8b-rtx-4090",
+        "check": "fitted-ttft-p50",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "all_agree"
+      },
+      {
+        "scenario": "measured-8b-rtx-4090",
+        "check": "fitted-ttft-p99",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "all_agree"
+      },
+      {
+        "scenario": "measured-8b-rtx-4090",
+        "check": "fitted-tpot-mean",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "all_agree"
+      },
+      {
+        "scenario": "measured-8b-rtx-4090",
+        "check": "fitted-tpot-p50",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "all_agree"
+      },
+      {
+        "scenario": "measured-8b-rtx-4090",
+        "check": "fitted-tpot-p99",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "typescript_differs"
+      },
+      {
+        "scenario": "measured-8b-rtx-4090",
+        "check": "fitted-e2e-mean",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "all_agree"
+      },
+      {
+        "scenario": "measured-8b-rtx-4090",
+        "check": "fitted-e2e-p50",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "all_agree"
+      },
+      {
+        "scenario": "measured-8b-rtx-4090",
+        "check": "fitted-e2e-p99",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "all_agree"
+      },
+      {
+        "scenario": "measured-8b-rtx-4090",
+        "check": "fitted-throughput",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "all_agree"
+      },
+      {
+        "scenario": "measured-8b-rtx-pro-6000",
+        "check": "kv-blocks-per-replica",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "references_disagree_outside"
+      },
+      {
+        "scenario": "measured-8b-rtx-pro-6000",
+        "check": "preemptions",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "all_agree"
+      },
+      {
+        "scenario": "measured-8b-rtx-pro-6000",
+        "check": "prefix-hit-rate",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "typescript_differs"
+      },
+      {
+        "scenario": "measured-8b-rtx-pro-6000",
+        "check": "default-ttft-mean",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "typescript_differs"
+      },
+      {
+        "scenario": "measured-8b-rtx-pro-6000",
+        "check": "default-ttft-p50",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "typescript_differs"
+      },
+      {
+        "scenario": "measured-8b-rtx-pro-6000",
+        "check": "default-ttft-p99",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "typescript_differs"
+      },
+      {
+        "scenario": "measured-8b-rtx-pro-6000",
+        "check": "default-tpot-mean",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "typescript_differs"
+      },
+      {
+        "scenario": "measured-8b-rtx-pro-6000",
+        "check": "default-tpot-p50",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "typescript_differs"
+      },
+      {
+        "scenario": "measured-8b-rtx-pro-6000",
+        "check": "default-tpot-p99",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "typescript_differs"
+      },
+      {
+        "scenario": "measured-8b-rtx-pro-6000",
+        "check": "default-e2e-mean",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "typescript_differs"
+      },
+      {
+        "scenario": "measured-8b-rtx-pro-6000",
+        "check": "default-e2e-p50",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "typescript_differs"
+      },
+      {
+        "scenario": "measured-8b-rtx-pro-6000",
+        "check": "default-e2e-p99",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "typescript_differs"
+      },
+      {
+        "scenario": "measured-8b-rtx-pro-6000",
+        "check": "default-throughput",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "typescript_differs"
+      },
+      {
+        "scenario": "measured-8b-rtx-pro-6000",
+        "check": "fitted-ttft-mean",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "all_agree"
+      },
+      {
+        "scenario": "measured-8b-rtx-pro-6000",
+        "check": "fitted-ttft-p50",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "all_agree"
+      },
+      {
+        "scenario": "measured-8b-rtx-pro-6000",
+        "check": "fitted-ttft-p99",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "all_agree"
+      },
+      {
+        "scenario": "measured-8b-rtx-pro-6000",
+        "check": "fitted-tpot-mean",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "all_agree"
+      },
+      {
+        "scenario": "measured-8b-rtx-pro-6000",
+        "check": "fitted-tpot-p50",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "all_agree"
+      },
+      {
+        "scenario": "measured-8b-rtx-pro-6000",
+        "check": "fitted-tpot-p99",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "all_agree"
+      },
+      {
+        "scenario": "measured-8b-rtx-pro-6000",
+        "check": "fitted-e2e-mean",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "all_agree"
+      },
+      {
+        "scenario": "measured-8b-rtx-pro-6000",
+        "check": "fitted-e2e-p50",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "all_agree"
+      },
+      {
+        "scenario": "measured-8b-rtx-pro-6000",
+        "check": "fitted-e2e-p99",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "all_agree"
+      },
+      {
+        "scenario": "measured-8b-rtx-pro-6000",
+        "check": "fitted-throughput",
+        "references": [
+          "vllm-measured",
+          "llmservingsim"
+        ],
+        "agreement": "all_agree"
+      }
+    ]
   },
   "approaches": {
     "total": 27,
