@@ -12,6 +12,7 @@ export { createWorld, livePods, podLoad, replicaSpec } from "./core/world.js";
 export { GPUS, MODELS, type GpuSpec, type ModelSpec, type Precision, type ReplicaSpec } from "./hardware/catalog.js";
 export { attnFlops, flopsPerToken, recomputeRatio, seqLoad } from "./cost/flops.js";
 export { kvBytesPerToken, maxBatch, memoryBudget, weightBytes, type MemoryBudget } from "./cost/memory.js";
+export { MAX_MEM_UTIL, TIGHT_REQUESTS, fitOf, fitsWith, fixesFor, type Fit, type Fix, type FixKind } from "./cost/fit.js";
 export { ridge, stepCost, type StepCost, type StepLoad } from "./cost/roofline.js";
 export { decodeCurve } from "./cost/throughput.js";
 

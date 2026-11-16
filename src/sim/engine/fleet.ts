@@ -70,18 +70,25 @@ export function requeue(w: World, r: Req): void {
 
 /** Tear down every pod (model, GPU or memory settings changed). In-flight requests go back to the gateway. */
 export function restartFleet(w: World): void {
+  let requeued = 0;
   for (const pod of w.pods) {
-    for (const id of [...pod.running, ...pod.waiting]) requeue(w, w.reqs.get(id)!);
+    for (const id of [...pod.running, ...pod.waiting]) {
+      requeue(w, w.reqs.get(id)!);
+      requeued++;
+    }
     pod.running = [];
     pod.waiting = [];
     pod.plan = null;
     if (pod.state !== "terminated") setPodState(w, pod, "terminated");
   }
   for (const r of w.reqs.values()) {
-    if (r.stage === "toPod" || r.stage === "transfer" || r.stage === "handoff") requeue(w, r);
+    if (r.stage === "toPod" || r.stage === "transfer" || r.stage === "handoff") {
+      requeue(w, r);
+      requeued++;
+    }
   }
   w.handoff = [];
-  emit(w, "fleet.restart");
+  emit(w, "fleet.restart", { requeued });
 }
 
 /** Scale up to the autoscaler's target at once; scale down pods that have been idle long enough. */
