@@ -69,7 +69,9 @@ _Where:_ Dive-in panel of a pod, group "Roofline and throughput", below the thro
 ### text
 A step cannot run faster than its arithmetic allows or than its data can arrive [@williams2009]:
 
-$$t_{\text{step}} = \max\!\left(\frac{\text{FLOPs}}{\text{peak FLOP/s}},\ \frac{\text{bytes read}}{\text{memory bandwidth}}\right)$$
+$$t_{\text{GPU}} = \max\!\left(\frac{\text{FLOPs}}{\text{peak FLOP/s} \cdot \text{MFU}},\ \frac{\text{bytes read}}{\text{bandwidth} \cdot \text{MBU}}\right) + t_{\text{all-reduce}} + t_{\text{launch}}$$
+
+Memory and arithmetic overlap inside a GPU, so they take the larger. What a roofline leaves out is added: on several GPUs the all-reduces of tensor parallelism (two per layer, they do not overlap the matrix products), and the time to launch each layer's kernels, which is much larger for a step too big to be replayed from a captured CUDA graph [@shoeybi2019]. Host time then adds to this or, with overlap, hides behind it.
 
 The ridge is the arithmetic intensity (FLOPs per byte read) where the two terms are equal, $\text{peak FLOP/s} \div \text{bandwidth}$. Decode reads {weights} of weights to make one token per sequence, so it sits left of the ridge at any batch: throughput is set by bandwidth and context length, not FLOPs. Prefill does thousands of FLOPs per byte and runs at the flat roof.
 
