@@ -1,0 +1,21 @@
+id: calib-70b-h200-tp8-batch4
+title: Calibration data, four sequences decoding together, Llama 3.1 70B on eight H200s
+role: calibration
+# Four requests 80 ms apart (BLIS queues requests through a tokeniser pool, so simultaneous arrivals reach its engine one after another and the TypeScript model's front end has no such queue): the batch grows to 4 and then decodes together.
+model: llama-70b
+gpu: h200
+engine:
+  tp: 8
+  gpu_memory_utilisation: 0.9
+  max_num_seqs: 64
+  max_num_batched_tokens: 8192
+  block_size: 16
+  prefix_caching: true
+replicas: 1
+routing: round-robin
+requests:
+  - { session: 1, at: 1.00, turns: [[1000, 300]] }
+  - { session: 2, at: 1.08, turns: [[1000, 300]] }
+  - { session: 3, at: 1.16, turns: [[1000, 300]] }
+  - { session: 4, at: 1.24, turns: [[1000, 300]] }
+checks: []
