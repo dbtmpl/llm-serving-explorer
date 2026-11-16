@@ -21,6 +21,7 @@ import path from "node:path";
 import { CONCEPTS } from "../src/sim/catalog.js";
 import { isVerifiable } from "../src/sim/verification.js";
 import type { Agreement, Classification } from "./compare.js";
+import { rowOf, summariseDeviations, type CheckRow, type DeviationSummary } from "./deviation.js";
 import { REFERENCES, referencesOf } from "./refs/index.js";
 import { CONFORMANCE_DIR, loadScenario, scenarioIds, type Check } from "./scenario.js";
 import { compareScenario } from "./suite.js";
@@ -55,6 +56,9 @@ export interface ReferenceSummary {
     disputed: number;
   };
   headline: { definition: string; agree: number; total: number; share: number; knownDifferences: number };
+  /** How far the model is from this reference: the distribution of the deviations, and the deviation of every check. */
+  deviations: DeviationSummary;
+  rows: CheckRow[];
   /** Approaches (`module/id`) named by at least one scenario this reference covers. */
   verified: string[];
   knownDifferences: KnownDifferenceEntry[];
@@ -87,7 +91,7 @@ function approachScenarios(): Map<string, readonly string[]> {
 }
 
 export function buildSummary(): Summary {
-  const empty = (): ReferenceSummary["checks"]["byKind"] => ({ exact: { total: 0 }, calibrated: { total: 0 }, directional: { total: 0 } });
+  const empty = (): ReferenceSummary["checks"]["byKind"] => ({ exact: { total: 0 }, capacity: { total: 0 }, calibrated: { total: 0 }, directional: { total: 0 } });
   const refs: Record<string, ReferenceSummary> = {};
   const covered: Record<string, Set<string>> = {};
   for (const r of REFERENCES) {
@@ -99,6 +103,8 @@ export function buildSummary(): Summary {
       scenarios: { total: 0, calibration: 0, withChecks: 0 },
       checks: { total: 0, byKind: empty(), agree: 0, knownDifferences: 0, disputed: 0 },
       headline: { definition: headlineDefinition(r.name), agree: 0, total: 0, share: 0, knownDifferences: 0 },
+      deviations: summariseDeviations([]),
+      rows: [],
       verified: [],
       knownDifferences: []
     };
@@ -133,6 +139,7 @@ export function buildSummary(): Summary {
           sum.checks.disputed++;
           continue;
         }
+        sum.rows.push(rowOf(id, c, ref));
         const k = sum.checks.byKind[c.check.kind];
         k.total++;
         k[o.classification] = (k[o.classification] ?? 0) + 1;
@@ -157,6 +164,7 @@ export function buildSummary(): Summary {
   for (const sum of Object.values(refs)) {
     sum.checks.agree = sum.checks.total - sum.checks.knownDifferences;
     sum.headline = { ...sum.headline, agree: sum.checks.agree, total: sum.checks.total, share: sum.checks.total ? Math.round((sum.checks.agree / sum.checks.total) * 1e4) / 1e4 : 0, knownDifferences: sum.checks.knownDifferences };
+    sum.deviations = summariseDeviations(sum.rows);
     sum.verified = [...named].filter(([, ids]) => ids.some((s) => covered[sum.id]!.has(s))).map(([a]) => a).sort();
   }
   return {

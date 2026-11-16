@@ -5,6 +5,7 @@
  */
 import { loadFitted } from "./calibration/fitted.js";
 import { REFERENCES, referenceById } from "./refs/index.js";
+import { GROUPS, GROUP_LABEL, type Distribution } from "./deviation.js";
 import { loadScenario, scenarioIds, SPAN } from "./scenario.js";
 import type { ReferenceSummary, Summary } from "./summary.js";
 
@@ -13,17 +14,44 @@ const pct = (x: number): string => `${(x * 100).toFixed(1)} percent`;
 /** `Check -> text`: the sentence that names a recorded value pair, with the references' real names. */
 const nameOf = (id: string): string => (id === "typescript" ? "TypeScript" : id === SPAN ? "span" : referenceById(id).name);
 
+const fmtPct = (x: number | null): string => (x === null ? "unbounded" : x === 0 ? "0%" : x * 100 < 0.1 ? `${(x * 100).toPrecision(1)}%` : `${(x * 100).toFixed(1)}%`);
+
+/** The table of distributions: one row per group, then all groups together. */
+function distributionTable(r: ReferenceSummary): string[] {
+  const d = r.deviations;
+  const row = (label: string, g: Distribution) => `| ${label} | ${g.n} | ${fmtPct(g.median)} | ${fmtPct(g.max)} | ${g.within["1"]} | ${g.within["5"]} | ${g.within["10"]} | ${g.within["25"]} |`;
+  return [
+    "| Group | Comparisons | Median deviation | Largest deviation | Within 1% | Within 5% | Within 10% | Within 25% |",
+    "|---|---|---|---|---|---|---|---|",
+    ...GROUPS.filter((g) => d.groups[g].n).map((g) => row(GROUP_LABEL[g], d.groups[g])),
+    row("**All**", d.overall)
+  ];
+}
+
+/** The sentence the READMEs quote: the median deviation and how many comparisons are within 5%. A test keeps them in step with summary.json. */
+export function readmeHeadline(s: Summary, ref: string): string {
+  const o = s.references[ref]!.deviations.overall;
+  return `median deviation ${fmtPct(o.median)} over ${o.n} comparisons, ${o.within["5"]} of them within 5%`;
+}
+
 export function renderHeadline(s: Summary, ref: string): string {
   const r = s.references[ref]!;
   const k = r.checks.byKind;
   const row = (name: string, c: (typeof k)["exact"], agree: number, how: string) => `| ${name} | ${c.total} | ${agree} | ${c.known_difference ?? 0} | ${how} |`;
   const disputed = r.checks.disputed ? ` ${r.checks.disputed} checks it shares with another reference that disagrees with it are in the cross-reference section, not here.` : "";
   return [
-    `**${r.headline.definition}: ${r.headline.agree} of ${r.headline.total} (${pct(r.headline.share)}), with ${r.headline.knownDifferences} known differences.** Regenerate with \`pnpm conformance:summary\`; the figures below are in \`conformance/summary.json\`, kept in step with the scenarios by a test.${disputed}`,
+    `**How far the model is from ${r.name}: ${readmeHeadline(s, ref)}.** ${r.deviations.definition} Regenerate with \`pnpm conformance:summary\`; the figures are in \`conformance/summary.json\` with the deviation of every check, kept in step with the scenarios by a test.`,
+    "",
+    ...distributionTable(r),
+    "",
+    `Groups: ${GROUPS.map((g) => `**${GROUP_LABEL[g]}**: ${GROUP_DEFINITION[g]}`).join(" ")}${r.deviations.overall.unbounded ? ` ${r.deviations.overall.unbounded} comparison(s) have no finite deviation (the reference value is zero) and are in no "within" column.` : ""}`,
+    "",
+    `The count of checks is secondary, because a tolerance is a line the suite drew: **${r.headline.agree} of ${r.headline.total} checks hold as written (${pct(r.headline.share)}), with ${r.headline.knownDifferences} known differences.**${disputed}`,
     "",
     "| Kind of check | Checks | Agree | Known difference | Agree means |",
     "|---|---|---|---|---|",
     row("Exact", k.exact, k.exact.exact ?? 0, "every key of an integer or decision equal"),
+    row("Capacity", k.capacity, k.capacity.within_tolerance ?? 0, "a size derived from estimates within a relative tolerance set on principle"),
     row("Calibrated", k.calibrated, k.calibrated.within_tolerance ?? 0, "within the scenario's relative tolerance"),
     row("Directional", k.directional, k.directional.directional_agree ?? 0, "same direction, effect within the scenario's factor band"),
     "",
@@ -33,13 +61,37 @@ export function renderHeadline(s: Summary, ref: string): string {
   ].join("\n");
 }
 
-/** The one figure per reference that the root README quotes in prose; a test fails if the README says anything else. */
+/** The one count per reference that the root README quotes in prose, beside the deviation headline; a test fails if the README says anything else. */
 export function readmeFigure(s: Summary, ref: string): string {
   const h = s.references[ref]!.headline;
   return `${h.agree} of ${h.total} checks agree (${pct(h.share)})`;
 }
 
-/** The table of the README's parity section: one block per reference. */
+const GROUP_DEFINITION: Record<(typeof GROUPS)[number], string> = {
+  capacity: "KV blocks per replica, and the prefix-cache and host-tier hit rates; deviation is the relative difference.",
+  decisions: "every exact check (pod chosen, requests shed or preempted, cached tokens, requests per pod, discrete counts) and the counts of replicas used, requests completed and preemptions; deviation is the share of the individual values that differ.",
+  timings: "time to first token, time per token, end-to-end time, throughput, KV hand-over time and tokens per speculative step; deviation is the relative difference.",
+  effects: "the directional checks (an intervention's effect on a metric); deviation is |model effect / reference effect - 1|."
+};
+
+/** The checks that do not hold, one row each. */
+function failingTable(r: ReferenceSummary): string[] {
+  const rows = r.rows.filter((x) => !x.holds);
+  if (!rows.length) return ["No check differs."];
+  const cell = (t: string): string => t.replace(/\|/g, "\\|");
+  return [
+    "| Compared | Ours | Reference | Deviation | Missed | Cause |",
+    "|---|---|---|---|---|---|",
+    ...rows.map((x) => {
+      const missed = x.byDesign ? `${x.kind === "exact" ? "different by design" : `${x.tolerance} (different by design)`}` : x.kind === "exact" ? "decision differs" : x.tolerance;
+      return `| \`${x.scenario}\`: ${cell(x.what)} | ${cell(x.ours)} | ${cell(x.theirs)} | ${cell(x.deviationText)} | ${cell(missed)} | ${cell(x.cause ?? "")} |`;
+    })
+  ];
+}
+
+export { failingTable };
+
+/** The README's parity section: one block per reference, led by the deviations, then the checks that do not hold. */
 export function renderReadmeParity(s: Summary): string {
   const out: string[] = [];
   for (const r of Object.values(s.references)) {
@@ -47,14 +99,23 @@ export function renderReadmeParity(s: Summary): string {
     const k = r.checks.byKind;
     const row = (name: string, what: string, c: (typeof k)["exact"], agree: number) => `| ${name} | ${what} | ${c.total} | ${agree} | ${c.known_difference ?? 0} |`;
     out.push(
-      `**${r.name}** (${r.kind === "simulator" ? "commit" : "revision"} \`${r.lock.slice(0, 8)}\`): ${r.headline.agree} of ${r.headline.total} checks agree (${pct(r.headline.share)}), ${r.headline.knownDifferences} known differences. ${r.verified.length} of the ${s.approaches.total} approaches in the table above are covered by at least one of its scenarios.`,
+      `**${r.name}** (${r.kind === "simulator" ? "commit" : "revision"} \`${r.lock.slice(0, 8)}\`): ${readmeHeadline(s, r.id)}.`,
+      "",
+      ...distributionTable(r),
+      "",
+      `Counting checks instead: ${r.headline.agree} of ${r.headline.total} checks agree (${pct(r.headline.share)}), ${r.headline.knownDifferences} known differences; ${r.verified.length} of the ${s.approaches.total} approaches in the table above are covered by at least one of its scenarios.`,
       "",
       "| Kind of check | What must hold | Checks | Agree | Known difference |",
       "|---|---|---|---|---|",
-      row("Exact", "Integers and decisions are equal (KV blocks per replica, cached prefix tokens, the pod chosen, which requests are shed or preempted)", k.exact, k.exact.exact ?? 0),
+      row("Exact", "Decisions and discrete counts are equal (the pod chosen, cached prefix tokens, which requests are shed or preempted)", k.exact, k.exact.exact ?? 0),
+      row("Capacity", "KV blocks per replica within 0.1%: both sides derive them from estimates", k.capacity, k.capacity.within_tolerance ?? 0),
       row("Calibrated", "A timing or rate is within the tolerance written in the scenario", k.calibrated, k.calibrated.within_tolerance ?? 0),
       row("Directional", "The same intervention moves the same metric the same way by a similar factor (memory tiers, eviction, routing policy, autoscaling)", k.directional, k.directional.directional_agree ?? 0),
       `| **All** | | **${r.checks.total}** | **${r.headline.agree}** | **${r.headline.knownDifferences}** |`,
+      "",
+      `Every check that does not hold as written (the scenario files carry the full reasons, [the parity page](docs/parity.md) the numbers):`,
+      "",
+      ...failingTable(r),
       ""
     );
   }

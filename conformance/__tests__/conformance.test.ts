@@ -132,7 +132,7 @@ describe("parity summary", () => {
     for (const r of Object.values(s.references)) {
       expect(r.headline.agree + r.headline.knownDifferences, r.id).toBe(r.headline.total);
       expect(r.headline.knownDifferences, r.id).toBe(r.knownDifferences.length);
-      expect(r.checks.total, r.id).toBe(r.checks.byKind.exact.total + r.checks.byKind.calibrated.total + r.checks.byKind.directional.total);
+      expect(r.checks.total, r.id).toBe(r.checks.byKind.exact.total + r.checks.byKind.capacity.total + r.checks.byKind.calibrated.total + r.checks.byKind.directional.total);
     }
     expect(s.approaches.verified + s.approaches.notVerifiable).toBe(s.approaches.total);
   }, 60_000);

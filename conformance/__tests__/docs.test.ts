@@ -6,7 +6,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { replaceGenerated } from "../../src/sim/docs.js";
-import { readmeFigure, renderCalibration, renderCrossReference, renderHeadline, renderKnownDifferences, renderNotVerifiable, renderReadmeParity } from "../docs.js";
+import { readmeFigure, readmeHeadline, renderCalibration, renderCrossReference, renderHeadline, renderKnownDifferences, renderNotVerifiable, renderReadmeParity } from "../docs.js";
 import { REFERENCES } from "../refs/index.js";
 import { CONFORMANCE_DIR } from "../scenario.js";
 import { buildSummary } from "../summary.js";
@@ -43,7 +43,8 @@ describe("docs/parity.md", () => {
     // The figures in the opening paragraphs are prose, so they are checked, not rewritten.
     for (const r of REFERENCES) {
       if (!summary.references[r.id]!.checks.total) continue;
-      expect(expected.split(readmeFigure(summary, r.id)).length - 1, `README must say "${readmeFigure(summary, r.id)}" in the introduction and in the parity section`).toBeGreaterThanOrEqual(2);
+      for (const figure of [readmeFigure(summary, r.id), readmeHeadline(summary, r.id)])
+        expect(expected.split(figure).length - 1, `README must say "${figure}" in the introduction and in the parity section`).toBeGreaterThanOrEqual(2);
     }
   }, 60_000);
   it("links to the parity page from the conformance README", () => {

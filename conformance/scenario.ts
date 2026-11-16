@@ -8,9 +8,11 @@
  * data, and could not be handed to a reviewer who does not read TypeScript.) The only cost is one
  * dev dependency, `yaml`.
  *
- * Three kinds of check, strictest first:
+ * Four kinds of check, strictest first:
  *
  * - `exact`: integers and decisions that must be equal.
+ * - `capacity`: a size both sides derive from estimates (KV blocks per replica), within a relative
+ *   tolerance chosen on principle, not to fit.
  * - `calibrated`: a timing or rate that must agree within a relative tolerance, after the
  *   TypeScript model's free timing parameters have been fitted to BLIS on other scenarios
  *   (`conformance/calibration/`). The TypeScript run of a scenario with a calibrated check uses
@@ -103,6 +105,10 @@ export type Scalar = number | string | boolean | null;
 export type Differences = Record<string, Record<string, Scalar>>;
 
 export interface KnownDifference {
+  /** Three to twenty words: why, for the table of failing checks in the README. */
+  cause: string;
+  /** True when the two sides follow different rules on purpose (round robin, the autoscalers), so there is no miss to measure against a tolerance. */
+  byDesign: boolean;
   /**
    * Which comparison this records: a reference's id (the TypeScript model against that reference),
    * or `span` (the model against the range of references that disagree with each other).
@@ -141,6 +147,17 @@ export interface ExactCheck extends CheckBase {
   quantity: ExactQuantity;
 }
 
+/** Quantities a capacity check may compare: one number per run that both sides derive from estimates. */
+export const CAPACITY_QUANTITIES = ["kv_blocks_per_replica"] as const;
+export type CapacityQuantity = (typeof CAPACITY_QUANTITIES)[number];
+
+export interface CapacityCheck extends CheckBase {
+  kind: "capacity";
+  quantity: CapacityQuantity;
+  /** Largest allowed |typescript - reference| / reference. */
+  relTol: number;
+}
+
 export interface CalibratedCheck extends CheckBase {
   kind: "calibrated";
   metric: Metric;
@@ -164,7 +181,7 @@ export interface DirectionalCheck extends CheckBase {
   band: [number, number];
 }
 
-export type Check = ExactCheck | CalibratedCheck | DirectionalCheck;
+export type Check = ExactCheck | CapacityCheck | CalibratedCheck | DirectionalCheck;
 
 /** Speculative decoding: K draft tokens per step, accepting `acceptanceLength` tokens per step on average (BLIS's own parameter). */
 export interface SpeculativeSpec {
@@ -265,7 +282,7 @@ const obj = (file: string, v: unknown, what: string): Record<string, unknown> =>
   return v as Record<string, unknown>;
 };
 
-const EXACT: readonly ExactQuantity[] = ["kv_blocks_per_replica", "prefix_cached_tokens", "routed_pod", "requests_per_pod", "session_pod_changes", "preemptions", "request_fate", "prefill_pool_requests"];
+const EXACT: readonly ExactQuantity[] = ["prefix_cached_tokens", "routed_pod", "requests_per_pod", "session_pod_changes", "preemptions", "request_fate", "prefill_pool_requests"];
 
 function expand(file: string, raw: Record<string, unknown>): ScenarioRequest[] {
   const out: ScenarioRequest[] = [];
@@ -371,7 +388,9 @@ function check(file: string, c: unknown, arms: string[]): Check {
       const want = [TYPESCRIPT, reference === SPAN ? SPAN : reference].sort().join(",");
       if (Object.keys(v).sort().join(",") !== want) fail(file, `check ${base.id}: difference ${key} of the known_difference for "${reference}" must give the values of ${want.replace(",", " and ")}`);
     }
-    base.knownDifferences.push({ reference, reason: reasonOf(k, "known_difference"), differences });
+    const cause = str(file, k, "cause");
+    if (cause.split(/\s+/).length > 24) fail(file, `check ${base.id}: the cause of a known_difference is a few words (the reason carries the explanation)`);
+    base.knownDifferences.push({ reference, cause, byDesign: k.by_design === true, reason: reasonOf(k, "known_difference"), differences });
   }
   if (o.reference_gap !== undefined) {
     const k = obj(file, o.reference_gap, "reference_gap");
@@ -393,6 +412,13 @@ function check(file: string, c: unknown, arms: string[]): Check {
       if (!EXACT.includes(quantity)) fail(file, `unknown quantity "${quantity}"`);
       return { ...base, kind: "exact", quantity };
     }
+    case "capacity": {
+      const quantity = str(file, o, "quantity") as CapacityQuantity;
+      if (!CAPACITY_QUANTITIES.includes(quantity)) fail(file, `check ${base.id}: "${quantity}" is not a capacity (capacities: ${CAPACITY_QUANTITIES.join(", ")}); integers and decisions use kind "exact"`);
+      const relTol = num(file, o, "rel_tol");
+      if (!(relTol > 0 && relTol < 1)) fail(file, `check ${base.id}: rel_tol must be in (0, 1)`);
+      return { ...base, kind: "capacity", quantity, relTol };
+    }
     case "calibrated": {
       const relTol = num(file, o, "rel_tol");
       if (!(relTol > 0 && relTol < 1)) fail(file, `check ${base.id}: rel_tol must be in (0, 1)`);
@@ -406,7 +432,7 @@ function check(file: string, c: unknown, arms: string[]): Check {
       return { ...base, kind: "directional", metric: metric(), baseline: arm("baseline"), intervention: arm("intervention"), effect: o.effect as "ratio" | "difference", direction: o.direction as "increase" | "decrease", band: band as [number, number] };
     }
     default:
-      return fail(file, `check ${base.id}: kind must be "exact", "calibrated" or "directional"`);
+      return fail(file, `check ${base.id}: kind must be "exact", "capacity", "calibrated" or "directional"`);
   }
 }
 

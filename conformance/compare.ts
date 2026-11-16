@@ -19,12 +19,38 @@
  * check never passes merely by matching the more convenient reference.
  */
 import { metricOf, quantityOf, type Reduced } from "./record.js";
-import { SPAN, TYPESCRIPT, type CalibratedCheck, type Check, type DirectionalCheck, type Differences, type ExactCheck, type Scalar } from "./scenario.js";
+import { SPAN, TYPESCRIPT, type CalibratedCheck, type CapacityCheck, type Check, type DirectionalCheck, type Differences, type ExactCheck, type Scalar } from "./scenario.js";
 
 export type Records = Record<string, Reduced>;
 
 /** How a passing or recorded check is counted in a reference's parity summary. */
 export type Classification = "exact" | "within_tolerance" | "directional_agree" | "known_difference";
+
+/**
+ * How far the model is from a reference on one check, as a number that does not depend on whether a
+ * tolerance was met.
+ *
+ * - `relative`: a quantity or metric: signed (model - reference) / reference. Null when the reference is zero and the model is not.
+ * - `decisions`: an exact check on decisions or discrete counts: how many of the individual values differ out of how many were compared
+ *   (`share` = differing / total), and, for integers per row, the largest |model - reference| / |reference| (null where no row has a non-zero reference).
+ * - `effect`: a directional check: the model's effect over the reference's, and whether both move the expected way.
+ */
+export type Deviation =
+  | { kind: "relative"; value: number | null }
+  | { kind: "decisions"; differing: number; total: number; share: number; maxRelative: number | null }
+  | { kind: "effect"; ratio: number | null; directionMatches: boolean };
+
+/** The deviation as one non-negative number for ranking and distributions: |relative|, the share of decisions that differ, or |ratio - 1|. Null when unbounded. */
+export function absoluteDeviation(d: Deviation): number | null {
+  switch (d.kind) {
+    case "relative":
+      return d.value === null ? null : Math.abs(d.value);
+    case "decisions":
+      return d.share;
+    case "effect":
+      return d.ratio === null ? null : Math.abs(d.ratio - 1);
+  }
+}
 
 export interface Outcome {
   check: Check;
@@ -35,6 +61,7 @@ export interface Outcome {
   referenceValues: Record<string, Scalar>;
   /** Keys whose values differ (a key present on one side only differs); empty when the check holds as stated. Each carries `typescript` and the reference's id. */
   differences: Differences;
+  deviation: Deviation;
   /** Extra numbers worth printing: relative error, the two effects. */
   detail: Record<string, number | null>;
   classification: Classification;
@@ -44,7 +71,12 @@ export interface Outcome {
 export const round4 = (x: number): number => (x === 0 || !Number.isFinite(x) ? x : Number(x.toPrecision(4)));
 
 const classify = (check: Check, differences: Differences): Classification =>
-  Object.keys(differences).length ? "known_difference" : check.kind === "exact" ? "exact" : check.kind === "calibrated" ? "within_tolerance" : "directional_agree";
+  Object.keys(differences).length ? "known_difference" : check.kind === "exact" ? "exact" : check.kind === "directional" ? "directional_agree" : "within_tolerance";
+
+const relative = (x: number | null, y: number | null): number | null => (x === null || y === null ? null : y === 0 ? (x === 0 ? 0 : null) : (x - y) / y);
+
+/** The one number of a capacity or calibrated check in a record. */
+const scalarOf = (check: CapacityCheck | CalibratedCheck, r: Reduced): number | null => (check.kind === "capacity" ? (quantityOf(r, check.quantity).value as number) : metricOf(r, check.metric));
 
 const idOf = (records: Records): string => Object.values(records)[0]!.source;
 
@@ -57,7 +89,27 @@ function exact(check: ExactCheck, ts: Reduced, ref: Reduced): Outcome {
     const y = key in b ? b[key]! : null;
     if (x !== y) differences[key] = { [TYPESCRIPT]: x, [ref.source]: y };
   }
-  return { check, reference: ref.source, typescript: a, referenceValues: b, differences, detail: {}, classification: classify(check, differences) };
+  const keys = [...new Set([...Object.keys(a), ...Object.keys(b)])];
+  let maxRelative: number | null = null;
+  for (const key of keys) {
+    const x = a[key];
+    const y = b[key];
+    // a pod label is a name, not a size: only integers that are quantities have a relative difference
+    if (check.quantity === "routed_pod" || typeof x !== "number" || typeof y !== "number" || y === 0) continue;
+    maxRelative = Math.max(maxRelative ?? 0, Math.abs(x - y) / Math.abs(y));
+  }
+  const differing = Object.keys(differences).length;
+  const deviation: Deviation = { kind: "decisions", differing, total: keys.length, share: keys.length ? differing / keys.length : 0, maxRelative };
+  return { check, reference: ref.source, typescript: a, referenceValues: b, differences, deviation, detail: {}, classification: classify(check, differences) };
+}
+
+function capacity(check: CapacityCheck, ts: Reduced, ref: Reduced): Outcome {
+  const x = scalarOf(check, ts);
+  const y = scalarOf(check, ref);
+  const relError = relative(x, y);
+  const within = relError !== null && Math.abs(relError) <= check.relTol;
+  const differences: Differences = within ? {} : { value: { [TYPESCRIPT]: x, [ref.source]: y } };
+  return { check, reference: ref.source, typescript: { value: x }, referenceValues: { value: y }, differences, deviation: { kind: "relative", value: relError }, detail: { relError }, classification: classify(check, differences) };
 }
 
 function calibrated(check: CalibratedCheck, ts: Reduced, ref: Reduced): Outcome {
@@ -66,7 +118,7 @@ function calibrated(check: CalibratedCheck, ts: Reduced, ref: Reduced): Outcome 
   const relError = x === null || y === null || y === 0 ? null : (x - y) / y;
   const within = relError !== null && Math.abs(relError) <= check.relTol;
   const differences: Differences = within ? {} : { value: { [TYPESCRIPT]: x === null ? null : round4(x), [ref.source]: y === null ? null : round4(y) } };
-  return { check, reference: ref.source, typescript: { value: x }, referenceValues: { value: y }, differences, detail: { relError }, classification: classify(check, differences) };
+  return { check, reference: ref.source, typescript: { value: x }, referenceValues: { value: y }, differences, deviation: { kind: "relative", value: relError }, detail: { relError }, classification: classify(check, differences) };
 }
 
 const effectOf = (check: DirectionalCheck, from: number | null, to: number | null): number | null => {
@@ -101,6 +153,7 @@ function directional(check: DirectionalCheck, ts: Records, ref: Records): Outcom
     typescript: { baseline: r(a.from), intervention: r(a.to), effect: r(a.effect) },
     referenceValues: { baseline: r(b.from), intervention: r(b.to), effect: r(b.effect) },
     differences,
+    deviation: { kind: "effect", ratio, directionMatches: moves(check, a.effect) && moves(check, b.effect) },
     detail: { effectRatio: ratio },
     classification: classify(check, differences)
   };
@@ -112,6 +165,10 @@ export function evaluate(check: Check, ts: Records, ref: Records): Outcome {
     case "exact": {
       const arm = Object.keys(ts)[0]!;
       return exact(check, ts[arm]!, ref[arm]!);
+    }
+    case "capacity": {
+      const arm = Object.keys(ts)[0]!;
+      return capacity(check, ts[arm]!, ref[arm]!);
     }
     case "calibrated":
       return calibrated(check, ts[check.arm]!, ref[check.arm]!);
@@ -158,13 +215,13 @@ export interface Comparison {
 }
 
 const span = (xs: number[]): [number, number] => [Math.min(...xs), Math.max(...xs)];
-const show = ([lo, hi]: [number, number]): string => `[${round4(lo)}, ${round4(hi)}]`;
+const show = ([lo, hi]: [number, number], r4: (x: number) => number = round4): string => `[${r4(lo)}, ${r4(hi)}]`;
 
 /** Reported values of one reference at the keys a check compares, as a difference would print them. */
 function reported(o: Outcome, key: string): Scalar {
   if (o.check.kind === "exact") return key in o.referenceValues ? o.referenceValues[key]! : null;
   const v = o.referenceValues[key === "value" || key === "effect" ? key : "value"];
-  return typeof v === "number" ? round4(v) : (v ?? null);
+  return typeof v === "number" ? (o.check.kind === "capacity" ? v : round4(v)) : (v ?? null);
 }
 
 function gapOf(check: Check, outcomes: Record<string, Outcome>, refs: Record<string, Records>): Differences {
@@ -194,13 +251,16 @@ function againstSpan(check: Check, ts: Records, refs: Record<string, Records>, o
       }
       return out;
     }
+    case "capacity":
     case "calibrated": {
-      const t = metricOf(ts[check.arm]!, check.metric);
-      const vs = ids.map((id) => metricOf(refs[id]![check.arm]!, check.metric));
-      if (t === null || vs.some((v) => v === null || v === 0)) return { value: { [TYPESCRIPT]: t === null ? null : round4(t), [SPAN]: vs.map((v) => (v === null ? "none" : String(round4(v)))).join(" | ") } };
+      const arm = check.kind === "capacity" ? Object.keys(ts)[0]! : check.arm;
+      const r4 = check.kind === "capacity" ? (x: number) => x : round4;
+      const t = scalarOf(check, ts[arm]!);
+      const vs = ids.map((id) => scalarOf(check, refs[id]![arm]!));
+      if (t === null || vs.some((v) => v === null || v === 0)) return { value: { [TYPESCRIPT]: t === null ? null : r4(t), [SPAN]: vs.map((v) => (v === null ? "none" : String(r4(v)))).join(" | ") } };
       const [lo, hi] = span(vs as number[]);
       const distance = t < lo ? (lo - t) / lo : t > hi ? (t - hi) / hi : 0;
-      return distance <= check.relTol ? {} : { value: { [TYPESCRIPT]: round4(t), [SPAN]: show([lo, hi]) } };
+      return distance <= check.relTol ? {} : { value: { [TYPESCRIPT]: r4(t), [SPAN]: show([lo, hi], r4) } };
     }
     case "directional": {
       const a = sideOf(check, ts).effect;

@@ -54,16 +54,19 @@ checks:
     tolerance: "30 percent: the fit leaves up to 34 percent in time to first token on its own calibration scenarios (BLIS's per-request front-end overhead and its prefill efficiency are not a roofline), so a held-out value within 30 percent shows the fit generalises as well as it fits."
     known_difference:
       reference: blis
+      cause: "One compute-efficiency factor cannot follow the reference's prefill cost curve"
       reason: >-
-        Two things differ and both are visible in the per-request times (run `pnpm conformance:report timing-8b-h100-burst`; BLIS rows are in the reference).
-        First, BLIS passes each request through an admission queue (a tokeniser pool with a per-token service time and a fixed delay,
-        docs/guide/latency-models.md in inference-sim), so requests that arrive together reach its engine one after another: its first request is prefilled
-        alone and sees its first token after 75 ms, where the TypeScript model's front end tokenises all 32 at once and its first step already carries
-        5 prompts (8,192 tokens) and ends after 242 ms. Second, a full 8,192-token prefill step takes about 139 ms in BLIS (steps between the groups of
-        prompts it batches: 362 ms less 223 ms) and about 206 ms in the TypeScript model (448 ms less 242 ms): the fitted MFU of 0.667 is a compromise
-        between BLIS's short prompts (the TypeScript model is faster than BLIS on 128 tokens: 41 against 52 ms) and its long ones (slower on 8,000: 284 against 214 ms, calibration
-        scenario calib-8b-h100-isolated), because a single efficiency factor cannot bend like BLIS's size-dependent prefill cost. A burst is a queue of full prefill
-        steps, so it sits on the steep end. The result is 39 percent more mean time to first token. Decoding agrees (time per token +6.3 percent, end to end +11.6 percent, both inside tolerance).
+        The prefill cost curve is the main cause; the arrival handling is a minor one. A full 8,192-token prefill step takes about 139 ms in BLIS
+        (steps between the groups of prompts it batches: 362 ms less 223 ms) and about 206 ms in the TypeScript model (448 ms less 242 ms): the fitted MFU
+        of 0.667 is a compromise between BLIS's short prompts (the TypeScript model is faster than BLIS on 128 tokens: 41 against 52 ms) and its long ones
+        (slower on 8,000: 284 against 214 ms, calibration scenario calib-8b-h100-isolated), because a single efficiency factor cannot bend like BLIS's
+        size-dependent prefill cost. A burst is a queue of full prefill steps, so it sits on the steep end. The minor cause: BLIS passes each request through
+        an admission queue (a tokeniser pool with a per-token service time and a fixed delay, docs/guide/latency-models.md in inference-sim), so requests that
+        arrive together reach its engine one after another (its first request is prefilled alone and sees its first token after 75 ms), where the TypeScript model's
+        front end tokenises all 32 at once and its first step already carries 5 prompts and ends after 242 ms. Measured on 2026-11-16 by running the same trace
+        through the pinned BLIS with `--renderer-num-workers 0`, which removes that serialisation, BLIS's mean time to first token moves only from 545 to 529 ms
+        (and its first request's from 75 to 179 ms, because the whole admission time becomes an uncontended delay for every request), so the serialisation explains
+        about 3 percent of BLIS's own value and little of the gap. The result is 39 percent more mean time to first token. Decoding agrees (time per token +6.3 percent, end to end +11.6 percent, both inside tolerance).
       differences:
         value: { typescript: 0.7586, blis: 0.5452 }
   - id: tpot-mean
@@ -86,6 +89,7 @@ checks:
     tolerance: "10 percent: the load is open loop, so throughput over the run is the offered token rate plus the tail of the last answers; it differs only through the tail."
     known_difference:
       reference: blis
+      cause: "Same prefill cost curve, seen from the throughput side"
       reason: >-
         The same cause as in ttft-mean, seen from the other side: the burst's 32 prompts take longer to prefill in the TypeScript model (full 8,192-token prefill
         steps of 206 ms against BLIS's 139 ms), so the 6,400 generated tokens are spread over a longer span (the run ends later), and throughput is 10.3 percent lower,

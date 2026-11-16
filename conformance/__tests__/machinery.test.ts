@@ -42,7 +42,7 @@ describe("scenario format", () => {
     expect(() => parseScenario("other.yaml", YAML)).toThrow(/must equal the file name/);
   });
   it("rejects a known_difference without a concrete reason", () => {
-    const bad = YAML.replace("    tolerance: because", "    tolerance: because\n    known_difference:\n      reference: blis\n      reason: they differ\n      differences:\n        value: { typescript: 1, blis: 2 }");
+    const bad = YAML.replace("    tolerance: because", "    tolerance: because\n    known_difference:\n      reference: blis\n      cause: they differ\n      reason: they differ\n      differences:\n        value: { typescript: 1, blis: 2 }");
     expect(() => parseScenario("tiny.yaml", bad)).toThrow(/concrete reason/);
   });
   it("rejects a block size the TypeScript model cannot honour", () => {
