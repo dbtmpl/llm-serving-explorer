@@ -61,6 +61,6 @@ Fits to BLIS and to the measured runs, before and after:
 
 ## Consequences
 
-- Visitors see time per token on the default H100 and 8B fall from 11.6 to 9.8 ms and the KV pool of one H100 grow from 27,928 to 28,539 blocks because the activation and graph terms are smaller (the default 12-sequence engine keeps 0.61 GB for them instead of 1.90); the preemption preset needed a smaller pool (0.28 instead of 0.3) to preempt.
+- Visitors see, for a burst of 12 requests at the defaults, time per token on the default H100 and 8B fall from 15.5 to 12.6 ms (time to first token 2.88 to 2.66 s) and the KV pool of one H100 grow from 27,928 to 28,539 blocks; for the 70B on four H200s time per token goes from 22.6 to 21.7 ms and the pool from 74,790 to 75,768 blocks because the activation and graph terms are smaller (the default 12-sequence engine keeps 0.61 GB for them instead of 1.90); the preemption preset needed a smaller pool (0.28 instead of 0.3) to preempt.
 - The activation term now depends on `max_num_batched_tokens`: the "static batching" architecture, with a budget of 65,536, keeps 4.8 GB for the pass, as vLLM would.
 - Any later change to a cost term re-runs `pnpm conformance:calibrate` (minutes) and the known differences of the measured scenarios, which are recorded with the numbers at the time.
