@@ -42,6 +42,7 @@ checks:
     band: [0.33, 3]
     tolerance: "Within a factor of 3 of each other: how much the wait falls depends on how fast and how far each scales (5 s to load in both, but the TypeScript rule reaches its target at once and BLIS's steps), so only that it falls by a similar order of magnitude is claimed."
     known_difference:
+      reference: blis
       reason: >-
         Both fall, by different amounts, because the two autoscalers react at different times and reach different sizes. The TypeScript rule is concurrency
         based and acts on the count of requests in flight: it adds a replica at 1.1 s, 2.1 s and 3.1 s (one per second, as the count crosses 8, 16 and 24), so with

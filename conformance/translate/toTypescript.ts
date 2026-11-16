@@ -3,7 +3,7 @@
  */
 import { DEFAULT_PARAMS, type Params, type TraceRequest } from "../../src/sim/index.js";
 import { MAIN_ARM, type Deployment, type Scenario } from "../scenario.js";
-import { gpuNames, modelNames } from "./names.js";
+import { typescriptGpu, typescriptModel } from "./names.js";
 
 /** Seed of the world. A trace consumes no random numbers, so any value gives the same run; fixed for the record. */
 export const TS_SEED = 7;
@@ -46,8 +46,8 @@ export function toTypescript(s: Scenario, arm: string = MAIN_ARM, timing: Timing
   const autoscale = d.autoscale;
   const params: Params = {
     ...DEFAULT_PARAMS,
-    model: modelNames(d.model).typescript,
-    gpu: gpuNames(d.gpu).typescript,
+    model: typescriptModel(d.model),
+    gpu: typescriptGpu(d.gpu),
     precision: "bf16",
     tp: d.engine.tp,
     gpuMemUtil: d.engine.gpuMemoryUtilisation,

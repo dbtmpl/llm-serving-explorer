@@ -1,31 +1,28 @@
 /**
- * The conformance suite: the TypeScript model against the committed BLIS references.
+ * The conformance suite: the TypeScript model against every reference's committed records.
  *
- * Node only. BLIS is not run here; its recorded output is read from `conformance/reference/`, and the
- * reference carries the hash of the BLIS input it was made from, so a scenario edited without
- * regenerating its reference fails loudly instead of being compared with something stale.
+ * Node only. No reference is run here (BLIS needs its binary, measured data needs a clone); each
+ * reference's recorded output is read from `conformance/reference/<id>/`, and a record carries the hash
+ * of the input it was made from, so a scenario edited without regenerating its reference fails loudly
+ * instead of being compared with something stale.
  *
  * Each check either passes as stated or has a `known_difference`, in which case the test asserts the
  * observed difference is EXACTLY the recorded one: it cannot vanish (the model was fixed: update the
  * record) or grow (a new divergence) without this suite noticing. An exact check is equal; a
  * calibrated check is within its relative tolerance after the fit; a directional check has the same
- * direction and a similar effect in both simulators.
+ * direction and a similar effect on both sides. Where several references cover a check, see `compare.ts`.
  */
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { evaluate } from "../compare.js";
-import type { Reduced, Reference } from "../record.js";
-import { lockedCommit } from "../run/blis.js";
-import { runTypescriptArms } from "../run/typescript.js";
+import type { Reduced } from "../record.js";
 import { DEFAULT_PARAMS } from "../../src/sim/index.js";
 import { calibrateAll } from "../calibration/calibrate.js";
 import { loadFitted, pairKey } from "../calibration/fitted.js";
+import { REFERENCES, checkReferences, fitReferenceOf, loadReferenceFile, referencesOf } from "../refs/index.js";
+import { SPAN, REFERENCE_DIR, loadScenario, scenarioIds, usesCalibration } from "../scenario.js";
+import { compareScenario, runModel } from "../suite.js";
 import { SUMMARY_FILE, buildSummary } from "../summary.js";
-import { REFERENCE_DIR, loadScenario, scenarioIds, usesCalibration } from "../scenario.js";
-import { scenarioInputHash } from "../translate/toBlis.js";
-
-const HASH = /^[0-9a-f]{64}$/;
 
 describe("scenarios and references", () => {
   it("has at least the scenarios phase 1 promises", () => {
@@ -33,55 +30,75 @@ describe("scenarios and references", () => {
       expect.arrayContaining(["kv-budget-8b-h100", "prefix-cache", "routing-round-robin", "routing-least-loaded", "routing-prefix-aware", "preemption-overflow", "queue-deadline-shedding"])
     );
   });
-  it("has no reference without a scenario", () => {
-    const ids = new Set(scenarioIds());
-    for (const f of readdirJson()) expect(ids.has(f), `${f}.json has no scenario`).toBe(true);
+  it("has no reference record without a scenario it can answer", () => {
+    for (const r of REFERENCES) {
+      const dir = path.join(REFERENCE_DIR, r.id);
+      if (!existsSync(dir)) continue;
+      for (const f of readdirSync(dir).filter((x) => x.endsWith(".json"))) {
+        const id = path.basename(f, ".json");
+        expect(scenarioIds().includes(id), `${r.id}/${f} has no scenario`).toBe(true);
+        expect(referencesOf(loadScenario(id)).some((x) => x.id === r.id), `${r.id} cannot answer ${id}`).toBe(true);
+      }
+    }
+  });
+  it("every reference names a lock and says what it is evidence for", () => {
+    for (const r of REFERENCES) {
+      expect(r.lock().length, r.id).toBeGreaterThan(6);
+      expect(r.evidence.length, r.id).toBeGreaterThan(80);
+    }
   });
 });
-
-function readdirJson(): string[] {
-  return readdirSync(REFERENCE_DIR)
-    .filter((f) => f.endsWith(".json"))
-    .map((f) => path.basename(f, ".json"));
-}
 
 for (const id of scenarioIds()) {
   describe(`scenario ${id}`, () => {
     const scenario = loadScenario(id);
-    const file = path.join(REFERENCE_DIR, `${id}.json`);
+    const refs = referencesOf(scenario);
 
-    it("has a reference made from the current scenario, by the pinned BLIS", () => {
-      expect(existsSync(file), `no reference: run pnpm conformance:reference`).toBe(true);
-      const ref = JSON.parse(readFileSync(file, "utf8")) as Reference;
-      expect(ref.inputHash, "the scenario changed after its reference was generated; run pnpm conformance:reference").toBe(scenarioInputHash(scenario));
-      expect(ref.blis.commit, "reference made by another BLIS commit than conformance/blis.lock; regenerate").toBe(lockedCommit());
-      expect(ref.blis.catalogHash).toMatch(HASH);
-      expect(ref.blis.registryHash).toMatch(HASH);
-      expect(Object.keys(ref.records).sort()).toEqual(Object.keys(scenario.arms).sort());
-      for (const [arm, rec] of Object.entries(ref.records)) {
-        expect(rec.simulator).toBe("blis");
-        expect(rec.scenario, arm).toBe(id);
-      }
+    it("is answered by at least one reference", () => {
+      expect(refs.length).toBeGreaterThan(0);
     });
 
+    for (const ref of refs) {
+      it(`has a ${ref.id} reference made from the current scenario`, () => {
+        const file = loadReferenceFile(ref.id, id);
+        expect(file, `no reference: run pnpm conformance:reference --ref ${ref.id} --only ${id}`).not.toBeNull();
+        expect(file!.reference).toBe(ref.id);
+        expect(file!.inputHash, "the scenario changed after its reference was generated; run pnpm conformance:reference").toBe(ref.inputHash(scenario));
+        expect(ref.provenanceProblem(file!.provenance)).toBeNull();
+        expect(Object.keys(file!.records).sort()).toEqual(Object.keys(scenario.arms).sort());
+        for (const [arm, rec] of Object.entries(file!.records)) {
+          expect(rec.source).toBe(ref.id);
+          expect(rec.scenario, arm).toBe(id);
+        }
+      });
+    }
+
     const ts: { runs?: Record<string, Reduced> } = {};
-    const typescript = (): Record<string, Reduced> => (ts.runs ??= runTypescriptArms(scenario));
+    const typescript = (): Record<string, Reduced> => (ts.runs ??= runModel(scenario));
 
     it("runs to completion in the TypeScript model with every request accounted for", () => {
       for (const [arm, reduced] of Object.entries(typescript())) expect(reduced.requests, arm).toHaveLength(scenario.arms[arm]!.requests.length);
     });
 
-    for (const check of scenario.checks) {
-      it(`${check.id} (${check.kind}): ${check.knownDifference ? "differs exactly as recorded" : "holds"}`, () => {
-        const ref = JSON.parse(readFileSync(file, "utf8")) as Reference;
-        const outcome = evaluate(check, typescript(), ref.records);
-        if (check.knownDifference) {
-          expect(outcome.differences, `${check.id}: the observed difference is not the recorded known_difference`).toEqual(check.knownDifference.differences);
-        } else {
-          expect(outcome.differences, `${check.id}: ${check.claim} (${JSON.stringify({ typescript: outcome.typescript, blis: outcome.blis, ...outcome.detail })})`).toEqual({});
+    it("names only references that cover its checks, and records differences only for comparisons that happen", () => {
+      for (const check of scenario.checks) {
+        const ids = checkReferences(scenario, check).map((r) => r.id);
+        expect(ids.length, `${check.id}: no reference covers it`).toBeGreaterThan(0);
+        for (const k of check.knownDifferences) expect([...ids, SPAN], `${check.id}: a known_difference for ${k.reference}, which does not cover the check`).toContain(k.reference);
+      }
+    });
+
+    scenario.checks.forEach((check, i) => {
+      const covering = checkReferences(scenario, check).map((r) => r.id);
+      it(`${check.id} (${check.kind}) against ${covering.join(" and ")}: ${check.knownDifferences.length || check.referenceGap ? "differs exactly as recorded" : "holds"}`, () => {
+        const c = compareScenario(scenario, typescript()).comparisons[i]!;
+        expect(c.unusedRecords, `${check.id}: records that no comparison uses (a stale known_difference or reference_gap)`).toEqual([]);
+        for (const a of c.assertions) {
+          if (a.scope === "gap") expect(a.observed, `${check.id}: the references disagree with each other and the scenario does not explain the gap (reference_gap)`).toEqual(a.recorded);
+          else expect(a.observed, `${check.id} (${a.scope}): ${check.claim}`).toEqual(a.recorded);
         }
       });
-    }
+    });
   });
 }
 
@@ -94,11 +111,12 @@ describe("calibration", () => {
     for (const id of scenarioIds()) {
       const s = loadScenario(id);
       if (!usesCalibration(s)) continue;
-      for (const d of Object.values(s.arms)) expect(fitted.pairs[pairKey(d.model, d.gpu, d.engine.tp)], `${id}: no calibration for ${d.model}/${d.gpu}/tp${d.engine.tp}`).toBeDefined();
+      const ref = fitReferenceOf(s);
+      for (const d of Object.values(s.arms)) expect(fitted.references[ref]?.pairs[pairKey(d.model, d.gpu, d.engine.tp)], `${id}: no calibration to ${ref} for ${d.model}/${d.gpu}/tp${d.engine.tp}`).toBeDefined();
     }
   });
   it("never lets the fit move the site's defaults, and reports them beside the fitted values", () => {
-    for (const p of Object.values(loadFitted().pairs)) expect(p.defaults).toEqual({ mbu: DEFAULT_PARAMS.mbu, mfu: DEFAULT_PARAMS.mfu, hostMsBase: DEFAULT_PARAMS.hostMsBase, hostMsPerSeq: DEFAULT_PARAMS.hostMsPerSeq });
+    for (const p of Object.values(loadFitted().references).flatMap((r) => Object.values(r.pairs))) expect(p.defaults).toEqual({ mbu: DEFAULT_PARAMS.mbu, mfu: DEFAULT_PARAMS.mfu, hostMsBase: DEFAULT_PARAMS.hostMsBase, hostMsPerSeq: DEFAULT_PARAMS.hostMsPerSeq });
   });
   it("does not use a calibration scenario as a held-out check", () => {
     for (const id of scenarioIds()) if (loadScenario(id).role === "calibration") expect(loadScenario(id).checks).toEqual([]);
@@ -111,10 +129,11 @@ describe("parity summary", () => {
   }, 60_000);
   it("counts a known difference as a difference and an unverifiable approach as no agreement at all", () => {
     const s = buildSummary();
-    expect(s.headline.agree + s.headline.knownDifferences).toBe(s.headline.total);
-    expect(s.headline.knownDifferences).toBe(s.knownDifferences.length);
+    for (const r of Object.values(s.references)) {
+      expect(r.headline.agree + r.headline.knownDifferences, r.id).toBe(r.headline.total);
+      expect(r.headline.knownDifferences, r.id).toBe(r.knownDifferences.length);
+      expect(r.checks.total, r.id).toBe(r.checks.byKind.exact.total + r.checks.byKind.calibrated.total + r.checks.byKind.directional.total);
+    }
     expect(s.approaches.verified + s.approaches.notVerifiable).toBe(s.approaches.total);
-    // every check belongs to a scenario; none belongs to an approach that cannot be verified
-    expect(s.headline.total).toBe(s.checks.total);
   }, 60_000);
 });

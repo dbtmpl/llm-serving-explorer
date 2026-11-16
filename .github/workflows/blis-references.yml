@@ -1,6 +1,6 @@
 name: BLIS references
 
-# Rebuild BLIS at the commit pinned in conformance/blis.lock, regenerate the references the
+# Rebuild BLIS at the commit pinned in conformance/refs/blis/lock, regenerate the references the
 # conformance tests compare against, and fail if they differ from the committed ones. This is the
 # only place Go and BLIS are needed; the ordinary CI job reads the committed references.
 on:
@@ -11,8 +11,9 @@ on:
     branches:
       - main
     paths:
-      - conformance/blis.lock
+      - conformance/refs/blis/lock
       - conformance/scenarios/**
+      - conformance/refs/**
       - conformance/translate/**
       - conformance/run/**
       - conformance/scripts/**
@@ -22,8 +23,9 @@ on:
       - .github/workflows/blis-references.yml
   pull_request:
     paths:
-      - conformance/blis.lock
+      - conformance/refs/blis/lock
       - conformance/scenarios/**
+      - conformance/refs/**
       - conformance/translate/**
       - conformance/run/**
       - conformance/scripts/**
@@ -48,8 +50,8 @@ jobs:
       - name: Fetch inference-sim at the pinned commit
         run: |
           set -euo pipefail
-          commit="$(grep -v '^#' conformance/blis.lock | grep -E '^[0-9a-f]{40}$' | head -n 1)"
-          test -n "$commit" || { echo "conformance/blis.lock has no 40-character commit"; exit 1; }
+          commit="$(grep -v '^#' conformance/refs/blis/lock | grep -E '^[0-9a-f]{40}$' | head -n 1)"
+          test -n "$commit" || { echo "conformance/refs/blis/lock has no 40-character commit"; exit 1; }
           git clone --quiet https://github.com/inference-sim/inference-sim.git "$RUNNER_TEMP/inference-sim"
           git -C "$RUNNER_TEMP/inference-sim" checkout --quiet "$commit"
           echo "BLIS_SRC=$RUNNER_TEMP/inference-sim" >> "$GITHUB_ENV"
@@ -82,7 +84,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Regenerate the references
-        run: pnpm conformance:reference
+        run: pnpm conformance:reference --ref blis
 
       - name: Fail if they differ from the committed references
         run: |

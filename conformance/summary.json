@@ -1,38 +1,129 @@
 {
-  "blisCommit": "c79c745619b16a8019339e3bbc79ee5e2923b258",
   "scenarios": {
     "total": 36,
     "calibration": 17,
     "withChecks": 19
   },
-  "checks": {
-    "total": 46,
-    "byKind": {
-      "exact": {
-        "total": 14,
-        "known_difference": 4,
-        "exact": 10
+  "references": {
+    "blis": {
+      "id": "blis",
+      "name": "BLIS",
+      "kind": "simulator",
+      "lock": "c79c745619b16a8019339e3bbc79ee5e2923b258",
+      "scenarios": {
+        "total": 36,
+        "calibration": 17,
+        "withChecks": 19
       },
-      "calibrated": {
-        "total": 24,
-        "within_tolerance": 22,
-        "known_difference": 2
+      "checks": {
+        "total": 46,
+        "byKind": {
+          "exact": {
+            "total": 14,
+            "known_difference": 4,
+            "exact": 10
+          },
+          "calibrated": {
+            "total": 24,
+            "within_tolerance": 22,
+            "known_difference": 2
+          },
+          "directional": {
+            "total": 8,
+            "directional_agree": 6,
+            "known_difference": 2
+          }
+        },
+        "agree": 38,
+        "knownDifferences": 8,
+        "disputed": 0
       },
-      "directional": {
-        "total": 8,
-        "directional_agree": 6,
-        "known_difference": 2
-      }
-    },
-    "agree": 38,
-    "knownDifferences": 8
+      "headline": {
+        "definition": "share of the checks BLIS covers that agree (exact, within tolerance or directionally)",
+        "agree": 38,
+        "total": 46,
+        "share": 0.8261,
+        "knownDifferences": 8
+      },
+      "verified": [
+        "admission/on-demand",
+        "autoscaling/target-concurrency",
+        "batching/continuous",
+        "cost/flops-per-token",
+        "cost/host-overhead",
+        "cost/kv-bytes-per-token",
+        "cost/roofline",
+        "cost/tensor-parallelism",
+        "decoding/autoregressive",
+        "decoding/speculative",
+        "disaggregation/decode-first-threshold",
+        "engine/chunked-prefill",
+        "flowcontrol/deadline",
+        "kvcache/block-hash",
+        "kvcache/hbm-dram-ssd-remote",
+        "kvcache/lru-session",
+        "kvcache/paged-blocks",
+        "kvcache/recompute-newest",
+        "routing/least-loaded",
+        "routing/prefix-aware",
+        "routing/round-robin"
+      ],
+      "knownDifferences": [
+        {
+          "scenario": "autoscale-overload",
+          "check": "wait-falls",
+          "kind": "directional",
+          "claim": "Mean time to first token, which here is queue wait, is lower with the autoscaler."
+        },
+        {
+          "scenario": "kv-budget-70b-h200-tp4",
+          "check": "kv-blocks-per-replica",
+          "kind": "exact",
+          "claim": "One tensor-parallel replica holds the same number of KV blocks in both simulators."
+        },
+        {
+          "scenario": "kv-budget-8b-h100",
+          "check": "kv-blocks-per-replica",
+          "kind": "exact",
+          "claim": "One replica holds the same number of KV blocks in both simulators."
+        },
+        {
+          "scenario": "routing-round-robin",
+          "check": "pod-sequence",
+          "kind": "exact",
+          "claim": "Request i goes to the replica after the one request i-1 went to, wrapping after four (replicas are named by first use, since which replica starts is arbitrary)."
+        },
+        {
+          "scenario": "routing-round-robin",
+          "check": "requests-per-pod",
+          "kind": "exact",
+          "claim": "Twelve requests over four replicas is three each."
+        },
+        {
+          "scenario": "tiers-offload",
+          "check": "host-tier-hit-rate",
+          "kind": "directional",
+          "claim": "With the tier, a share of prompt tokens is served from host memory; without it, none is."
+        },
+        {
+          "scenario": "timing-8b-h100-burst",
+          "check": "ttft-mean",
+          "kind": "calibrated",
+          "claim": "Mean time to first token agrees with BLIS after calibration."
+        },
+        {
+          "scenario": "timing-8b-h100-burst",
+          "check": "throughput",
+          "kind": "calibrated",
+          "claim": "Output tokens per second over the run agree with BLIS after calibration."
+        }
+      ]
+    }
   },
-  "headline": {
-    "definition": "share of checks on mechanisms BLIS also models that agree (exact, within tolerance or directionally)",
-    "agree": 38,
-    "total": 46,
-    "share": 0.8261,
-    "knownDifferences": 8
+  "crossReference": {
+    "checks": 0,
+    "byAgreement": {},
+    "entries": []
   },
   "approaches": {
     "total": 27,
@@ -86,56 +177,6 @@
     {
       "approach": "workload/trace-replay",
       "reason": "It is how both simulators are given the same requests, not a mechanism BLIS models: every scenario uses it, and the conformance machinery fails when the two row sets differ, but there is nothing in BLIS to compare it with."
-    }
-  ],
-  "knownDifferences": [
-    {
-      "scenario": "autoscale-overload",
-      "check": "wait-falls",
-      "kind": "directional",
-      "claim": "Mean time to first token, which here is queue wait, is lower with the autoscaler."
-    },
-    {
-      "scenario": "kv-budget-70b-h200-tp4",
-      "check": "kv-blocks-per-replica",
-      "kind": "exact",
-      "claim": "One tensor-parallel replica holds the same number of KV blocks in both simulators."
-    },
-    {
-      "scenario": "kv-budget-8b-h100",
-      "check": "kv-blocks-per-replica",
-      "kind": "exact",
-      "claim": "One replica holds the same number of KV blocks in both simulators."
-    },
-    {
-      "scenario": "routing-round-robin",
-      "check": "pod-sequence",
-      "kind": "exact",
-      "claim": "Request i goes to the replica after the one request i-1 went to, wrapping after four (replicas are named by first use, since which replica starts is arbitrary)."
-    },
-    {
-      "scenario": "routing-round-robin",
-      "check": "requests-per-pod",
-      "kind": "exact",
-      "claim": "Twelve requests over four replicas is three each."
-    },
-    {
-      "scenario": "tiers-offload",
-      "check": "host-tier-hit-rate",
-      "kind": "directional",
-      "claim": "With the tier, a share of prompt tokens is served from host memory; without it, none is."
-    },
-    {
-      "scenario": "timing-8b-h100-burst",
-      "check": "ttft-mean",
-      "kind": "calibrated",
-      "claim": "Mean time to first token agrees with BLIS after calibration."
-    },
-    {
-      "scenario": "timing-8b-h100-burst",
-      "check": "throughput",
-      "kind": "calibrated",
-      "claim": "Output tokens per second over the run agree with BLIS after calibration."
     }
   ]
 }

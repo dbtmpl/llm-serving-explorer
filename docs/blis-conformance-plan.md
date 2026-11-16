@@ -1,6 +1,6 @@
 # Plan: the TypeScript model and BLIS side by side
 
-Status: accepted; phases 1 to 5 done, phase 6 not started. Written 2026-11-15 against inference-sim `c79c7456` (2026-11-13). What agreement shows, and the results, are in [`blis-parity.md`](blis-parity.md).
+Status: accepted; phases 1 to 5 done, phase 6 not started. Written 2026-11-15 against inference-sim `c79c7456` (2026-11-13). What agreement shows, and the results, are in [`parity.md`](parity.md).
 
 ## Goal
 
@@ -62,7 +62,7 @@ Consistent with ADR 0006: `src/sim/` stays free of anything BLIS-specific except
 | `conformance/run/` | Runs the TypeScript model headless; reduces either simulator's output to one comparable record (per-request rows plus aggregates) |
 | `conformance/reference/<id>.json` | Committed, reduced BLIS records, with the BLIS commit and data hashes they came from |
 | `conformance/calibration/` | Fitted MBU, MFU and host-time values per model and GPU, with the fit residuals |
-| `conformance/blis.lock` | The pinned inference-sim commit. No submodule: CI clones that commit and builds it |
+| `conformance/refs/blis/lock` | The pinned inference-sim commit. No submodule: CI clones that commit and builds it |
 | `conformance/__tests__/` | Vitest suite comparing TypeScript output with the references |
 | `src/replay/` | Adapter that drives the same graph from a BLIS replay file |
 | `public/replay/<id>.json` | Replay files for the site, generated from the pinned BLIS |
@@ -92,7 +92,7 @@ In both, parameters are fixed per scenario: the menus are read-only, and switchi
 
 1. **Shared input and exact checks.** Done. Trace workload, scenario format, translators, BLIS runner, reducer. Scenarios for KV budget, prefix cache, routing (three policies), preemption, shedding.
 2. **Calibration.** Done. `conformance/calibration/` fits MBU, MFU and the two host-time coefficients per model and GPU (`pnpm conformance:calibrate`, deterministic, documented loss and search), plus the draft cost and the link rate; held-out timing scenarios check time to first token, time per token, end-to-end time and throughput; speculative decoding and the prefill/decode split are checked the same way. Time to first token is the weak spot: a single MFU cannot follow BLIS's prefill cost, and a 32-request burst is recorded as a known difference.
-3. **Registry and docs.** Done. `ApproachMeta.verification` (scenario ids, or `{ notVerifiable }`), the enforcing test, the README column, the parity summary (`conformance/summary.json`, `pnpm conformance:summary`, kept in step by a test) and [`blis-parity.md`](blis-parity.md).
+3. **Registry and docs.** Done. `ApproachMeta.verification` (scenario ids, or `{ notVerifiable }`), the enforcing test, the README column, the parity summary (`conformance/summary.json`, `pnpm conformance:summary`, kept in step by a test) and [`parity.md`](parity.md).
 4. **Directional checks.** Done, with a different scenario shape than first planned: a scenario can have `arms`. Tiers (host memory only), eviction pressure, prefix-aware routing against round robin and autoscaling. BLIS's autoscaler runs only under `blis run`, so that scenario is a constant-rate stream.
 5. **Scene interface and request-level calibrated mode.** Done. `Run` (`src/live/run.ts`) is the interface the canvas draws, implemented by the live model and by the replay adapter (`src/replay/`); `pnpm replay:build` writes four replay files from the pinned BLIS to `public/replay/`. What it shows and omits: [ADR 0007](adr/0007-calibrated-replay-mode.md).
 6. **Upstream.** Not started. Propose `--events-output`; step-level replay when it lands.

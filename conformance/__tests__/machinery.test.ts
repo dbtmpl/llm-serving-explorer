@@ -5,9 +5,9 @@
 import { describe, expect, it } from "vitest";
 import { evaluate, round4 } from "../compare.js";
 import { metricOf, quantityOf, NO_AGGREGATES, type Reduced, type RequestRow } from "../record.js";
-import { reduceBlis } from "../run/blis.js";
+import { reduceBlis } from "../refs/blis/run.js";
 import { MAIN_ARM, expandStream, mainArm, parseScenario, type CalibratedCheck, type DirectionalCheck, type ExactCheck } from "../scenario.js";
-import { scenarioInputHash, toBlis } from "../translate/toBlis.js";
+import { scenarioInputHash, toBlis } from "../refs/blis/translate.js";
 import { acceptanceForLength, toTypescript } from "../translate/toTypescript.js";
 
 const YAML = `
@@ -42,7 +42,7 @@ describe("scenario format", () => {
     expect(() => parseScenario("other.yaml", YAML)).toThrow(/must equal the file name/);
   });
   it("rejects a known_difference without a concrete reason", () => {
-    const bad = YAML.replace("    tolerance: because", "    tolerance: because\n    known_difference:\n      reason: they differ\n      differences:\n        value: { typescript: 1, blis: 2 }");
+    const bad = YAML.replace("    tolerance: because", "    tolerance: because\n    known_difference:\n      reference: blis\n      reason: they differ\n      differences:\n        value: { typescript: 1, blis: 2 }");
     expect(() => parseScenario("tiny.yaml", bad)).toThrow(/concrete reason/);
   });
   it("rejects a block size the TypeScript model cannot honour", () => {
@@ -180,8 +180,8 @@ describe("comparison", () => {
   const row = (session: number, round: number, pod: number | null, arrivalS: number, cachedTokens: number | null = 0): RequestRow => ({
     session, round, inputTokens: 1, outputTokens: 1, cachedTokens, pod, arrivalS, firstTokenS: null, lastTokenS: null, fate: "completed", preemptions: null
   });
-  const rec = (simulator: Reduced["simulator"], rows: RequestRow[], blocks = 100): Reduced => ({ simulator, scenario: "x", kvBlocksPerReplica: blocks, requests: rows, preemptions: 0, requestsPerPod: [1, 1], aggregates: NO_AGGREGATES });
-  const check = (quantity: ExactCheck["quantity"]): ExactCheck => ({ id: "c", claim: "c", kind: "exact", quantity, tolerance: "t" });
+  const rec = (source: Reduced["source"], rows: RequestRow[], blocks = 100): Reduced => ({ source, scenario: "x", kvBlocksPerReplica: blocks, requests: rows, preemptions: 0, requestsPerPod: [1, 1], aggregates: NO_AGGREGATES });
+  const check = (quantity: ExactCheck["quantity"]): ExactCheck => ({ id: "c", claim: "c", kind: "exact", quantity, tolerance: "t", knownDifferences: [] });
   const one = (r: Reduced) => ({ [MAIN_ARM]: r });
 
   it("names replicas by first use, so a relabelling of interchangeable replicas is not a difference", () => {
@@ -203,8 +203,8 @@ describe("comparison", () => {
   });
 
   /** Requests that arrive at 0 and see their first token / last token after the given delays; 11 output tokens. */
-  const timed = (simulator: Reduced["simulator"], ttft: number[], decode = 0.01, extra: Partial<Reduced["aggregates"]> = {}): Reduced => ({
-    ...rec(simulator, ttft.map((t, i) => ({ ...row(i + 1, 0, 0, 0), outputTokens: 11, firstTokenS: t, lastTokenS: t + 10 * decode }))),
+  const timed = (source: Reduced["source"], ttft: number[], decode = 0.01, extra: Partial<Reduced["aggregates"]> = {}): Reduced => ({
+    ...rec(source, ttft.map((t, i) => ({ ...row(i + 1, 0, 0, 0), outputTokens: 11, firstTokenS: t, lastTokenS: t + 10 * decode }))),
     aggregates: { ...NO_AGGREGATES, ...extra }
   });
   it("derives timings from the rows, the same way for both simulators", () => {
@@ -215,7 +215,7 @@ describe("comparison", () => {
     expect(metricOf(r, "throughput_tokens_per_s")).toBeCloseTo(22 / 0.5, 9);
     expect(metricOf(r, "ttft_p50_s")).toBeCloseTo(0.2, 12);
   });
-  const cal = (relTol: number): CalibratedCheck => ({ id: "t", claim: "c", kind: "calibrated", metric: "ttft_mean_s", relTol, arm: MAIN_ARM, tolerance: "t" });
+  const cal = (relTol: number): CalibratedCheck => ({ id: "t", claim: "c", kind: "calibrated", metric: "ttft_mean_s", relTol, arm: MAIN_ARM, tolerance: "t", knownDifferences: [] });
   it("accepts a calibrated metric within its tolerance and reports both values outside it", () => {
     const blis = one(timed("blis", [0.1]));
     expect(evaluate(cal(0.1), one(timed("typescript", [0.109])), blis).differences).toEqual({});
@@ -225,8 +225,8 @@ describe("comparison", () => {
     expect(o.classification).toBe("known_difference");
     expect(evaluate(cal(0.1), one(timed("typescript", [0.109])), blis).classification).toBe("within_tolerance");
   });
-  const dir = (over: Partial<DirectionalCheck> = {}): DirectionalCheck => ({ id: "d", claim: "c", kind: "directional", metric: "ttft_mean_s", baseline: "off", intervention: "on", effect: "ratio", direction: "decrease", band: [0.5, 2], tolerance: "t", ...over });
-  const arms = (sim: Reduced["simulator"], off: number, on: number) => ({ off: timed(sim, [off], 0.01), on: timed(sim, [on], 0.01) });
+  const dir = (over: Partial<DirectionalCheck> = {}): DirectionalCheck => ({ id: "d", claim: "c", kind: "directional", metric: "ttft_mean_s", baseline: "off", intervention: "on", effect: "ratio", direction: "decrease", band: [0.5, 2], tolerance: "t", knownDifferences: [], ...over });
+  const arms = (sim: Reduced["source"], off: number, on: number) => ({ off: timed(sim, [off], 0.01), on: timed(sim, [on], 0.01) });
   it("compares the direction and size of an intervention's effect between the simulators", () => {
     expect(evaluate(dir(), arms("typescript", 1, 0.5), arms("blis", 1, 0.4)).differences).toEqual({});
     expect(evaluate(dir(), arms("typescript", 1, 0.5), arms("blis", 1, 0.4)).classification).toBe("directional_agree");
@@ -236,7 +236,7 @@ describe("comparison", () => {
     expect(evaluate(dir(), arms("typescript", 1, 0.5), arms("blis", 1, 1.3)).differences).toEqual({ effect: { typescript: 0.5, blis: 1.3 } });
   });
   it("measures a difference-type effect on rates that start at zero", () => {
-    const hit = (sim: Reduced["simulator"], off: number, on: number) => ({ off: timed(sim, [1], 0.01, { cpuTierHitRate: off }), on: timed(sim, [1], 0.01, { cpuTierHitRate: on }) });
+    const hit = (sim: Reduced["source"], off: number, on: number) => ({ off: timed(sim, [1], 0.01, { cpuTierHitRate: off }), on: timed(sim, [1], 0.01, { cpuTierHitRate: on }) });
     const c = dir({ metric: "cpu_tier_hit_rate", effect: "difference", direction: "increase" });
     expect(evaluate(c, hit("typescript", 0, 0.4), hit("blis", 0, 0.5)).differences).toEqual({});
     expect(evaluate(c, hit("typescript", 0, 0), hit("blis", 0, 0.5)).differences).toEqual({ effect: { typescript: 0, blis: 0.5 } });

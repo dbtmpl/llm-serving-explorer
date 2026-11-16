@@ -4,6 +4,7 @@
 import { MIN_OUTPUT_TOKENS, advance, createWorld, loadTrace, setParam, type SimEvent, type World } from "../../src/sim/index.js";
 import { FRONTEND_HOPS } from "../../src/sim/workload/frontend.js";
 import { fittedFor, loadFitted, type FittedFile } from "../calibration/fitted.js";
+import { fitReferenceOf } from "../refs/index.js";
 import { NO_AGGREGATES, microseconds, sortRows, type Aggregates, type Fate, type Reduced, type RequestRow } from "../record.js";
 import { AUTOSCALE_LOAD_S, MAIN_ARM, usesCalibration, type Scenario } from "../scenario.js";
 import { TS_COLD_START_S, toTypescript, type TimingOverride } from "../translate/toTypescript.js";
@@ -15,13 +16,14 @@ const LOOP_STEP_S = 0.05;
 const MAX_SIMULATED_S = 3600;
 
 /**
- * The timing values to run a scenario with: the fitted ones when the scenario has a calibrated or
- * directional check, otherwise the site's defaults (an empty override).
+ * The timing values to run a scenario with: the ones fitted to a reference when the scenario has a
+ * calibrated or directional check, otherwise the site's defaults (an empty override). The reference
+ * is the one the scenario names (`fit_reference`) or the only one that covers it.
  */
-export function timingFor(s: Scenario, arm: string, fitted?: FittedFile): TimingOverride {
+export function timingFor(s: Scenario, arm: string, fitted?: FittedFile, reference?: string): TimingOverride {
   if (!usesCalibration(s)) return {};
   const d = s.arms[arm]!;
-  const f = fittedFor(fitted ?? loadFitted(), d.model, d.gpu, d.engine.tp);
+  const f = fittedFor(fitted ?? loadFitted(), reference ?? fitReferenceOf(s), d.model, d.gpu, d.engine.tp);
   return {
     ...f.timing,
     ...(d.speculative && f.specCost ? { specCost: f.specCost.value } : {}),
@@ -144,7 +146,7 @@ export function reduceTypescript(s: Scenario, w: World, arm: string = MAIN_ARM):
     peakReplicas: requestsPerPod.filter((n) => n > 0).length
   };
   return {
-    simulator: "typescript",
+    source: "typescript",
     scenario: s.id,
     kvBlocksPerReplica: w.pods[0]!.budget.poolBlocks,
     requests,
@@ -155,8 +157,8 @@ export function reduceTypescript(s: Scenario, w: World, arm: string = MAIN_ARM):
 }
 
 /** Run every arm of a scenario; a scenario with a timing check uses the fitted values. */
-export function runTypescriptArms(s: Scenario, fitted?: FittedFile): Record<string, Reduced> {
+export function runTypescriptArms(s: Scenario, fitted?: FittedFile, reference?: string): Record<string, Reduced> {
   const out: Record<string, Reduced> = {};
-  for (const arm of Object.keys(s.arms)) out[arm] = runTypescript(s, arm, timingFor(s, arm, fitted)).reduced;
+  for (const arm of Object.keys(s.arms)) out[arm] = runTypescript(s, arm, timingFor(s, arm, fitted, reference)).reduced;
   return out;
 }

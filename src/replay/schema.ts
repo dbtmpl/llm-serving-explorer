@@ -35,7 +35,7 @@ export interface ReplayParams {
 }
 
 export interface ReplayBlis {
-  /** Full commit hash of inference-sim that produced the run (conformance/blis.lock). */
+  /** Full commit hash of inference-sim that produced the run (conformance/refs/blis/lock). */
   commit: string;
   /** The vLLM release BLIS follows. */
   engineVersion: string;

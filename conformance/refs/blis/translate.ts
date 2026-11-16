@@ -19,10 +19,14 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { parse, stringify } from "yaml";
-import { POD_QUEUE_SLACK } from "../../src/sim/index.js";
-import { AUTOSCALE_LOAD_S, CONFORMANCE_DIR, MAIN_ARM, type Deployment, type Scenario } from "../scenario.js";
-import { GPU_MEMORY_GIB, gpuNames, modelNames } from "./names.js";
+import { POD_QUEUE_SLACK } from "../../../src/sim/index.js";
+import { AUTOSCALE_LOAD_S, MAIN_ARM, type Deployment, type Scenario } from "../../scenario.js";
+import { GPU_MEMORY_GIB, gpuName, modelName } from "./names.js";
+
+/** The router configurations this build ships, byte copies of the ones the pinned BLIS ships. */
+export const EPP_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "epp");
 
 /** GPUs per node in the simulated cluster. 8 is the usual HGX node; it only bounds how many replicas fit. */
 export const GPUS_PER_NODE = 8;
@@ -93,8 +97,8 @@ function engineBlock(d: Deployment): Record<string, unknown> {
 export function toBlis(s: Scenario, arm: string = MAIN_ARM): BlisInput {
   const d = s.arms[arm];
   if (!d) throw new Error(`${s.id}: no arm "${arm}"`);
-  const model = modelNames(d.model).blis;
-  const gpu = gpuNames(d.gpu).blis;
+  const model = modelName(d.model);
+  const gpu = gpuName(d.gpu);
   const name = `${s.id}${arm === MAIN_ARM ? "" : `-${arm}`}`;
   const perPoolNodes = (replicas: number): number => Math.max(1, Math.ceil((replicas * d.engine.tp) / GPUS_PER_NODE));
   const pools = d.disagg
@@ -105,7 +109,7 @@ export function toBlis(s: Scenario, arm: string = MAIN_ARM): BlisInput {
     : [{ role: "colocated", replicas: d.replicas }];
   const nodes = pools.reduce((n, p) => n + perPoolNodes(d.autoscale ? d.autoscale.maxReplicas : p.replicas), 0);
   const eppFile = d.disagg ? EPP_PD_FILE : EPP_FILES[d.routing];
-  const shipped = readFileSync(path.join(CONFORMANCE_DIR, "translate", "epp", eppFile), "utf8");
+  const shipped = readFileSync(path.join(EPP_DIR, eppFile), "utf8");
 
   // A queue deadline is the router's flow-control queue-wait budget (`flowControl.defaultRequestTTL`).
   // Flow control is a feature gate of the same configuration, so the shipped file is extended, not replaced.

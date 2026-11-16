@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { CONCEPTS } from "../catalog.js";
 import { CITATIONS, type CitationKey } from "../citations.js";
+import { loadScenario } from "../../../conformance/scenario.js";
+import { referencesOf as coveringReferences } from "../../../conformance/refs/index.js";
 import { renderApproachTable, renderCitationList, replaceGenerated } from "../docs.js";
 import { ARCHITECTURES } from "../presets/architectures.js";
 import { isVerifiable } from "../verification.js";
@@ -67,15 +69,18 @@ describe("approach registry", () => {
   });
 });
 
+/** The names of the references that cover a scenario. */
+const referencesOf = (id: string): string[] => coveringReferences(loadScenario(id)).map((r) => r.name);
+
 /** The conformance scenarios (`conformance/scenarios/*.yaml`), by id. */
 const scenarioFiles = (): string[] =>
   readdirSync(path.join(repoRoot, "conformance", "scenarios"))
     .filter((f) => f.endsWith(".yaml"))
     .map((f) => f.replace(/\.yaml$/, ""));
 
-describe("verification against BLIS", () => {
+describe("verification against the references", () => {
   const approaches = CONCEPTS.flatMap((c) => c.approaches.map((a) => ({ name: `${c.module}/${a.id}`, a })));
-  it("every approach names the scenarios that check it, or says why BLIS cannot", () => {
+  it("every approach names the scenarios that check it, or says why no reference can", () => {
     for (const { name, a } of approaches) {
       const v = a.verification;
       if (isVerifiable(v)) expect(v.length, `${name}: an empty list is neither a scenario nor a reason`).toBeGreaterThan(0);
@@ -112,11 +117,11 @@ describe("module layout", () => {
  */
 describe("generated documentation", () => {
   const targets: { file: string; blocks: Record<string, string> }[] = [
-    { file: path.join(repoRoot, "README.md"), blocks: { approaches: renderApproachTable(CONCEPTS, "src/sim/") } },
-    { file: path.join(simDir, "README.md"), blocks: { approaches: renderApproachTable(CONCEPTS, ""), citations: renderCitationList(CONCEPTS) } },
+    { file: path.join(repoRoot, "README.md"), blocks: { approaches: renderApproachTable(CONCEPTS, "src/sim/", referencesOf) } },
+    { file: path.join(simDir, "README.md"), blocks: { approaches: renderApproachTable(CONCEPTS, "", referencesOf), citations: renderCitationList(CONCEPTS) } },
     ...modules.map((module) => ({
       file: path.join(simDir, module, "README.md"),
-      blocks: { approaches: renderApproachTable(CONCEPTS.filter((c) => c.module === module), null) }
+      blocks: { approaches: renderApproachTable(CONCEPTS.filter((c) => c.module === module), null, referencesOf) }
     }))
   ];
   for (const target of targets) {

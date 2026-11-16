@@ -1,8 +1,9 @@
 {
   "scenario": "kv-budget-70b-h200-tp4",
+  "reference": "blis",
   "inputHash": "7ac5da76ac50653ea11a0acad633f68f2f46549b0060b08d922f984616fc41f6",
-  "blis": {
-    "commit": "c79c745619b16a8019339e3bbc79ee5e2923b258",
+  "provenance": {
+    "lock": "c79c745619b16a8019339e3bbc79ee5e2923b258",
     "catalogHash": "db74e4bb49f75d658e5d0850934da60daf513274b937a03b7ab994760bd6d21f",
     "registryHash": "8dbcf3b85eed842f2bc798b34d2b95716fc58117750f4164d869b26770353fe0",
     "engineVersion": "0.32.0",
@@ -10,7 +11,7 @@
   },
   "records": {
     "main": {
-      "simulator": "blis",
+      "source": "blis",
       "scenario": "kv-budget-70b-h200-tp4",
       "kvBlocksPerReplica": 74760,
       "requests": [

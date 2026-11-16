@@ -6,13 +6,14 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { BLOCK_TOKENS, CONFORMANCE_DIR, type Scenario } from "../scenario.js";
-import { NO_AGGREGATES, microseconds, sortRows, type BlisProvenance, type Fate, type Reduced, type Reference, type RequestRow } from "../record.js";
-import { scenarioInputHash, toBlis } from "../translate/toBlis.js";
+import { fileURLToPath } from "node:url";
+import { BLOCK_TOKENS, type Scenario } from "../../scenario.js";
+import { NO_AGGREGATES, microseconds, sortRows, type Fate, type Reduced, type RequestRow } from "../../record.js";
+import type { BlisInput } from "./translate.js";
 
-export const BLIS_LOCK = path.join(CONFORMANCE_DIR, "blis.lock");
+export const BLIS_LOCK = path.join(path.dirname(fileURLToPath(import.meta.url)), "lock");
 
-/** The commit pinned in `conformance/blis.lock` (the first non-comment line). */
+/** The commit pinned in `conformance/refs/blis/lock` (the first non-comment line). */
 export function lockedCommit(): string {
   const line = readFileSync(BLIS_LOCK, "utf8")
     .split("\n")
@@ -36,7 +37,7 @@ interface Row {
   round_index?: number;
 }
 
-interface Result {
+export interface BlisResult {
   engine: { version: string };
   data: { catalog: { hash: string }; registry: { hash: string } };
   request_rows: Row[];
@@ -50,7 +51,7 @@ interface Result {
  * A row's fate. BLIS rows say only "dropped"; the Result says why in aggregate (`requests.dropped`).
  * Attribution is therefore only possible when every drop has one cause, and refused otherwise.
  */
-function fateOf(s: Scenario, result: Result, row: Row): Fate {
+function fateOf(s: Scenario, result: BlisResult, row: Row): Fate {
   if (row.fate === "completed") return "completed";
   if (row.fate !== "dropped") return "other";
   const causes = Object.keys(result.requests.dropped ?? {});
@@ -59,7 +60,7 @@ function fateOf(s: Scenario, result: Result, row: Row): Fate {
   throw new Error(`${s.id}: BLIS dropped requests for several causes (${causes.join(", ")}); the rows cannot be attributed one by one`);
 }
 
-export function reduceBlis(s: Scenario, arm: string, result: Result): Reduced {
+export function reduceBlis(s: Scenario, arm: string, result: BlisResult): Reduced {
   const d = s.arms[arm]!;
   const cluster = result.reports.engine.cluster;
   if (cluster.kv_capacity_tokens_per_replica % BLOCK_TOKENS) throw new Error(`${s.id}: KV capacity ${cluster.kv_capacity_tokens_per_replica} is not a whole number of blocks`);
@@ -120,7 +121,7 @@ export function reduceBlis(s: Scenario, arm: string, result: Result): Reduced {
     peakReplicas: requestsPerPod.filter((n) => n > 0).length
   };
   return {
-    simulator: "blis",
+    source: "blis",
     scenario: s.id,
     kvBlocksPerReplica: cluster.kv_capacity_tokens_per_replica / BLOCK_TOKENS,
     requests: sortRows(rows),
@@ -130,8 +131,10 @@ export function reduceBlis(s: Scenario, arm: string, result: Result): Reduced {
   };
 }
 
-export interface BlisRun {
-  reference: Reference;
+/** What one BLIS run leaves: its Result and the router fork's version string. */
+export interface BlisRaw {
+  result: BlisResult;
+  routerModule: string;
 }
 
 /** Version string of the router fork, as `blis router-configs` prints it on its first line. */
@@ -140,41 +143,26 @@ function routerModule(binary: string): string {
 }
 
 /**
- * Write each arm's BLIS input to a scratch directory, run it, and reduce the Result.
+ * Write one arm's BLIS input to a scratch directory (or `keep`, used as given), run it, and return the Result.
  * Throws with BLIS's own message when it refuses the scenario.
  */
-export function runBlis(s: Scenario, binary: string, keep?: string): BlisRun {
-  const records: Record<string, Reduced> = {};
-  let provenance: BlisProvenance | undefined;
-  for (const arm of Object.keys(s.arms)) {
-    const input = toBlis(s, arm);
-    const dir = keep ? path.join(keep, arm) : mkdtempSync(path.join(tmpdir(), `blis-${s.id}-${arm}-`));
-    mkdirSync(dir, { recursive: true });
-    try {
-      for (const [file, text] of Object.entries(input.files)) {
-        const target = path.join(dir, file);
-        mkdirSync(path.dirname(target), { recursive: true });
-        writeFileSync(target, text);
-      }
-      try {
-        execFileSync(binary, input.args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 28 });
-      } catch (e) {
-        const err = e as { stderr?: string; message: string };
-        throw new Error(`${s.id}/${arm}: blis ${input.args[0]} failed:\n${err.stderr ?? err.message}`);
-      }
-      const result = JSON.parse(readFileSync(path.join(dir, "result.json"), "utf8")) as Result;
-      provenance ??= {
-        // the weekly upstream job regenerates against a newer commit than the pin and says so here
-        commit: process.env.BLIS_COMMIT ?? lockedCommit(),
-        catalogHash: result.data.catalog.hash,
-        registryHash: result.data.registry.hash,
-        engineVersion: result.engine.version,
-        routerModule: routerModule(binary)
-      };
-      records[arm] = reduceBlis(s, arm, result);
-    } finally {
-      if (!keep) rmSync(dir, { recursive: true, force: true });
+export function runBlisInput(label: string, input: BlisInput, binary: string, keep?: string): BlisRaw {
+  const dir = keep ?? mkdtempSync(path.join(tmpdir(), `blis-${input.scenarioFile}-`));
+  mkdirSync(dir, { recursive: true });
+  try {
+    for (const [file, text] of Object.entries(input.files)) {
+      const target = path.join(dir, file);
+      mkdirSync(path.dirname(target), { recursive: true });
+      writeFileSync(target, text);
     }
+    try {
+      execFileSync(binary, input.args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 28 });
+    } catch (e) {
+      const err = e as { stderr?: string; message: string };
+      throw new Error(`${label}: blis ${input.args[0]} failed:\n${err.stderr ?? err.message}`);
+    }
+    return { result: JSON.parse(readFileSync(path.join(dir, "result.json"), "utf8")) as BlisResult, routerModule: routerModule(binary) };
+  } finally {
+    if (!keep) rmSync(dir, { recursive: true, force: true });
   }
-  return { reference: { scenario: s.id, inputHash: scenarioInputHash(s), blis: provenance!, records } };
 }

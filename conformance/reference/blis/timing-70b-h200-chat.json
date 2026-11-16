@@ -1,8 +1,9 @@
 {
   "scenario": "timing-70b-h200-chat",
+  "reference": "blis",
   "inputHash": "725070a8a7df51f1d3674c12179b2911cf48bffce1dfcfbedf0956a1eb09acc3",
-  "blis": {
-    "commit": "c79c745619b16a8019339e3bbc79ee5e2923b258",
+  "provenance": {
+    "lock": "c79c745619b16a8019339e3bbc79ee5e2923b258",
     "catalogHash": "db74e4bb49f75d658e5d0850934da60daf513274b937a03b7ab994760bd6d21f",
     "registryHash": "8dbcf3b85eed842f2bc798b34d2b95716fc58117750f4164d869b26770353fe0",
     "engineVersion": "0.32.0",
@@ -10,7 +11,7 @@
   },
   "records": {
     "main": {
-      "simulator": "blis",
+      "source": "blis",
       "scenario": "timing-70b-h200-chat",
       "kvBlocksPerReplica": 74760,
       "requests": [

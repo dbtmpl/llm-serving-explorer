@@ -1,8 +1,29 @@
-# Agreement with BLIS
+# Agreement with references
 
-The TypeScript model in `src/sim/` is compared, scenario by scenario, with [BLIS](https://github.com/inference-sim/inference-sim) (inference-sim), a discrete-event simulator that runs the [llm-d](https://github.com/llm-d/llm-d) router's own code (its Endpoint Picker, in process) in front of a Go translation of [vLLM](https://github.com/vllm-project/vllm)'s scheduler. This page says what that agreement shows, what it does not, how it is produced, and where the two differ. The machinery is in [`conformance/`](../conformance/README.md); the plan it followed is [`blis-conformance-plan.md`](blis-conformance-plan.md).
+The TypeScript model in `src/sim/` is compared, scenario by scenario, with external references. Each reference is a different kind of evidence, and each has its own section here with its own figure.
 
-## What agreement shows, and what it does not
+| Reference | Id | What it is | Evidence for |
+|---|---|---|---|
+| [BLIS](https://github.com/inference-sim/inference-sim) (inference-sim) | `blis` | A discrete-event simulator that runs the [llm-d](https://github.com/llm-d/llm-d) router's own code (its Endpoint Picker, in process) in front of a Go translation of [vLLM](https://github.com/vllm-project/vllm)'s scheduler | Decisions of llm-d and vLLM as simulated |
+
+This page says what agreement shows, what it does not, how it is produced, and where the model and each reference differ. The machinery is in [`conformance/`](../conformance/README.md); the plan it followed is [`blis-conformance-plan.md`](blis-conformance-plan.md).
+
+## How it is produced
+
+- **Shared, neutral scenarios.** One YAML file per scenario in [`conformance/scenarios/`](../conformance/scenarios/) describes the deployment, the request list and the checks, with model and GPU names that neither the model nor any reference owns. Every tolerance and its one-line justification is written into the scenario before its first comparison run.
+- **One adapter per reference.** `conformance/refs/<id>/` implements the `Reference` interface (`conformance/refs/reference.ts`): what it supports (models, GPUs, mechanisms, quantities), how a scenario becomes its native input, how that is run or loaded, and how the raw output is reduced to the one comparable record. A reference may be a simulator that is run or measured data that is reduced; either produces the committed file for a scenario. `conformance/translate/` holds the TypeScript model's own translation.
+- **Pinned, committed references.** Each reference pins what it was made from in a lock file (BLIS: `conformance/refs/blis/lock`, a commit; there is no submodule, CI clones and builds it). Its output for each scenario is reduced and committed under `conformance/reference/<id>/`, with a hash of everything the reference was given. The ordinary test run needs no external tool; it fails if a scenario changed without its reference being regenerated.
+- **Which references apply.** A check applies to every reference that supports the scenario's model, GPU and mechanisms and can state what the check compares, unless the check names its references. Each reference has its own `known_difference` records.
+- **When two references cover a check.** They are first compared with each other by the check's own rule. If they agree, the model is held against each. If they disagree, the gap between them is recorded and explained in the scenario (`reference_gap`, asserted exactly), and the model is held against the span they leave: a check never passes merely by matching the more convenient reference. Cross-reference standings are in the last section.
+- **CI jobs.** `conformance` (every pull request) runs the model on every scenario and compares it with the references. `blis-references` (nightly, and when the pin, a scenario or a translator changes; it regenerates only BLIS's references) rebuilds the pinned BLIS, regenerates the references and the fit, and fails if they differ from the committed ones. `blis-upstream` (weekly, allowed to fail) does the same against BLIS's `main`, to see drift before the pin is bumped.
+- **The rule on differences.** A check holds as stated, or it carries a `known_difference` with a reason and the exact values that differ, and the test asserts the observed difference equals the recorded one: it fails if the difference disappears or changes. A failing check is fixed in the model only when the model is demonstrably wrong against the vLLM or llm-d source; otherwise it is recorded. A tolerance is never widened to make a test pass, and a scenario is never tuned until it agrees.
+
+Three kinds of check: **exact** (integers and decisions that must be equal), **calibrated** (a timing or rate within a relative tolerance after the fit) and **directional** (the same intervention moves the same metric in the same direction by a similar factor).
+
+
+## BLIS
+
+### What agreement with BLIS shows, and what it does not
 
 **It is evidence that the model makes the same decisions as llm-d and vLLM 0.32** for routing, flow control, engine scheduling (admission, chunked prefill, preemption) and KV accounting (block budget, prefix reuse), in the situations the scenarios construct. BLIS embeds the router's code and ports the scheduler with references to the vLLM source lines, so an exact check that passes is a check against those implementations as BLIS runs them.
 
@@ -12,38 +33,27 @@ The TypeScript model in `src/sim/` is compared, scenario by scenario, with [BLIS
 
 **Directional checks are weaker than exact ones.** Where the two simulators follow different rules by design (the autoscalers), or store different things (BLIS evicts KV chunks, the model whole sessions), only the direction and rough size of an intervention's effect is compared, within a factor band written beside the scenario before it was run.
 
-## How it is produced
+### Result
 
-- **Shared, neutral scenarios.** One YAML file per scenario in [`conformance/scenarios/`](../conformance/scenarios/) describes the deployment, the request list and the checks, with model and GPU names that neither simulator owns. Every tolerance and its one-line justification is written into the scenario before its first comparison run.
-- **Translators.** `conformance/translate/` turns a scenario into the TypeScript model's parameters and trace, and into BLIS's scenario, deployment, router configuration and trace. The router configurations are byte copies of the ones the pinned BLIS ships; the reference script checks that.
-- **A pinned BLIS.** `conformance/blis.lock` names one commit. There is no submodule; CI clones that commit and builds it.
-- **Committed references.** BLIS's output for each scenario is reduced to one comparable record and committed under `conformance/reference/`, with a hash of everything handed to BLIS. The ordinary test run needs neither Go nor BLIS; it fails if a scenario changed without its reference being regenerated.
-- **CI jobs.** `conformance` (every pull request) runs the model on every scenario and compares it with the references. `blis-references` (nightly, and when the pin, a scenario or a translator changes) rebuilds the pinned BLIS, regenerates the references and the fit, and fails if they differ from the committed ones. `blis-upstream` (weekly, allowed to fail) does the same against BLIS's `main`, to see drift before the pin is bumped.
-- **The rule on differences.** A check holds as stated, or it carries a `known_difference` with a reason and the exact values that differ, and the test asserts the observed difference equals the recorded one: it fails if the difference disappears or changes. A failing check is fixed in the model only when the model is demonstrably wrong against the vLLM or llm-d source; otherwise it is recorded. A tolerance is never widened to make a test pass, and a scenario is never tuned until it agrees.
-
-Three kinds of check: **exact** (integers and decisions that must be equal), **calibrated** (a timing or rate within a relative tolerance after the fit) and **directional** (the same intervention moves the same metric in the same direction by a similar factor).
-
-## Result
-
-<!-- generated:parity-headline:start -->
-**share of checks on mechanisms BLIS also models that agree (exact, within tolerance or directionally): 38 of 46 (82.6 percent), with 8 known differences.** Regenerate with `pnpm conformance:summary`; the figures below are in `conformance/summary.json`, kept in step with the scenarios by a test.
+<!-- generated:parity-headline-blis:start -->
+**share of the checks BLIS covers that agree (exact, within tolerance or directionally): 38 of 46 (82.6 percent), with 8 known differences.** Regenerate with `pnpm conformance:summary`; the figures below are in `conformance/summary.json`, kept in step with the scenarios by a test.
 
 | Kind of check | Checks | Agree | Known difference | Agree means |
 |---|---|---|---|---|
 | Exact | 14 | 10 | 4 | every key of an integer or decision equal |
-| Calibrated | 24 | 22 | 2 | within the scenario's relative tolerance, after the fit |
+| Calibrated | 24 | 22 | 2 | within the scenario's relative tolerance |
 | Directional | 8 | 6 | 2 | same direction, effect within the scenario's factor band |
 
-Approaches in the registry: 21 of 27 are named by at least one scenario; 6 cannot be verified (below). Being named by a scenario means checked, not agreeing: several approaches appear in a check that is a known difference. Approaches that cannot be verified are not in the figure at all, in either direction.
+Approaches in the registry: 21 of 27 are named by at least one scenario this reference covers; 6 are named by none and say why (below). Being named by a scenario means checked, not agreeing: several approaches appear in a check that is a known difference. Approaches that cannot be verified are not in the figure at all, in either direction.
 
-Scenarios: 36, of which 17 are calibration data (they carry no checks; the fit uses them) and 19 carry the 46 checks. BLIS commit: `c79c7456`.
-<!-- generated:parity-headline:end -->
+Scenarios this reference covers: 36, of which 17 are calibration data (they carry no checks; the fit uses them) and 19 carry the 46 checks. BLIS commit: `c79c7456`.
+<!-- generated:parity-headline-blis:end -->
 
-## Calibration
+### Calibration
 
 The parameters of `src/sim/core/params.ts` that the fit sets are `mbu`, `mfu`, `hostMsBase` and `hostMsPerSeq`, per (model, GPU, tensor-parallel degree); the draft cost `specCost` and the link rate `linkGbps` are fitted on the pairs that have a speculative or prefill/decode calibration scenario. The method is a deterministic coordinate search in log space on a stated loss ([`conformance/calibration/fit.ts`](../conformance/calibration/fit.ts)); the values and every residual are committed in [`conformance/calibration/fitted.json`](../conformance/calibration/fitted.json) and a test refits from the references and compares.
 
-<!-- generated:parity-calibration:start -->
+<!-- generated:parity-calibration-blis:start -->
 | Pair | MBU | MFU | Host ms, fixed | Host ms, per sequence | Loss at defaults, at fit | Worst residual, time to first token | Worst residual, time per token |
 |---|---|---|---|---|---|---|---|
 | `llama-3.1-8b/b200/tp1` | 0.6 (default 0.6) | 0.681818 (default 0.5) | 1.16219 (default 1.5) | 0.00713199 (default 0.05) | 0.0438953, 0.0229969 | -22.4% | +8.7% |
@@ -52,15 +62,15 @@ The parameters of `src/sim/core/params.ts` that the fit sets are `mbu`, `mfu`, `
 
 - `llama-3.1-8b/h100/tp1`: draft cost `specCost` 0.0001 (default 0.04); time per token +1.7% from BLIS's on `calib-8b-h100-spec`. BLIS prices its n-gram drafter at nothing, so the fit goes to the lower bound.
 - `llama-3.1-8b/h100/tp1`: link rate `linkGbps` 323.81 Gbit/s (default 100); hand-over time +0.1% from BLIS's on `calib-8b-h100-pd`. BLIS's fabric is 400 Gbit/s InfiniBand at 0.811 of line rate, which is 324 Gbit/s.
-<!-- generated:parity-calibration:end -->
+<!-- generated:parity-calibration-blis:end -->
 
 A single MFU cannot bend the way BLIS's prefill cost does (short prompts cost more than the compute alone, long ones less per token), so time to first token is the weaker of the two timings: the fit leaves up to a third on the calibration scenarios, and the burst scenario below misses its tolerance. Time per token, which is memory-bound decoding, is close everywhere.
 
-## Known differences
+### Known differences
 
 Each is a check that does not hold as stated. The values are the TypeScript model's, then BLIS's; the scenario file carries the same reason next to the check.
 
-<!-- generated:parity-known:start -->
+<!-- generated:parity-known-blis:start -->
 - **`autoscale-overload` / `wait-falls`** (directional). Mean time to first token, which here is queue wait, is lower with the autoscaler. TypeScript / BLIS: effect: 0.08289 / 0.4021. Both fall, by different amounts, because the two autoscalers react at different times and reach different sizes. The TypeScript rule is concurrency based and acts on the count of requests in flight: it adds a replica at 1.1 s, 2.1 s and 3.1 s (one per second, as the count crosses 8, 16 and 24), so with the 5 s load time the new replicas serve from 6.1, 7.1 and 8.1 s, four replicas in all. BLIS's saturation analyzer (the llm-d workload-variant autoscaler's token-based rule) compares the tokens in the queue and in KV memory with 80 percent of the pool, so it waits until the queue holds enough prompt tokens: its first added replica serves from 11 s, its second from 18 s, and it stops at three. The queue therefore drains later and less in BLIS, and mean time to first token falls to 0.40 of the fixed arm's (8.3 s against 20.7 s) where the TypeScript model's falls to 0.083 (1.7 s against 20.5 s). The rules differ by design; the direction is the same.
 
 - **`kv-budget-70b-h200-tp4` / `kv-blocks-per-replica`** (exact). One tensor-parallel replica holds the same number of KV blocks in both simulators. TypeScript / BLIS: value: 74790 / 74760. The same accounting as kv-budget-8b-h100, per GPU, and the same device memory (an H200's 150,109,880,320 bytes, 139.80 GiB) and CUDA-graph estimate (1,159,725,056 bytes). Two terms remain. The activation peak: BLIS charges 5 bf16 hidden-state rows per token for four-way tensor parallelism (671,088,640 bytes), the TypeScript model keeps the residual stream whole and splits only the feed-forward width over four GPUs (634,650,624 bytes): 36.4 MB more per GPU in BLIS. And the weights: 35,276,193,792 bytes per GPU in BLIS (it sizes them from the model's graph, including normalisation weights and the rounding of each shard), 35,275,000,000 in the TypeScript model (70.55e9 parameters from the architecture, in BF16, over four). Together 37.6 MB per GPU, over 1,310,720 bytes per GPU-block, 29 blocks, plus one of rounding: 30 blocks (0.04%).
@@ -76,9 +86,15 @@ Each is a check that does not hold as stated. The values are the TypeScript mode
 - **`timing-8b-h100-burst` / `ttft-mean`** (calibrated). Mean time to first token agrees with BLIS after calibration. TypeScript / BLIS: value: 0.7586 / 0.5452. Two things differ and both are visible in the per-request times (run `pnpm conformance:report timing-8b-h100-burst`; BLIS rows are in the reference). First, BLIS passes each request through an admission queue (a tokeniser pool with a per-token service time and a fixed delay, docs/guide/latency-models.md in inference-sim), so requests that arrive together reach its engine one after another: its first request is prefilled alone and sees its first token after 75 ms, where the TypeScript model's front end tokenises all 32 at once and its first step already carries 5 prompts (8,192 tokens) and ends after 242 ms. Second, a full 8,192-token prefill step takes about 139 ms in BLIS (steps between the groups of prompts it batches: 362 ms less 223 ms) and about 206 ms in the TypeScript model (448 ms less 242 ms): the fitted MFU of 0.667 is a compromise between BLIS's short prompts (the TypeScript model is faster than BLIS on 128 tokens: 41 against 52 ms) and its long ones (slower on 8,000: 284 against 214 ms, calibration scenario calib-8b-h100-isolated), because a single efficiency factor cannot bend like BLIS's size-dependent prefill cost. A burst is a queue of full prefill steps, so it sits on the steep end. The result is 39 percent more mean time to first token. Decoding agrees (time per token +6.3 percent, end to end +11.6 percent, both inside tolerance).
 
 - **`timing-8b-h100-burst` / `throughput`** (calibrated). Output tokens per second over the run agree with BLIS after calibration. TypeScript / BLIS: value: 1678 / 1870. The same cause as in ttft-mean, seen from the other side: the burst's 32 prompts take longer to prefill in the TypeScript model (full 8,192-token prefill steps of 206 ms against BLIS's 139 ms), so the 6,400 generated tokens are spread over a longer span (the run ends later), and throughput is 10.3 percent lower, just outside the 10 percent tolerance. Decoding itself is within tolerance (time per token +6.3 percent).
-<!-- generated:parity-known:end -->
+<!-- generated:parity-known-blis:end -->
 
 Changes made to the model because the first comparison showed it wrong against the vLLM source (not recorded as differences): a finished request caches `prompt + output - 1` tokens, and a waiting request is admitted only when its whole input sequence fits in the free blocks. Both are in the model's history, with their sources in `src/sim/engine/`.
+
+## Between references
+
+<!-- generated:parity-cross:start -->
+No check is covered by more than one reference yet (BLIS): the references cover different GPUs and models. The comparison between references is implemented and tested on synthetic records (`conformance/__tests__/references.test.ts`).
+<!-- generated:parity-cross:end -->
 
 ## What is not verifiable
 

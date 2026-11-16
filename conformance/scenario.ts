@@ -1,6 +1,7 @@
 /**
  * The neutral scenario: one description of a deployment, a workload and the checks to run on it,
- * which neither simulator owns. `translate/` turns it into each simulator's own input.
+ * which neither the model nor any reference owns. `translate/` turns it into the TypeScript model's
+ * input and each reference (`refs/<id>/`) turns it into its own.
  *
  * Format: YAML, so that every tolerance can carry its justification as plain text next to it and
  * the request lists stay readable. (JSON has no comments; a TypeScript module would be code, not
@@ -27,6 +28,13 @@ import { parse } from "yaml";
 export const CONFORMANCE_DIR = path.dirname(fileURLToPath(import.meta.url));
 export const SCENARIO_DIR = path.join(CONFORMANCE_DIR, "scenarios");
 export const REFERENCE_DIR = path.join(CONFORMANCE_DIR, "reference");
+
+/** Where reference `ref` keeps its committed record of scenario `scenario`. */
+export const referenceFile = (ref: string, scenario: string): string => path.join(REFERENCE_DIR, ref, `${scenario}.json`);
+
+/** The name a known difference or a gap uses for the TypeScript model, and for the span of several references. */
+export const TYPESCRIPT = "typescript";
+export const SPAN = "span";
 
 /** KV block size in tokens. Both simulators use vLLM's default; the scenario states it so a mismatch fails loudly. */
 export const BLOCK_TOKENS = 16;
@@ -91,11 +99,25 @@ export type Metric = (typeof METRICS)[number];
 
 export type Scalar = number | string | boolean | null;
 
+/** The keys that differ, each with the value every party has there: `typescript` and the reference's id (or, for a gap, each reference's id). */
+export type Differences = Record<string, Record<string, Scalar>>;
+
 export interface KnownDifference {
-  /** What each simulator does and why they differ: a finding, not a shrug. */
+  /**
+   * Which comparison this records: a reference's id (the TypeScript model against that reference),
+   * or `span` (the model against the range of references that disagree with each other).
+   */
+  reference: string;
+  /** What each side does and why they differ: a finding, not a shrug. */
   reason: string;
-  /** Exactly the keys that differ, with each simulator's value. The test fails if this drifts. */
-  differences: Record<string, { typescript: Scalar; blis: Scalar }>;
+  /** Exactly the keys that differ, with each side's value. The test fails if this drifts. */
+  differences: Differences;
+}
+
+/** Two references that both cover a check and disagree with each other: the gap, explained. Asserted exactly like a known difference. */
+export interface ReferenceGap {
+  reason: string;
+  differences: Differences;
 }
 
 interface CheckBase {
@@ -104,7 +126,14 @@ interface CheckBase {
   claim: string;
   /** One line: why this standard (equal, this relative tolerance, this factor band) is the right one. Written before the first run. */
   tolerance: string;
-  knownDifference?: KnownDifference;
+  /**
+   * The references this check applies to. Unstated: every reference that supports the scenario's
+   * model, GPU and mechanisms and can state the check's quantity (`refs/reference.ts`, `checkReferences`).
+   */
+  references?: string[];
+  /** One record per comparison that does not hold as stated. */
+  knownDifferences: KnownDifference[];
+  referenceGap?: ReferenceGap;
 }
 
 export interface ExactCheck extends CheckBase {
@@ -203,6 +232,11 @@ export interface Scenario {
   title: string;
   /** `calibration`: the TypeScript model's timing parameters are fitted to this scenario's BLIS run. */
   role: "check" | "calibration";
+  /**
+   * The reference whose fit the TypeScript model's timing parameters come from when a check is
+   * calibrated. Unstated: the only reference that covers the scenario.
+   */
+  fitReference?: string;
   /** The deployments to run; one named `main` unless the scenario declares `arms`. */
   arms: Record<string, Deployment>;
   checks: Check[];
@@ -221,6 +255,10 @@ const str = (file: string, o: Record<string, unknown>, key: string): string => {
   const v = o[key];
   if (typeof v !== "string" || !v.trim()) fail(file, `"${key}" must be a non-empty string`);
   return v as string;
+};
+const stringList = (file: string, v: unknown, what: string): string[] => {
+  if (!Array.isArray(v) || !v.length || v.some((x) => typeof x !== "string")) fail(file, `${what} must be a non-empty list of names`);
+  return v as string[];
 };
 const obj = (file: string, v: unknown, what: string): Record<string, unknown> => {
   if (typeof v !== "object" || v === null || Array.isArray(v)) fail(file, `${what} must be a mapping`);
@@ -308,19 +346,36 @@ function deployment(file: string, raw: Record<string, unknown>): Deployment {
 
 function check(file: string, c: unknown, arms: string[]): Check {
   const o = obj(file, c, "a check");
-  const base: CheckBase = { id: str(file, o, "id"), claim: str(file, o, "claim"), tolerance: str(file, o, "tolerance") };
-  if (o.known_difference !== undefined) {
-    const k = obj(file, o.known_difference, "known_difference");
+  const base: CheckBase = { id: str(file, o, "id"), claim: str(file, o, "claim"), tolerance: str(file, o, "tolerance"), knownDifferences: [] };
+  const references = o.references === undefined ? undefined : stringList(file, o.references, `check ${base.id}: "references"`);
+  if (references) base.references = references;
+  const differencesOf = (k: Record<string, unknown>, where: string): Differences => {
+    const diffs = obj(file, k.differences, `${where}.differences`);
+    const differences: Differences = {};
+    for (const [key, v] of Object.entries(diffs)) differences[key] = obj(file, v, `difference ${key}`) as Record<string, Scalar>;
+    if (!Object.keys(differences).length) fail(file, `check ${base.id}: ${where} lists no differences`);
+    return differences;
+  };
+  const reasonOf = (k: Record<string, unknown>, where: string): string => {
     const reason = str(file, k, "reason");
-    if (reason.length < 80) fail(file, `check ${base.id}: a known_difference needs a concrete reason (what each simulator does and why they differ)`);
-    const diffs = obj(file, k.differences, "known_difference.differences");
-    const differences: KnownDifference["differences"] = {};
-    for (const [key, v] of Object.entries(diffs)) {
-      const d = obj(file, v, `difference ${key}`);
-      differences[key] = { typescript: d.typescript as Scalar, blis: d.blis as Scalar };
+    if (reason.length < 80) fail(file, `check ${base.id}: ${where} needs a concrete reason (what each side does and why they differ)`);
+    return reason;
+  };
+  const known = o.known_difference === undefined ? [] : Array.isArray(o.known_difference) ? o.known_difference : [o.known_difference];
+  for (const item of known) {
+    const k = obj(file, item, "known_difference");
+    const reference = str(file, k, "reference");
+    if (base.knownDifferences.some((x) => x.reference === reference)) fail(file, `check ${base.id}: two known_difference records for "${reference}"`);
+    const differences = differencesOf(k, "known_difference");
+    for (const [key, v] of Object.entries(differences)) {
+      const want = [TYPESCRIPT, reference === SPAN ? SPAN : reference].sort().join(",");
+      if (Object.keys(v).sort().join(",") !== want) fail(file, `check ${base.id}: difference ${key} of the known_difference for "${reference}" must give the values of ${want.replace(",", " and ")}`);
     }
-    if (!Object.keys(differences).length) fail(file, `check ${base.id}: known_difference lists no differences`);
-    base.knownDifference = { reason, differences };
+    base.knownDifferences.push({ reference, reason: reasonOf(k, "known_difference"), differences });
+  }
+  if (o.reference_gap !== undefined) {
+    const k = obj(file, o.reference_gap, "reference_gap");
+    base.referenceGap = { reason: reasonOf(k, "reference_gap"), differences: differencesOf(k, "reference_gap") };
   }
   const metric = (): Metric => {
     const m = str(file, o, "metric") as Metric;
@@ -362,7 +417,8 @@ export function parseScenario(file: string, text: string): Scenario {
   if (path.basename(file, ".yaml") !== id) fail(file, `"id" (${id}) must equal the file name`);
   const role = raw.role === undefined ? "check" : raw.role;
   if (role !== "check" && role !== "calibration") fail(file, `role must be "check" or "calibration"`);
-  const { arms: armsRaw, checks: checksRaw, id: _id, title: _title, role: _role, ...baseRaw } = raw;
+  const { arms: armsRaw, checks: checksRaw, id: _id, title: _title, role: _role, fit_reference: fitRaw, ...baseRaw } = raw;
+  const fitReference = fitRaw === undefined ? undefined : str(file, { fit_reference: fitRaw }, "fit_reference");
   const arms: Record<string, Deployment> = {};
   if (armsRaw === undefined) arms[MAIN_ARM] = deployment(file, baseRaw);
   else
@@ -372,7 +428,7 @@ export function parseScenario(file: string, text: string): Scenario {
   const checks = (checksRaw as unknown[]).map((c) => check(file, c, Object.keys(arms)));
   if (role === "check" && !checks.length) fail(file, `a scenario with role "check" needs at least one check`);
   if (role === "calibration" && checks.length) fail(file, `a calibration scenario states no checks: it is the data the fit uses`);
-  return { id, title: str(file, raw, "title"), role: role as Scenario["role"], arms, checks };
+  return { id, title: str(file, raw, "title"), role: role as Scenario["role"], ...(fitReference ? { fitReference } : {}), arms, checks };
 }
 
 export function loadScenario(id: string): Scenario {

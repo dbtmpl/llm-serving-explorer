@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 
-/** The commit the replay files were generated from, as conformance/blis.lock pins it. */
-const COMMIT = readFileSync("conformance/blis.lock", "utf8")
+/** The commit the replay files were generated from, as conformance/refs/blis/lock pins it. */
+const COMMIT = readFileSync("conformance/refs/blis/lock", "utf8")
   .split("\n")
   .map((l) => l.trim())
   .find((l) => l && !l.startsWith("#"))!;

@@ -53,6 +53,7 @@ checks:
     rel_tol: 0.30
     tolerance: "30 percent: the fit leaves up to 34 percent in time to first token on its own calibration scenarios (BLIS's per-request front-end overhead and its prefill efficiency are not a roofline), so a held-out value within 30 percent shows the fit generalises as well as it fits."
     known_difference:
+      reference: blis
       reason: >-
         Two things differ and both are visible in the per-request times (run `pnpm conformance:report timing-8b-h100-burst`; BLIS rows are in the reference).
         First, BLIS passes each request through an admission queue (a tokeniser pool with a per-token service time and a fixed delay,
@@ -84,6 +85,7 @@ checks:
     rel_tol: 0.10
     tolerance: "10 percent: the load is open loop, so throughput over the run is the offered token rate plus the tail of the last answers; it differs only through the tail."
     known_difference:
+      reference: blis
       reason: >-
         The same cause as in ttft-mean, seen from the other side: the burst's 32 prompts take longer to prefill in the TypeScript model (full 8,192-token prefill
         steps of 206 ms against BLIS's 139 ms), so the 6,400 generated tokens are spread over a longer span (the run ends later), and throughput is 10.3 percent lower,

@@ -19,9 +19,9 @@ import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, 
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { lockedCommit } from "../conformance/run/blis.js";
+import { lockedCommit } from "../conformance/refs/blis/run.js";
 import { BLOCK_TOKENS, CONFORMANCE_DIR, mainArm } from "../conformance/scenario.js";
-import { EPP_FILES, toBlis } from "../conformance/translate/toBlis.js";
+import { EPP_FILES, toBlis } from "../conformance/refs/blis/translate.js";
 import { REPLAY_SCHEMA, parseReplay, type ReplayFate, type ReplayFile, type ReplayRequest, type ReplayScorer } from "../src/replay/schema.js";
 import { REPLAY_SCENARIOS, type Expect, type ReplayScenario } from "./scenarios.js";
 
@@ -330,12 +330,12 @@ export function build(rs: ReplayScenario, binary: string, keep?: string): Replay
 
 function main(): void {
   const binary = arg("blis") ?? process.env.BLIS_BIN;
-  if (!binary) die("name the BLIS binary with BLIS_BIN=<path> (build it from the commit in conformance/blis.lock; see conformance/README.md).");
+  if (!binary) die("name the BLIS binary with BLIS_BIN=<path> (build it from the commit in conformance/refs/blis/lock; see conformance/README.md).");
   if (!existsSync(binary)) die(`the BLIS binary ${binary} does not exist.`);
   // the router configurations the translator ships must be the ones this binary's router ships
   for (const file of new Set(Object.values(EPP_FILES))) {
     const shipped = execFileSync(binary, ["router-configs", "--file", file], { encoding: "utf8" });
-    if (shipped !== readFileSync(path.join(CONFORMANCE_DIR, "translate", "epp", file), "utf8")) die(`conformance/translate/epp/${file} differs from the file this BLIS ships`);
+    if (shipped !== readFileSync(path.join(CONFORMANCE_DIR, "refs", "blis", "epp", file), "utf8")) die(`conformance/refs/blis/epp/${file} differs from the file this BLIS ships`);
   }
   const only = arg("only");
   mkdirSync(OUT_DIR, { recursive: true });

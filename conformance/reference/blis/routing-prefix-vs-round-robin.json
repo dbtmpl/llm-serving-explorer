@@ -1,8 +1,9 @@
 {
   "scenario": "routing-prefix-vs-round-robin",
+  "reference": "blis",
   "inputHash": "5f75221fb8fae5a475964e9d66dc94ed6c34857ee0fb326566d47ea21a40e9f5",
-  "blis": {
-    "commit": "c79c745619b16a8019339e3bbc79ee5e2923b258",
+  "provenance": {
+    "lock": "c79c745619b16a8019339e3bbc79ee5e2923b258",
     "catalogHash": "db74e4bb49f75d658e5d0850934da60daf513274b937a03b7ab994760bd6d21f",
     "registryHash": "8dbcf3b85eed842f2bc798b34d2b95716fc58117750f4164d869b26770353fe0",
     "engineVersion": "0.32.0",
@@ -10,7 +11,7 @@
   },
   "records": {
     "round-robin": {
-      "simulator": "blis",
+      "source": "blis",
       "scenario": "routing-prefix-vs-round-robin",
       "kvBlocksPerReplica": 27926,
       "requests": [
@@ -305,7 +306,7 @@
       }
     },
     "prefix-aware": {
-      "simulator": "blis",
+      "source": "blis",
       "scenario": "routing-prefix-vs-round-robin",
       "kvBlocksPerReplica": 27926,
       "requests": [
