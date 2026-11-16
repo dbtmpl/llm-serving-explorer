@@ -16,23 +16,26 @@ routing: prefix-aware
 requests:
   - { session: 1, at: 1.0, turns: [[200, 20]] }
 checks:
+  # Owner's decision of 2026-11-16: a capacity both sides derive from estimates is checked within a relative tolerance, not for integer
+  # equality. Before it this check was a recorded known difference (27,928 against 27,926 blocks, 0.007%), with the explanation below, kept as it was:
+  #
+    # Both now follow vLLM's start-up sizing: pool = (ceil(device memory x utilisation) - weights - activation peak -
+    # CUDA-graph estimate) / block size (vllm/v1/worker/utils.py request_memory; vllm/v1/worker/gpu_worker.py
+    # determine_available_memory). Both use the memory the CUDA driver reports for an H100 80GB (85,029,158,912 bytes,
+    # 79.19 GiB), the same 1,159,725,056-byte graph estimate (the median of 22 vLLM start-up logs, from the BLIS
+    # registry), and weights of 16.06 GB and blocks of 2,097,152 bytes. What is left is the activation peak: BLIS
+    # charges 11 bf16 hidden-state rows per token of a full 8,192-token step (738,197,504 bytes, from NVIDIA's memory
+    # model through its registry), the TypeScript model sums the residual stream, the feed-forward buffers and the
+    # sampling logits (735,313,920 bytes). The 2.9 MB difference is 1.4 blocks, and with the rounding of 16,059,990,016
+    # bytes of real weights against 16.06 GB it makes 2 blocks (0.007%). BLIS's pool, 27,926 blocks, is the figure its
+    # own run reports; its KV budget routine returns 27,927 before the engine builds the pool.
+  #
+  # The tolerance of 0.1% is set on principle, not to fit the observed difference. Verified on 2026-11-16 that it is the right size: with the model's
+  # pool changed by 0.1%, 1% and by 30 blocks, the TypeScript run of every one of the 36 scenarios keeps every decision (placements, cached tokens,
+  # preemptions, fates); 35 are bit-for-bit the same and the one built at the edge of its pool (preemption-overflow, 3,601 blocks) changes only times.
   - id: kv-blocks-per-replica
-    claim: One replica holds the same number of KV blocks in both simulators.
-    kind: exact
+    claim: One replica holds the same number of KV blocks as the reference, to within 0.1 percent.
+    kind: capacity
     quantity: kv_blocks_per_replica
-    tolerance: A block count is an integer set by memory arithmetic that both simulators state; a few percent of drift would already change when preemption starts, so it is not given any.
-    known_difference:
-      reference: blis
-      reason: >-
-        Both now follow vLLM's start-up sizing: pool = (ceil(device memory x utilisation) - weights - activation peak -
-        CUDA-graph estimate) / block size (vllm/v1/worker/utils.py request_memory; vllm/v1/worker/gpu_worker.py
-        determine_available_memory). Both use the memory the CUDA driver reports for an H100 80GB (85,029,158,912 bytes,
-        79.19 GiB), the same 1,159,725,056-byte graph estimate (the median of 22 vLLM start-up logs, from the BLIS
-        registry), and weights of 16.06 GB and blocks of 2,097,152 bytes. What is left is the activation peak: BLIS
-        charges 11 bf16 hidden-state rows per token of a full 8,192-token step (738,197,504 bytes, from NVIDIA's memory
-        model through its registry), the TypeScript model sums the residual stream, the feed-forward buffers and the
-        sampling logits (735,313,920 bytes). The 2.9 MB difference is 1.4 blocks, and with the rounding of 16,059,990,016
-        bytes of real weights against 16.06 GB it makes 2 blocks (0.007%). BLIS's pool, 27,926 blocks, is the figure its
-        own run reports; its KV budget routine returns 27,927 before the engine builds the pool.
-      differences:
-        value: { typescript: 27928, blis: 27926 }
+    rel_tol: 0.001
+    tolerance: "0.1 percent (decision of 2026-11-16): the terms that remain are estimates on both sides (the activation peak, the rounding of the weights); a difference below one part in a thousand changes no admission decision in any scenario."

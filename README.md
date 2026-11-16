@@ -19,7 +19,7 @@
 
 LLM Serving Explorer is an interactive, animated explanation of how a modern inference stack serves requests. One graph starts empty and grows as requests arrive: text becomes tokens, the router picks a pod, the engine batches work step by step, and KV-cache blocks fill, move and are evicted on the GPU. It runs in slow motion in your browser and explains each event where it happens. In **Explore** mode you change the model, hardware and policies while requests are in flight. In **Calibrated** mode the same graph replays runs of [BLIS](https://github.com/inference-sim/inference-sim), a simulator built on the [llm-d](https://github.com/llm-d/llm-d) router's own code and a translation of [vLLM](https://github.com/vllm-project/vllm)'s scheduler.
 
-Explore mode is driven by an independent TypeScript model that re-implements vLLM's scheduling and memory behaviour (continuous batching, chunked prefill, paged KV blocks, block-level prefix caching, preemption by recompute) and llm-d's routing, flow control and prefill/decode design. It runs no vLLM or llm-d code. Instead, every push is compared with BLIS on shared scenarios: 38 of 46 checks agree (82.6 percent), and each of the other 8 is a recorded difference with its cause. BLIS is itself a simulator, so this is agreement with how llm-d and vLLM decide, not a measurement on a GPU cluster, and absolute timings remain indicative. See [Parity with BLIS, llm-d and vLLM](#parity-with-blis-llm-d-and-vllm).
+Explore mode is driven by an independent TypeScript model that re-implements vLLM's scheduling and memory behaviour (continuous batching, chunked prefill, paged KV blocks, block-level prefix caching, preemption by recompute) and llm-d's routing, flow control and prefill/decode design. It runs no vLLM or llm-d code. Instead, every push is compared with BLIS on shared scenarios, and the offsets are what we report: median deviation 3.1% over 46 comparisons, 28 of them within 5%. 40 of 46 checks agree (87.0 percent) as written, and each of the other 6 is a recorded difference with its cause. BLIS is itself a simulator, so this is agreement with how llm-d and vLLM decide, not a measurement on a GPU cluster, and absolute timings remain indicative. See [Parity with BLIS, llm-d and vLLM](#parity-with-blis-llm-d-and-vllm).
 
 <p align="center">
   <img alt="Demo: ten requests on one pod, then a thousand at once with pods scaling up" src="docs/assets/demo.webp" width="100%">
@@ -128,19 +128,41 @@ The full list of sources, with links, is in [`src/sim/README.md`](src/sim/README
 The model is checked against [BLIS](https://github.com/inference-sim/inference-sim) (inference-sim), a discrete-event simulator that runs the llm-d router's code in front of a Go translation of vLLM 0.32's scheduler. Agreement with BLIS is therefore agreement with how those two systems route, queue, admit, preempt and account for KV memory.
 
 <!-- generated:parity-readme:start -->
-**BLIS** (commit `c79c7456`): 38 of 46 checks agree (82.6 percent), 8 known differences. 21 of the 27 approaches in the table above are covered by at least one of its scenarios.
+**BLIS** (commit `c79c7456`): median deviation 3.1% over 46 comparisons, 28 of them within 5%.
+
+| Group | Comparisons | Median deviation | Largest deviation | Within 1% | Within 5% | Within 10% | Within 25% |
+|---|---|---|---|---|---|---|---|
+| Capacity and KV accounting | 2 | 0.02% | 0.04% | 2 | 2 | 2 | 2 |
+| Decisions | 12 | 0% | 75.0% | 10 | 10 | 10 | 10 |
+| Timings and rates | 24 | 4.0% | 39.1% | 8 | 15 | 19 | 23 |
+| Directional effects | 8 | 15.8% | unbounded | 1 | 1 | 3 | 5 |
+| **All** | 46 | 3.1% | unbounded | 21 | 28 | 34 | 40 |
+
+Counting checks instead: 40 of 46 checks agree (87.0 percent), 6 known differences; 21 of the 27 approaches in the table above are covered by at least one of its scenarios.
 
 | Kind of check | What must hold | Checks | Agree | Known difference |
 |---|---|---|---|---|
-| Exact | Integers and decisions are equal (KV blocks per replica, cached prefix tokens, the pod chosen, which requests are shed or preempted) | 14 | 10 | 4 |
+| Exact | Decisions and discrete counts are equal (the pod chosen, cached prefix tokens, which requests are shed or preempted) | 12 | 10 | 2 |
+| Capacity | KV blocks per replica within 0.1%: both sides derive them from estimates | 2 | 2 | 0 |
 | Calibrated | A timing or rate is within the tolerance written in the scenario | 24 | 22 | 2 |
 | Directional | The same intervention moves the same metric the same way by a similar factor (memory tiers, eviction, routing policy, autoscaling) | 8 | 6 | 2 |
-| **All** | | **46** | **38** | **8** |
+| **All** | | **46** | **40** | **6** |
+
+Every check that does not hold as written (the scenario files carry the full reasons, [the parity page](docs/parity.md) the numbers):
+
+| Compared | Ours | Reference | Deviation | Missed | Cause |
+|---|---|---|---|---|---|
+| `autoscale-overload`: mean time to first token, fixed to autoscaled | 8.3% of baseline | 40% of baseline | ratio 0.206 | effect ratio 0.33 to 3 (different by design) | The autoscalers follow different rules and reach different sizes |
+| `routing-round-robin`: pod chosen per request | per request | per request | 8 of 12 differ (67%) | different by design | llm-d picks at random among tied pods; the model rotates strictly, as Envoy does |
+| `routing-round-robin`: requests per pod | 3/3/3/3 | 4/4/3/1 | 3 of 4 differ (75%); largest 200% | different by design | Same cause: random choice among tied pods against strict rotation |
+| `tiers-offload`: host-tier hit rate, gpu-only to with-dram | 49.8% | 0.0% | unbounded (reference effect is zero), direction differs | effect ratio 0.67 to 1.5 | The reference reports a zero host-tier hit counter although the tier works (its counter, not the behaviour) |
+| `timing-8b-h100-burst`: mean time to first token | 759 ms | 545 ms | +39.1% | 30% | One compute-efficiency factor cannot follow the reference's prefill cost curve |
+| `timing-8b-h100-burst`: throughput | 1,678 tok/s | 1,870 tok/s | -10.3% | 10% | Same prefill cost curve, seen from the throughput side |
 
 6 of the 27 approaches have no counterpart in any reference and are counted neither way; regenerate with `pnpm conformance:summary && pnpm docs:sync`.
 <!-- generated:parity-readme:end -->
 
-In short, 38 of 46 checks agree (82.6 percent). The known differences are: KV blocks per replica off by 2 in about 28,000 and by 30 in about 75,000 (activation estimate and rounding); round robin, which here is Envoy's strict rotation and in llm-d a rotation among tied pods; time to first token and throughput when 32 requests arrive at one instant, where one compute-efficiency factor cannot follow BLIS's prefill cost; the host-memory tier's hit-rate counter, which BLIS reports as zero; and how far queue wait falls under autoscaling, because the two autoscalers follow different rules.
+In short, against BLIS: median deviation 3.1% over 46 comparisons, 28 of them within 5%; 40 of 46 checks agree (87.0 percent) as written. The six that do not are in the table above: round robin (Envoy's strict rotation against llm-d's random choice among tied pods, two checks); time to first token and throughput when 32 requests arrive at one instant, where one compute-efficiency factor cannot follow BLIS's prefill cost; the host-memory tier's hit-rate counter, which BLIS reports as zero; and how far queue wait falls under autoscaling, because the two autoscalers follow different rules. KV blocks per replica, which differ by 2 in about 28,000 and by 30 in about 75,000, used to be recorded as differences; since 2026-11-16 they are checked within 0.1% (see [the parity page](docs/parity.md)).
 
 **How it is achieved**
 

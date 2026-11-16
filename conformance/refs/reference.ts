@@ -101,5 +101,5 @@ export function unsupportedBecause(ref: Pick<Reference, "supports" | "name">, s:
 
 /** Whether the reference can state what a check compares (its quantity or metric). Independent of the scenario. */
 export function canState(ref: Pick<Reference, "supports">, check: Check): boolean {
-  return check.kind === "exact" ? ref.supports.quantities.includes(check.quantity) : ref.supports.metrics.includes(check.metric);
+  return check.kind === "exact" || check.kind === "capacity" ? ref.supports.quantities.includes(check.quantity) : ref.supports.metrics.includes(check.metric);
 }

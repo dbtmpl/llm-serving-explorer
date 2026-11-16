@@ -7,6 +7,7 @@
  *
  * With several references covering a check, each is printed, then how they stand with each other.
  */
+import { rowOf } from "../deviation.js";
 import { referencesOf } from "../refs/index.js";
 import { loadScenario, scenarioIds } from "../scenario.js";
 import { compareScenario } from "../suite.js";
@@ -35,7 +36,9 @@ for (const id of ids) {
     for (const [ref, o] of Object.entries(c.perReference)) {
       const n = Object.keys(o.differences).length;
       const note = c.check.kind === "exact" ? "" : ` ${JSON.stringify({ typescript: o.typescript, [ref]: o.referenceValues, ...o.detail })}`;
+      const row = rowOf(id, c, ref);
       console.log(`${id} / ${c.check.id} [${c.check.kind}]${several ? ` vs ${ref}` : ""}: ${n === 0 ? "agrees" : `${n} difference(s)`}${note}`);
+      console.log(`  ours ${row.ours} | ${ref} ${row.theirs} | deviation ${row.deviationText} | tolerance ${row.tolerance} | ${row.holds ? "holds" : row.byDesign ? "differs by design" : "differs"}`);
       if (n) console.log(JSON.stringify(o.differences, null, 1));
     }
     if (several) {

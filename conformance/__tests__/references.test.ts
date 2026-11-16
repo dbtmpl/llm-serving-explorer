@@ -68,8 +68,8 @@ describe("several references on one check", () => {
       ...cal(),
       referenceGap: { reason: "x".repeat(90), differences: { value: { a: 0.1, b: 0.2 } } },
       knownDifferences: [
-        { reference: "span", reason: "y".repeat(90), differences: { value: { typescript: 0.3, span: "[0.1, 0.2]" } } },
-        { reference: "a", reason: "z".repeat(90), differences: { value: { typescript: 0.3, a: 0.1 } } }
+        { reference: "span", cause: "c", byDesign: false, reason: "y".repeat(90), differences: { value: { typescript: 0.3, span: "[0.1, 0.2]" } } },
+        { reference: "a", cause: "c", byDesign: false, reason: "z".repeat(90), differences: { value: { typescript: 0.3, a: 0.1 } } }
       ]
     };
     const c = compare(check, timed("typescript", 0.3), { a: timed("a", 0.1), b: timed("b", 0.2) });
@@ -138,12 +138,52 @@ describe("what a reference supports", () => {
     expect(canState(blis, s.checks[0]!)).toBe(true);
   });
   it("parses per-reference known differences, a gap and a reference list, and rejects malformed ones", () => {
-    const withKnown = YAML("").replace("    tolerance: because", `    tolerance: because\n    references: [blis]\n    known_difference:\n      reference: blis\n      reason: ${"r".repeat(90)}\n      differences:\n        s7/r0: { typescript: 0, blis: 1 }\n    reference_gap:\n      reason: ${"g".repeat(90)}\n      differences:\n        s7/r0: { blis: 1, other: 0 }`);
+    const withKnown = YAML("").replace("    tolerance: because", `    tolerance: because\n    references: [blis]\n    known_difference:\n      reference: blis\n      cause: a few words\n      reason: ${"r".repeat(90)}\n      differences:\n        s7/r0: { typescript: 0, blis: 1 }\n    reference_gap:\n      reason: ${"g".repeat(90)}\n      differences:\n        s7/r0: { blis: 1, other: 0 }`);
     const c = parseScenario("tiny.yaml", withKnown).checks[0]!;
     expect(c.references).toEqual(["blis"]);
     expect(c.knownDifferences[0]!.reference).toBe("blis");
     expect(c.referenceGap!.differences).toEqual({ "s7/r0": { blis: 1, other: 0 } });
     expect(() => parseScenario("tiny.yaml", withKnown.replace("{ typescript: 0, blis: 1 }", "{ typescript: 0, other: 1 }"))).toThrow(/must give the values/);
     expect(() => parseScenario("tiny.yaml", withKnown.replace("      reference: blis\n", ""))).toThrow(/"reference"/);
+  });
+});
+
+import { evaluate } from "../compare.js";
+import { distributionOf, groupOf, rowOf } from "../deviation.js";
+import type { CapacityCheck } from "../scenario.js";
+
+describe("deviations and capacity checks", () => {
+  const capacity = (relTol = 0.001): CapacityCheck => ({ ...base, kind: "capacity", quantity: "kv_blocks_per_replica", relTol });
+  it("a capacity within its relative tolerance holds, and carries the signed relative deviation", () => {
+    const o = evaluate(capacity(), blocks(27928, "typescript"), blocks(27926, "blis"));
+    expect(o.differences).toEqual({});
+    expect(o.classification).toBe("within_tolerance");
+    expect(o.deviation).toEqual({ kind: "relative", value: 2 / 27926 });
+    expect(evaluate(capacity(0.00005), blocks(27928, "typescript"), blocks(27926, "blis")).differences).toEqual({ value: { typescript: 27928, blis: 27926 } });
+  });
+  it("exact decisions: the share that differ, and the largest relative difference of integers per row", () => {
+    const check: ExactCheck = { ...base, kind: "exact", quantity: "prefix_cached_tokens" };
+    const r = (source: string, a: number, b: number) => ({ [MAIN_ARM]: rec(source, [{ ...row(1, 0, null), cachedTokens: a }, { ...row(2, 0, null), cachedTokens: b }]) });
+    const o = evaluate(check, r("typescript", 100, 55), r("blis", 100, 50));
+    expect(o.deviation).toEqual({ kind: "decisions", differing: 1, total: 2, share: 0.5, maxRelative: 0.1 });
+  });
+  it("directional effects: the ratio of the effects and whether the direction matches", () => {
+    const dir: DirectionalCheck = { ...base, kind: "directional", metric: "ttft_mean_s", baseline: "off", intervention: "on", effect: "ratio", direction: "decrease", band: [0.5, 2] };
+    const arms = (s: string, off: number, on: number) => ({ off: timed(s, off)[MAIN_ARM]!, on: timed(s, on)[MAIN_ARM]! });
+    expect(evaluate(dir, arms("typescript", 1, 0.5), arms("blis", 1, 0.4)).deviation).toEqual({ kind: "effect", ratio: 0.5 / 0.4, directionMatches: true });
+    expect(evaluate(dir, arms("typescript", 1, 0.5), arms("blis", 1, 1.2)).deviation).toMatchObject({ directionMatches: false });
+  });
+  it("puts every check in one group and summarises a distribution with unbounded values kept out of the bins", () => {
+    expect(groupOf(capacity())).toBe("capacity");
+    expect(groupOf(cal())).toBe("timings");
+    expect(groupOf({ ...base, kind: "exact", quantity: "routed_pod" })).toBe("decisions");
+    const d = distributionOf([0, 0.004, 0.06, 0.2, null]);
+    expect(d).toMatchObject({ n: 5, median: 0.06, max: null, unbounded: 1, within: { "1": 2, "5": 2, "10": 3, "25": 4 } });
+    expect(distributionOf([0.01, 0.03]).max).toBe(0.03);
+  });
+  it("describes a row for the report and the README: both values, the deviation, the tolerance", () => {
+    const c = compare(cal(0.3), timed("typescript", 0.7586), { blis: timed("blis", 0.5452) });
+    const row = rowOf("s", c, "blis");
+    expect(row).toMatchObject({ ours: "759 ms", theirs: "545 ms", deviationText: "+39.1%", tolerance: "30%", holds: false, group: "timings" });
   });
 });

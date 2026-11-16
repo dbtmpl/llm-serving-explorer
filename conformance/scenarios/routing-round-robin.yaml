@@ -35,6 +35,8 @@ checks:
     tolerance: A routing decision is a discrete choice; a request either went to the same replica as the other simulator's or it did not.
     known_difference:
       reference: blis
+      cause: "llm-d picks at random among tied pods; the model rotates strictly, as Envoy does"
+      by_design: true
       reason: >-
         The TypeScript model rotates strictly through the replicas (Envoy's round robin), so request i goes to replica
         i mod 4. The llm-d router has no such policy. The closest configuration, which BLIS ships as
@@ -61,6 +63,8 @@ checks:
     tolerance: Counts of discrete decisions.
     known_difference:
       reference: blis
+      cause: "Same cause: random choice among tied pods against strict rotation"
+      by_design: true
       reason: >-
         Same cause as pod-sequence. A strict rotation gives 3, 3, 3, 3; llm-d's random choice among tied replicas gave
         4, 4, 3, 1 for this trace (counts sorted from the busiest replica; deterministic for the pinned build and seed).

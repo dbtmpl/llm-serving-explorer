@@ -64,6 +64,7 @@ checks:
     tolerance: "The two simulators' host-tier hit rates must be within a factor of 1.5 of each other: the rate is set by which conversations were evicted and fit in 32 GB, which both decide by least-recently-used order, but BLIS stores whole prompt chunks and not the answer's tokens and the TypeScript model whole conversations, so a few percent of tokens can differ."
     known_difference:
       reference: blis
+      cause: "The reference reports a zero host-tier hit counter although the tier works (its counter, not the behaviour)"
       reason: >-
         BLIS reports a host-tier hit rate of zero in this run (`cpu_tier_hit_rate` in its Result; the per-request rows carry no external-token count either) although the
         run shows the tier working: a follow-up's scheduling delay is 56.6 ms with the tier against 41.1 ms without (the 15.5 ms is the copy of about 3,050 tokens of KV,
