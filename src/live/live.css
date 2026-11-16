@@ -1188,3 +1188,90 @@ body,
     padding: 3px 10px;
   }
 }
+
+/* "does not fit" box and menu marks */
+.lv-fit {
+  position: absolute;
+  top: 82px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(560px, calc(100vw - 700px));
+  min-width: 320px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 14px 12px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--evict);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+  z-index: 5;
+}
+.lv-fit.tight {
+  border-left-color: var(--remote);
+}
+.lv-fit > b {
+  font-size: 13px;
+  font-weight: 650;
+}
+.lv-fit > span {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--sub);
+}
+.lv-fit-fixes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.lv-fit-fixes button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  text-align: left;
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 9px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+.lv-fit-fixes button small {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--sub);
+}
+.lv-fit-fixes button:hover {
+  border-color: var(--ink);
+}
+.lv-seg button.nofit {
+  opacity: 0.55;
+  text-decoration: underline dotted var(--evict);
+  text-underline-offset: 3px;
+}
+.lv-seg button.nofit i {
+  font-style: normal;
+  font-size: 9px;
+  margin-left: 3px;
+  color: var(--evict);
+}
+@media (max-width: 900px) {
+  .lv-fit {
+    top: 64px;
+    left: 8px;
+    right: 8px;
+    width: auto;
+    min-width: 0;
+    transform: none;
+    max-height: 42vh;
+    overflow-y: auto;
+  }
+}

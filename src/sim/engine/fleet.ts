@@ -88,7 +88,7 @@ export function restartFleet(w: World): void {
     }
   }
   w.handoff = [];
-  emit(w, "fleet.restart", { requeued });
+  emit(w, "fleet.restart", { requeued, inFlight: w.reqs.size });
 }
 
 /** Scale up to the autoscaler's target at once; scale down pods that have been idle long enough. */

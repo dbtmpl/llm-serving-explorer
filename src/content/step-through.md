@@ -849,6 +849,9 @@ End of this session's walkthrough
 ### body-evicted
 You followed session {sid} from its message at the client to its KV cache leaving GPU memory. Next follows the next new request; exit leaves step-through.
 
+### body-queued
+Weights and the KV pool are sized at start-up, so this change rebuilds every pod. {inFlight} requests in flight were still waiting at the router and keep waiting; new pods load weights for about {cold} s.
+
 ### body-idle
 You followed session {sid} from its message at the client to the end of its conversation. Next follows the next new request; exit leaves step-through.
 
@@ -934,10 +937,22 @@ Scaled down
 Idle for {idle} s. The KV in this node's HBM, DRAM and SSD is lost with it; only the remote pool and the text survive.
 
 ## `fleet.restart` Fleet restarted
-_Where:_ Beside the router, when a setting that sizes the weights or the KV pool changes and every pod is rebuilt.
+_Where:_ Beside the router, when a setting that sizes the weights or the KV pool changes and every pod is rebuilt; it says what happens to the requests that were in flight and, if the new settings leave no room for a KV cache, says so instead.
 
 ### title
 Fleet restarted
 
-### body
-Weights and the KV pool are sized at start-up, so this change rebuilds every pod. In-flight requests re-prefill.
+### body-requests-one
+Weights and the KV pool are sized at start-up, so this change rebuilds every pod. 1 request goes back to the queue and re-prefills; new pods load weights for about {cold} s.
+
+### body-requests-many
+Weights and the KV pool are sized at start-up, so this change rebuilds every pod. {requeued} requests go back to the queue and re-prefill; new pods load weights for about {cold} s.
+
+### body-queued
+Weights and the KV pool are sized at start-up, so this change rebuilds every pod. {inFlight} requests in flight were still waiting at the router and keep waiting; new pods load weights for about {cold} s.
+
+### body-idle
+Weights and the KV pool are sized at start-up, so this change rebuilds every pod. Nothing was in flight; the next request starts a pod, which loads weights for about {cold} s.
+
+### body-nofit
+Every pod is rebuilt, and with these settings none can start: {model} in {precision} leaves no room for a KV cache on a {gpu}. Requests wait at the router until you pick a configuration that fits (see the box at the top).

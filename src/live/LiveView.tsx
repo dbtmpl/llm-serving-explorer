@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
 import { STEP_KINDS, calloutFor, type Callout } from "./callouts.js";
 import { GATE_TIMEOUT_S, end, newScript, stepsFor, type Script } from "./walkthrough.js";
 import { TOUR, TourArt } from "./Tutorial.js";
@@ -15,10 +15,12 @@ import { ReplayInspector } from "../replay/ReplayInspector.js";
 import { DEFAULT_REPLAY, type ReplayId } from "../replay/scenarios.js";
 import type { ReplayFile } from "../replay/schema.js";
 import { exploreRun, type Run, type RunWorld } from "./run.js";
-import { ARCHITECTURES, DEFAULT_ARCH, DEFAULT_PARAMS, GPUS, MODELS, advance, costPerMTok, createWorld, elapsed, evictIdleNow, kvFill, livePods, median, setParam, spawnBurst, tokensPerSecond, type Params, type World } from "../sim/index.js";
+import { ARCHITECTURES, DEFAULT_ARCH, DEFAULT_PARAMS, GPUS, MODELS, advance, costPerMTok, createWorld, elapsed, evictIdleNow, fitOf, fitsWith, fixesFor, kvFill, livePods, median, replicaSpec, setParam, spawnBurst, tokensPerSecond, type Fix, type Params, type World } from "../sim/index.js";
 import "./live.css";
 
 const EMPTY_TEXT = panelFields("empty", { title: "title", text: "text", hint: "hint" });
+/** What the router says on its node while requests wait and no pod can start (src/content/panels.md). */
+const GATEWAY_NOTE = panelText("fit.gateway");
 const SPEEDS = [0.02, 0.05, 0.1, 0.25, 0.5, 1];
 /** A replay runs at BLIS's own pace at 1×; its scenarios last from under a minute to a few, so it also offers faster. */
 const REPLAY_SPEEDS = [0.5, 1, 2, 5, 10];
@@ -37,6 +39,8 @@ interface Calibrated {
   error: string;
 }
 const CALLOUT_TTL = 9;
+/** Seconds the restart note keeps the router's node to itself before other notes may take it. */
+const RESTART_HOLD_S = 6;
 
 interface Shown extends Callout {
   id: number;
@@ -149,16 +153,23 @@ function Slider({ label, value, min, max, step, fmt, onChange, id }: { label: st
   );
 }
 
-function Choice<T extends string | number | boolean>({ label, value, options, onChange }: { label: string; value: T; options: [T, string][]; onChange: (v: T) => void }) {
+/** Hover text and note for the menu options that would not fit (src/content/panels.md). */
+const FIT_OPTION = panelFields("fit.option", { title: "title", note: "note" });
+
+function Choice<T extends string | number | boolean>({ label, value, options, onChange, nofit }: { label: string; value: T; options: [T, string][]; onChange: (v: T) => void; nofit?: (v: T) => boolean }) {
   return (
     <div className="lv-choice">
       <span>{label}</span>
       <div className="lv-seg">
-        {options.map(([v, l]) => (
-          <button key={String(v)} className={v === value ? "on" : ""} onClick={() => onChange(v)}>
-            {l}
-          </button>
-        ))}
+        {options.map(([v, l]) => {
+          const bad = !!nofit?.(v);
+          return (
+            <button key={String(v)} className={`${v === value ? "on" : ""}${bad ? " nofit" : ""}`} data-fit={bad ? "no" : undefined} title={bad ? FIT_OPTION.title : undefined} onClick={() => onChange(v)}>
+              {l}
+              {bad && <i aria-hidden="true">⊘</i>}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -176,6 +187,13 @@ const Group = ({ title, children, open }: { title: string; children: ReactNode; 
     <div>{children}</div>
   </details>
 );
+
+/** The label and small print of a fix button (src/content/panels.md, `fit.fix`). */
+function fixText(f: Fix): { label: string; pool: string } {
+  const label = panelFields("fit.fix", { label: f.kind }, f.kind === "precision" ? {} : { value: f.value }).label;
+  const pool = panelFields("fit.fix", { pool: "pool" }, { tokens: fmtInt(Math.round(f.poolTokens / 100) * 100) }).pool;
+  return { label, pool };
+}
 
 export function LiveView() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -205,6 +223,7 @@ export function LiveView() {
   live.current.tour = tour;
   const heldEl = useRef<HTMLDivElement>(null);
   const tourEl = useRef<HTMLDivElement>(null);
+  const fitEl = useRef<HTMLDivElement>(null);
   const ringEl = useRef<HTMLDivElement>(null);
   live.current.playing = playing;
   live.current.speed = speed;
@@ -232,18 +251,18 @@ export function LiveView() {
      * the tutorial card at the left and the step box at the bottom, between the menus; narrow screens
      * put both above the transport bar. Does nothing, and costs nothing, when no guided mode is on.
      */
-    const guideScene = (scene: Scene, st: typeof live.current, cw: number, ch: number) => {
+    const guideScene = (scene: Scene, st: typeof live.current, cw: number, ch: number, bannerH: number) => {
       const tourStep = st.tour !== null ? TOUR[st.tour]! : null;
       const dock = tourStep ? tourEl.current : st.held ? heldEl.current : null;
       if (!dock) {
-        scene.reserve = { l: 0, t: 0, r: 0, b: 0 };
+        scene.reserve = { l: 0, t: bannerH, r: 0, b: 0 };
         scene.setGuide(null);
         scene.highlight = null;
         return;
       }
       const narrow = cw < 900;
-      const free: Free = { l: 16, t: narrow ? 68 : 80, r: cw - 16, b: ch - (narrow ? 78 : 90) };
-      const reserve = { l: 0, t: 0, r: 0, b: 0 };
+      const free: Free = { l: 16, t: (narrow ? 68 : 80) + bannerH, r: cw - 16, b: ch - (narrow ? 78 : 90) };
+      const reserve = { l: 0, t: bannerH, r: 0, b: 0 };
       const bh = dock.offsetHeight;
       let x: number;
       let y: number;
@@ -340,7 +359,10 @@ export function LiveView() {
       else if (replay && st.playing && world.t < replay.t) advance(world, Math.min(dt * replay.rate, replay.t - world.t));
       const events = shown.events.splice(0);
       scene.focusSid = st.stepMode ? st.focus : null;
-      guideScene(scene, st, cw, ch);
+      // the "does not fit" box at the top of the graph keeps the picture out from under it
+      const bannerH = fitEl.current ? fitEl.current.offsetHeight + 8 : 0;
+      scene.gatewayNote = fitEl.current && fitEl.current.dataset.state === "blocked" ? GATEWAY_NOTE : "";
+      guideScene(scene, st, cw, ch, bannerH);
       scene.update(shown, events, dt, animating, cw, ch);
       scene.draw(ctx, shown, dpr);
 
@@ -389,7 +411,10 @@ export function LiveView() {
       // callouts: new ones from this frame's events, then keep every box glued to its node
       if (!calibrated && st.explain && !st.stepMode && st.tour === null && events.length) {
         let next: Shown[] | null = null;
+        // a restart and the scale-up it causes happen in the same frame and share the router's node; the restart note is the one that explains, so it is not replaced
+        const restarted = events.some((e) => e.kind === "fleet.restart");
         for (const c of events.flatMap((e) => calloutFor(e, world))) {
+          if (c.target.type === "gateway" && c.key !== "restart" && (restarted || st.callouts.some((x) => x.key === "restart" && scene.vt - x.born < RESTART_HOLD_S))) continue;
           // one box per kind of event at a time, however many pods it happens on
           const family = c.key.replace(/\d+$/, "");
           if (c.once && st.seen.has(c.key)) continue;
@@ -786,6 +811,16 @@ export function LiveView() {
   const showLeft = panels && tour === null && !(stepMode && narrow);
   const showRight = tour !== null ? !!tourTarget && "el" in tourTarget && tourTarget.el === "right" : panels;
 
+  const fit = calibrated ? null : fitOf(p as Params);
+  const fixKey = `${p.model}|${p.gpu}|${p.precision}|${p.tp}|${p.gpuMemUtil}|${p.promptTokens}|${p.outputTokens}`;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const fixes = useMemo(() => (calibrated || !fit || fit.fits && !fit.tight ? [] : fixesFor(p as Params)), [calibrated, fixKey]);
+  const spec = calibrated ? null : replicaSpec(p as Params);
+  const applyFix = (f: Fix) => {
+    for (const [k, v] of Object.entries(f.changes)) set(k as keyof Params, v as never);
+  };
+  const nofit = (changes: Partial<Params>) => !calibrated && !fitsWith(p as Params, changes);
+  const anyNoFit = [...Object.keys(MODELS).map((model) => ({ model })), ...Object.keys(GPUS).map((gpu) => ({ gpu })), ...(["bf16", "fp8"] as const).map((precision) => ({ precision })), ...[1, 2, 4, 8].map((tp) => ({ tp }))].some(nofit);
   const live_ = livePods(w);
   const hit = w.m.promptTokens ? w.m.cachedTokens / w.m.promptTokens : 0;
   const empty = !calibrated && w.sessions.size === 0 && w.pods.length === 0 && w.pending.length === 0;
@@ -821,6 +856,33 @@ export function LiveView() {
           <small>
             <Rich inline text={EMPTY_TEXT.hint} />
           </small>
+        </div>
+      )}
+
+      {fit && spec && (!fit.fits || fit.tight) && (
+        <div ref={fitEl} className={`lv-fit ${fit.fits ? "tight" : "blocked"}`} data-testid="fit-banner" data-state={fit.fits ? "tight" : "blocked"} role={fit.fits ? "status" : "alert"}>
+          <b>{panelFields(fit.fits ? "fit.tight" : "fit.blocked", { title: "title" }).title}</b>
+          <span>
+            <Rich
+              inline
+              text={
+                fit.fits
+                  ? panelFields("fit.tight", { body: "body" }, { tokens: fmtInt(Math.round(fit.poolTokens / 100) * 100), requests: fit.poolRequests.toFixed(1) }).body
+                  : panelFields("fit.blocked", { body: "body" }, { model: spec.model.label, precision: spec.precision === "fp8" ? "FP8" : "BF16", need: fmtGB(fit.needBytes), usable: fmtGB(fit.usableBytes), gpu: spec.gpu.label, util: p.gpuMemUtil.toFixed(2) }).body
+              }
+            />
+          </span>
+          <div className="lv-fit-fixes">
+            {fixes.map((f) => {
+              const t = fixText(f);
+              return (
+                <button key={f.kind} data-testid={`fit-fix-${f.kind}`} onClick={() => applyFix(f)}>
+                  {t.label}
+                  <small>{t.pool}</small>
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -1042,11 +1104,12 @@ export function LiveView() {
             <span className="lv-live">changes apply live</span>
           </header>
           <Group title="Model and GPU">
-            <Choice label="model" value={p.model} options={Object.values(MODELS).map((m) => [m.id, m.label])} onChange={(v) => set("model", v)} />
-            <Choice label="precision" value={p.precision} options={[["bf16", "BF16"], ["fp8", "FP8"]]} onChange={(v) => set("precision", v)} />
-            <Choice label="GPU" value={p.gpu} options={Object.values(GPUS).map((g) => [g.id, g.label.replace(" SXM", "")])} onChange={(v) => set("gpu", v)} />
-            <Choice label="GPUs per pod (tensor parallel)" value={p.tp} options={[[1, "1"], [2, "2"], [4, "4"], [8, "8"]]} onChange={(v) => set("tp", v)} />
+            <Choice label="model" value={p.model} options={Object.values(MODELS).map((m) => [m.id, m.label])} nofit={(v) => nofit({ model: v })} onChange={(v) => set("model", v)} />
+            <Choice label="precision" value={p.precision} options={[["bf16", "BF16"], ["fp8", "FP8"]]} nofit={(v) => nofit({ precision: v })} onChange={(v) => set("precision", v)} />
+            <Choice label="GPU" value={p.gpu} options={Object.values(GPUS).map((g) => [g.id, g.label.replace(" SXM", "")])} nofit={(v) => nofit({ gpu: v })} onChange={(v) => set("gpu", v)} />
+            <Choice label="GPUs per pod (tensor parallel)" value={p.tp} options={[[1, "1"], [2, "2"], [4, "4"], [8, "8"]]} nofit={(v) => nofit({ tp: v })} onChange={(v) => set("tp", v)} />
             <Slider label="gpu_memory_utilization" value={p.gpuMemUtil} min={0.3} max={0.98} step={0.01} fmt={(v) => v.toFixed(2)} onChange={(v) => set("gpuMemUtil", v)} />
+            {anyNoFit && <Rich text={FIT_OPTION.note} className="lv-note" />}
             <Rich text={panelText("model.note")} className="lv-note" />
           </Group>
           <Group title="Engine">
