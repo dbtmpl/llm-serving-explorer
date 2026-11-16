@@ -1,0 +1,2450 @@
+{
+ "id": "rtx-4090-llama-3.1-8b",
+ "gpu": "rtx-4090",
+ "model": "llama-3.1-8b",
+ "source": {
+  "repository": "https://github.com/casys-kaist/LLMServingSim",
+  "commit": "49df63f2af61230da63dd2136044a2dbf9bd4161",
+  "licence": "MIT",
+  "copyright": "Copyright (c) 2024, CASYS Lab at KAIST",
+  "files": {
+   "bench/examples/RTX4090/Llama-3.1-8B/vllm/meta.json": "56cbcb2a08e9fe6f67d60cad8ee545f86c874f82b46ab413da484f331417b2fc",
+   "bench/examples/RTX4090/Llama-3.1-8B/vllm/requests.jsonl": "5a6f2a0b09d5eb84bd75b30ed625d883c22b4bcc0a839cd1128ae42f74ecc90d",
+   "bench/examples/RTX4090/Llama-3.1-8B/vllm/timeseries.csv": "f99d474f8d8a2c52f986fb27e46832a1627fc908d7570852b016573b89ab3173"
+  }
+ },
+ "engine": {
+  "vllmVersion": "0.19.0",
+  "deviceName": "NVIDIA GeForce RTX 4090",
+  "deviceTotalMemoryBytes": 25250627584,
+  "gpuMemoryUtilisation": 0.9,
+  "maxNumSeqs": 256,
+  "maxNumBatchedTokens": 2048,
+  "maxModelLen": 32768,
+  "blockSize": 16,
+  "enablePrefixCaching": true,
+  "tensorParallelSize": 1,
+  "numGpuBlocks": 2588,
+  "asyncScheduling": true,
+  "schedulerReserveFullIsl": true,
+  "cudagraphMode": "[2,1]"
+ },
+ "workload": {
+  "dataset": "workloads/sharegpt-llama-3.1-8b-300-sps10.jsonl",
+  "datasetSha256": "05e48b32da530d4a3dd77f3d47c6fe694ac8308d611aa088e38bb10fba2b3b3a",
+  "requests": 300,
+  "startedAt": "2026-08-20T23:19:39.992496Z"
+ },
+ "clockOffsetS": -1787240443.423884,
+ "timeseries": {
+  "ticks": 184,
+  "promptTokens": 257239,
+  "cachedPromptTokens": null,
+  "preemptedMax": null,
+  "runningMax": 49,
+  "waitingMax": 234,
+  "kvCachePctMax": 100
+ },
+ "requests": [
+  {
+   "id": "bench-0",
+   "arrivalS": 0,
+   "inputTokens": 2358,
+   "outputTokens": 531,
+   "firstTokenS": 0.691279,
+   "lastTokenS": 17.572162
+  },
+  {
+   "id": "bench-1",
+   "arrivalS": 0.265091,
+   "inputTokens": 1034,
+   "outputTokens": 769,
+   "firstTokenS": 0.691279,
+   "lastTokenS": 25.621038
+  },
+  {
+   "id": "bench-2",
+   "arrivalS": 0.396147,
+   "inputTokens": 1320,
+   "outputTokens": 769,
+   "firstTokenS": 0.894508,
+   "lastTokenS": 25.646478
+  },
+  {
+   "id": "bench-3",
+   "arrivalS": 0.488067,
+   "inputTokens": 685,
+   "outputTokens": 769,
+   "firstTokenS": 0.894508,
+   "lastTokenS": 25.646478
+  },
+  {
+   "id": "bench-4",
+   "arrivalS": 0.5049,
+   "inputTokens": 298,
+   "outputTokens": 526,
+   "firstTokenS": 1.063552,
+   "lastTokenS": 17.439716
+  },
+  {
+   "id": "bench-5",
+   "arrivalS": 0.521681,
+   "inputTokens": 399,
+   "outputTokens": 520,
+   "firstTokenS": 1.063552,
+   "lastTokenS": 17.051065
+  },
+  {
+   "id": "bench-6",
+   "arrivalS": 0.527328,
+   "inputTokens": 1307,
+   "outputTokens": 758,
+   "firstTokenS": 1.063552,
+   "lastTokenS": 25.114531
+  },
+  {
+   "id": "bench-7",
+   "arrivalS": 0.728436,
+   "inputTokens": 1379,
+   "outputTokens": 519,
+   "firstTokenS": 1.2402,
+   "lastTokenS": 17.051065
+  },
+  {
+   "id": "bench-8",
+   "arrivalS": 0.820447,
+   "inputTokens": 289,
+   "outputTokens": 761,
+   "firstTokenS": 1.2402,
+   "lastTokenS": 25.414138
+  },
+  {
+   "id": "bench-9",
+   "arrivalS": 0.94372,
+   "inputTokens": 1008,
+   "outputTokens": 692,
+   "firstTokenS": 1.379519,
+   "lastTokenS": 22.65888
+  },
+  {
+   "id": "bench-10",
+   "arrivalS": 0.945714,
+   "inputTokens": 576,
+   "outputTokens": 729,
+   "firstTokenS": 1.379519,
+   "lastTokenS": 23.834497
+  },
+  {
+   "id": "bench-11",
+   "arrivalS": 1.29612,
+   "inputTokens": 1479,
+   "outputTokens": 681,
+   "firstTokenS": 1.545892,
+   "lastTokenS": 22.282834
+  },
+  {
+   "id": "bench-12",
+   "arrivalS": 1.474614,
+   "inputTokens": 305,
+   "outputTokens": 698,
+   "firstTokenS": 1.760408,
+   "lastTokenS": 23.019653
+  },
+  {
+   "id": "bench-13",
+   "arrivalS": 1.498714,
+   "inputTokens": 2357,
+   "outputTokens": 766,
+   "firstTokenS": 1.954815,
+   "lastTokenS": 26.16276
+  },
+  {
+   "id": "bench-14",
+   "arrivalS": 1.518825,
+   "inputTokens": 835,
+   "outputTokens": 527,
+   "firstTokenS": 1.954815,
+   "lastTokenS": 17.902473
+  },
+  {
+   "id": "bench-15",
+   "arrivalS": 1.539036,
+   "inputTokens": 3452,
+   "outputTokens": 745,
+   "firstTokenS": 2.356751,
+   "lastTokenS": 24.683727
+  },
+  {
+   "id": "bench-16",
+   "arrivalS": 1.575239,
+   "inputTokens": 1355,
+   "outputTokens": 769,
+   "firstTokenS": 2.55501,
+   "lastTokenS": 26.585416
+  },
+  {
+   "id": "bench-17",
+   "arrivalS": 1.650633,
+   "inputTokens": 866,
+   "outputTokens": 769,
+   "firstTokenS": 2.55501,
+   "lastTokenS": 26.585416
+  },
+  {
+   "id": "bench-18",
+   "arrivalS": 1.70679,
+   "inputTokens": 2884,
+   "outputTokens": 767,
+   "firstTokenS": 2.763202,
+   "lastTokenS": 26.561066
+  },
+  {
+   "id": "bench-19",
+   "arrivalS": 1.740929,
+   "inputTokens": 539,
+   "outputTokens": 722,
+   "firstTokenS": 2.960279,
+   "lastTokenS": 23.961807
+  },
+  {
+   "id": "bench-20",
+   "arrivalS": 1.835199,
+   "inputTokens": 1403,
+   "outputTokens": 772,
+   "firstTokenS": 2.960279,
+   "lastTokenS": 27.31145
+  },
+  {
+   "id": "bench-21",
+   "arrivalS": 1.850297,
+   "inputTokens": 2197,
+   "outputTokens": 548,
+   "firstTokenS": 3.161026,
+   "lastTokenS": 18.693375
+  },
+  {
+   "id": "bench-22",
+   "arrivalS": 1.885392,
+   "inputTokens": 483,
+   "outputTokens": 776,
+   "firstTokenS": 3.3572,
+   "lastTokenS": 27.660947
+  },
+  {
+   "id": "bench-23",
+   "arrivalS": 1.930283,
+   "inputTokens": 461,
+   "outputTokens": 614,
+   "firstTokenS": 3.3572,
+   "lastTokenS": 21.038619
+  },
+  {
+   "id": "bench-24",
+   "arrivalS": 1.991734,
+   "inputTokens": 268,
+   "outputTokens": 581,
+   "firstTokenS": 3.3572,
+   "lastTokenS": 20.988199
+  },
+  {
+   "id": "bench-25",
+   "arrivalS": 2.145833,
+   "inputTokens": 437,
+   "outputTokens": 556,
+   "firstTokenS": 3.3572,
+   "lastTokenS": 21.407986
+  },
+  {
+   "id": "bench-26",
+   "arrivalS": 2.168665,
+   "inputTokens": 348,
+   "outputTokens": 720,
+   "firstTokenS": 3.3572,
+   "lastTokenS": 29.197242
+  },
+  {
+   "id": "bench-27",
+   "arrivalS": 2.239663,
+   "inputTokens": 327,
+   "outputTokens": 770,
+   "firstTokenS": 3.556226,
+   "lastTokenS": 31.196382
+  },
+  {
+   "id": "bench-28",
+   "arrivalS": 2.329675,
+   "inputTokens": 363,
+   "outputTokens": 550,
+   "firstTokenS": 3.556226,
+   "lastTokenS": 24.192865
+  },
+  {
+   "id": "bench-29",
+   "arrivalS": 2.334644,
+   "inputTokens": 624,
+   "outputTokens": 721,
+   "firstTokenS": 3.556226,
+   "lastTokenS": 31.682248
+  },
+  {
+   "id": "bench-30",
+   "arrivalS": 2.427753,
+   "inputTokens": 519,
+   "outputTokens": 742,
+   "firstTokenS": 3.556226,
+   "lastTokenS": 33.119044
+  },
+  {
+   "id": "bench-31",
+   "arrivalS": 2.447647,
+   "inputTokens": 319,
+   "outputTokens": 767,
+   "firstTokenS": 3.75776,
+   "lastTokenS": 34.4065
+  },
+  {
+   "id": "bench-32",
+   "arrivalS": 2.453455,
+   "inputTokens": 346,
+   "outputTokens": 604,
+   "firstTokenS": 3.75776,
+   "lastTokenS": 30.704809
+  },
+  {
+   "id": "bench-33",
+   "arrivalS": 2.751022,
+   "inputTokens": 1195,
+   "outputTokens": 557,
+   "firstTokenS": 3.75776,
+   "lastTokenS": 32.435718
+  },
+  {
+   "id": "bench-34",
+   "arrivalS": 3.087848,
+   "inputTokens": 403,
+   "outputTokens": 734,
+   "firstTokenS": 3.75776,
+   "lastTokenS": 38.215812
+  },
+  {
+   "id": "bench-35",
+   "arrivalS": 3.253069,
+   "inputTokens": 633,
+   "outputTokens": 767,
+   "firstTokenS": 3.956556,
+   "lastTokenS": 40.730974
+  },
+  {
+   "id": "bench-36",
+   "arrivalS": 3.288994,
+   "inputTokens": 814,
+   "outputTokens": 768,
+   "firstTokenS": 3.956556,
+   "lastTokenS": 42.032995
+  },
+  {
+   "id": "bench-37",
+   "arrivalS": 3.299728,
+   "inputTokens": 1092,
+   "outputTokens": 590,
+   "firstTokenS": 4.157076,
+   "lastTokenS": 38.062379
+  },
+  {
+   "id": "bench-38",
+   "arrivalS": 3.41471,
+   "inputTokens": 1320,
+   "outputTokens": 770,
+   "firstTokenS": 4.157076,
+   "lastTokenS": 45.267511
+  },
+  {
+   "id": "bench-39",
+   "arrivalS": 3.472693,
+   "inputTokens": 1484,
+   "outputTokens": 574,
+   "firstTokenS": 4.338284,
+   "lastTokenS": 40.707014
+  },
+  {
+   "id": "bench-40",
+   "arrivalS": 3.485592,
+   "inputTokens": 455,
+   "outputTokens": 768,
+   "firstTokenS": 4.338284,
+   "lastTokenS": 47.281782
+  },
+  {
+   "id": "bench-41",
+   "arrivalS": 3.554381,
+   "inputTokens": 468,
+   "outputTokens": 717,
+   "firstTokenS": 24.322344,
+   "lastTokenS": 46.1061
+  },
+  {
+   "id": "bench-42",
+   "arrivalS": 3.557163,
+   "inputTokens": 611,
+   "outputTokens": 569,
+   "firstTokenS": 24.904034,
+   "lastTokenS": 42.333646
+  },
+  {
+   "id": "bench-43",
+   "arrivalS": 3.797327,
+   "inputTokens": 393,
+   "outputTokens": 527,
+   "firstTokenS": 24.904034,
+   "lastTokenS": 40.602206
+  },
+  {
+   "id": "bench-44",
+   "arrivalS": 3.827363,
+   "inputTokens": 1034,
+   "outputTokens": 532,
+   "firstTokenS": 25.088748,
+   "lastTokenS": 40.926975
+  },
+  {
+   "id": "bench-45",
+   "arrivalS": 3.936554,
+   "inputTokens": 389,
+   "outputTokens": 565,
+   "firstTokenS": 25.088748,
+   "lastTokenS": 42.059137
+  },
+  {
+   "id": "bench-46",
+   "arrivalS": 3.973178,
+   "inputTokens": 1135,
+   "outputTokens": 739,
+   "firstTokenS": 25.088748,
+   "lastTokenS": 47.398251
+  },
+  {
+   "id": "bench-47",
+   "arrivalS": 4.047211,
+   "inputTokens": 1255,
+   "outputTokens": 779,
+   "firstTokenS": 25.339047,
+   "lastTokenS": 48.977443
+  },
+  {
+   "id": "bench-48",
+   "arrivalS": 4.126468,
+   "inputTokens": 851,
+   "outputTokens": 633,
+   "firstTokenS": 25.339047,
+   "lastTokenS": 44.085672
+  },
+  {
+   "id": "bench-49",
+   "arrivalS": 4.146282,
+   "inputTokens": 605,
+   "outputTokens": 708,
+   "firstTokenS": 25.388317,
+   "lastTokenS": 46.351724
+  },
+  {
+   "id": "bench-50",
+   "arrivalS": 4.495444,
+   "inputTokens": 621,
+   "outputTokens": 713,
+   "firstTokenS": 25.543341,
+   "lastTokenS": 46.64483
+  },
+  {
+   "id": "bench-51",
+   "arrivalS": 4.645694,
+   "inputTokens": 319,
+   "outputTokens": 765,
+   "firstTokenS": 25.543341,
+   "lastTokenS": 48.629869
+  },
+  {
+   "id": "bench-52",
+   "arrivalS": 4.925762,
+   "inputTokens": 1313,
+   "outputTokens": 773,
+   "firstTokenS": 25.795396,
+   "lastTokenS": 49.386408
+  },
+  {
+   "id": "bench-53",
+   "arrivalS": 5.152221,
+   "inputTokens": 908,
+   "outputTokens": 765,
+   "firstTokenS": 25.99363,
+   "lastTokenS": 48.727668
+  },
+  {
+   "id": "bench-54",
+   "arrivalS": 5.242531,
+   "inputTokens": 1232,
+   "outputTokens": 768,
+   "firstTokenS": 26.111327,
+   "lastTokenS": 48.977443
+  },
+  {
+   "id": "bench-55",
+   "arrivalS": 5.497271,
+   "inputTokens": 889,
+   "outputTokens": 751,
+   "firstTokenS": 26.111327,
+   "lastTokenS": 48.157858
+  },
+  {
+   "id": "bench-56",
+   "arrivalS": 5.506395,
+   "inputTokens": 838,
+   "outputTokens": 783,
+   "firstTokenS": 26.385798,
+   "lastTokenS": 50.715407
+  },
+  {
+   "id": "bench-57",
+   "arrivalS": 5.527837,
+   "inputTokens": 1078,
+   "outputTokens": 709,
+   "firstTokenS": 26.385798,
+   "lastTokenS": 46.861954
+  },
+  {
+   "id": "bench-58",
+   "arrivalS": 5.53283,
+   "inputTokens": 1168,
+   "outputTokens": 777,
+   "firstTokenS": 26.508798,
+   "lastTokenS": 50.205962
+  },
+  {
+   "id": "bench-59",
+   "arrivalS": 5.572728,
+   "inputTokens": 1141,
+   "outputTokens": 784,
+   "firstTokenS": 26.781372,
+   "lastTokenS": 51.003224
+  },
+  {
+   "id": "bench-60",
+   "arrivalS": 5.621582,
+   "inputTokens": 305,
+   "outputTokens": 743,
+   "firstTokenS": 26.781372,
+   "lastTokenS": 48.197744
+  },
+  {
+   "id": "bench-61",
+   "arrivalS": 5.653045,
+   "inputTokens": 824,
+   "outputTokens": 774,
+   "firstTokenS": 26.977012,
+   "lastTokenS": 50.402714
+  },
+  {
+   "id": "bench-62",
+   "arrivalS": 5.829287,
+   "inputTokens": 610,
+   "outputTokens": 530,
+   "firstTokenS": 26.977012,
+   "lastTokenS": 41.718416
+  },
+  {
+   "id": "bench-63",
+   "arrivalS": 5.874405,
+   "inputTokens": 843,
+   "outputTokens": 768,
+   "firstTokenS": 26.977012,
+   "lastTokenS": 49.685011
+  },
+  {
+   "id": "bench-64",
+   "arrivalS": 5.90631,
+   "inputTokens": 1685,
+   "outputTokens": 767,
+   "firstTokenS": 27.181466,
+   "lastTokenS": 49.685011
+  },
+  {
+   "id": "bench-65",
+   "arrivalS": 5.98439,
+   "inputTokens": 359,
+   "outputTokens": 770,
+   "firstTokenS": 27.181466,
+   "lastTokenS": 50.402714
+  },
+  {
+   "id": "bench-66",
+   "arrivalS": 5.999363,
+   "inputTokens": 1402,
+   "outputTokens": 730,
+   "firstTokenS": 27.28626,
+   "lastTokenS": 51.910996
+  },
+  {
+   "id": "bench-67",
+   "arrivalS": 6.161817,
+   "inputTokens": 368,
+   "outputTokens": 724,
+   "firstTokenS": 27.28626,
+   "lastTokenS": 53.202375
+  },
+  {
+   "id": "bench-68",
+   "arrivalS": 6.169744,
+   "inputTokens": 1236,
+   "outputTokens": 679,
+   "firstTokenS": 27.537744,
+   "lastTokenS": 55.493087
+  },
+  {
+   "id": "bench-69",
+   "arrivalS": 6.602723,
+   "inputTokens": 1007,
+   "outputTokens": 683,
+   "firstTokenS": 27.586755,
+   "lastTokenS": 59.337904
+  },
+  {
+   "id": "bench-70",
+   "arrivalS": 6.75179,
+   "inputTokens": 728,
+   "outputTokens": 796,
+   "firstTokenS": 27.800994,
+   "lastTokenS": 65.23838
+  },
+  {
+   "id": "bench-71",
+   "arrivalS": 6.772758,
+   "inputTokens": 288,
+   "outputTokens": 608,
+   "firstTokenS": 27.800994,
+   "lastTokenS": 60.80744
+  },
+  {
+   "id": "bench-72",
+   "arrivalS": 6.773556,
+   "inputTokens": 605,
+   "outputTokens": 516,
+   "firstTokenS": 42.215084,
+   "lastTokenS": 58.569498
+  },
+  {
+   "id": "bench-73",
+   "arrivalS": 6.943664,
+   "inputTokens": 587,
+   "outputTokens": 519,
+   "firstTokenS": 42.215084,
+   "lastTokenS": 58.699527
+  },
+  {
+   "id": "bench-74",
+   "arrivalS": 7.065188,
+   "inputTokens": 802,
+   "outputTokens": 683,
+   "firstTokenS": 42.308855,
+   "lastTokenS": 64.575768
+  },
+  {
+   "id": "bench-75",
+   "arrivalS": 7.195792,
+   "inputTokens": 574,
+   "outputTokens": 767,
+   "firstTokenS": 42.461615,
+   "lastTokenS": 69.187977
+  },
+  {
+   "id": "bench-76",
+   "arrivalS": 7.343312,
+   "inputTokens": 391,
+   "outputTokens": 770,
+   "firstTokenS": 42.461615,
+   "lastTokenS": 69.963429
+  },
+  {
+   "id": "bench-77",
+   "arrivalS": 7.351324,
+   "inputTokens": 436,
+   "outputTokens": 546,
+   "firstTokenS": 46.25246,
+   "lastTokenS": 63.252453
+  },
+  {
+   "id": "bench-78",
+   "arrivalS": 7.395216,
+   "inputTokens": 372,
+   "outputTokens": 584,
+   "firstTokenS": 46.25246,
+   "lastTokenS": 64.396118
+  },
+  {
+   "id": "bench-79",
+   "arrivalS": 7.408051,
+   "inputTokens": 918,
+   "outputTokens": 769,
+   "firstTokenS": 46.495932,
+   "lastTokenS": 71.021957
+  },
+  {
+   "id": "bench-80",
+   "arrivalS": 7.606706,
+   "inputTokens": 496,
+   "outputTokens": 684,
+   "firstTokenS": 46.738362,
+   "lastTokenS": 68.556213
+  },
+  {
+   "id": "bench-81",
+   "arrivalS": 7.70473,
+   "inputTokens": 906,
+   "outputTokens": 769,
+   "firstTokenS": 47.081886,
+   "lastTokenS": 71.693044
+  },
+  {
+   "id": "bench-82",
+   "arrivalS": 7.744345,
+   "inputTokens": 629,
+   "outputTokens": 635,
+   "firstTokenS": 47.081886,
+   "lastTokenS": 67.072431
+  },
+  {
+   "id": "bench-83",
+   "arrivalS": 7.751039,
+   "inputTokens": 429,
+   "outputTokens": 822,
+   "firstTokenS": 47.081886,
+   "lastTokenS": 73.638898
+  },
+  {
+   "id": "bench-84",
+   "arrivalS": 7.788389,
+   "inputTokens": 752,
+   "outputTokens": 546,
+   "firstTokenS": 47.398251,
+   "lastTokenS": 64.083206
+  },
+  {
+   "id": "bench-85",
+   "arrivalS": 7.827987,
+   "inputTokens": 518,
+   "outputTokens": 619,
+   "firstTokenS": 47.559416,
+   "lastTokenS": 66.850441
+  },
+  {
+   "id": "bench-86",
+   "arrivalS": 7.958781,
+   "inputTokens": 750,
+   "outputTokens": 768,
+   "firstTokenS": 47.559416,
+   "lastTokenS": 72.334224
+  },
+  {
+   "id": "bench-87",
+   "arrivalS": 8.05982,
+   "inputTokens": 1181,
+   "outputTokens": 701,
+   "firstTokenS": 48.333173,
+   "lastTokenS": 70.501469
+  },
+  {
+   "id": "bench-88",
+   "arrivalS": 8.278402,
+   "inputTokens": 1102,
+   "outputTokens": 768,
+   "firstTokenS": 48.456356,
+   "lastTokenS": 73.082498
+  },
+  {
+   "id": "bench-89",
+   "arrivalS": 8.341875,
+   "inputTokens": 1111,
+   "outputTokens": 706,
+   "firstTokenS": 48.927278,
+   "lastTokenS": 71.229935
+  },
+  {
+   "id": "bench-90",
+   "arrivalS": 8.355071,
+   "inputTokens": 356,
+   "outputTokens": 715,
+   "firstTokenS": 48.927278,
+   "lastTokenS": 71.546449
+  },
+  {
+   "id": "bench-91",
+   "arrivalS": 8.479235,
+   "inputTokens": 273,
+   "outputTokens": 769,
+   "firstTokenS": 48.927278,
+   "lastTokenS": 73.415935
+  },
+  {
+   "id": "bench-92",
+   "arrivalS": 8.622232,
+   "inputTokens": 1363,
+   "outputTokens": 606,
+   "firstTokenS": 49.200738,
+   "lastTokenS": 68.01605
+  },
+  {
+   "id": "bench-93",
+   "arrivalS": 8.705472,
+   "inputTokens": 1267,
+   "outputTokens": 552,
+   "firstTokenS": 49.200738,
+   "lastTokenS": 65.872093
+  },
+  {
+   "id": "bench-94",
+   "arrivalS": 8.852437,
+   "inputTokens": 950,
+   "outputTokens": 677,
+   "firstTokenS": 49.386408,
+   "lastTokenS": 70.251695
+  },
+  {
+   "id": "bench-95",
+   "arrivalS": 8.920311,
+   "inputTokens": 856,
+   "outputTokens": 769,
+   "firstTokenS": 49.386408,
+   "lastTokenS": 73.784296
+  },
+  {
+   "id": "bench-96",
+   "arrivalS": 8.995354,
+   "inputTokens": 853,
+   "outputTokens": 545,
+   "firstTokenS": 49.559835,
+   "lastTokenS": 65.674958
+  },
+  {
+   "id": "bench-97",
+   "arrivalS": 9.049814,
+   "inputTokens": 555,
+   "outputTokens": 601,
+   "firstTokenS": 49.559835,
+   "lastTokenS": 67.908973
+  },
+  {
+   "id": "bench-98",
+   "arrivalS": 9.052466,
+   "inputTokens": 2641,
+   "outputTokens": 556,
+   "firstTokenS": 50.110359,
+   "lastTokenS": 66.425337
+  },
+  {
+   "id": "bench-99",
+   "arrivalS": 9.064521,
+   "inputTokens": 480,
+   "outputTokens": 534,
+   "firstTokenS": 50.110359,
+   "lastTokenS": 65.541373
+  },
+  {
+   "id": "bench-100",
+   "arrivalS": 9.067011,
+   "inputTokens": 264,
+   "outputTokens": 545,
+   "firstTokenS": 50.110359,
+   "lastTokenS": 66.087129
+  },
+  {
+   "id": "bench-101",
+   "arrivalS": 9.168669,
+   "inputTokens": 615,
+   "outputTokens": 583,
+   "firstTokenS": 50.110359,
+   "lastTokenS": 67.606248
+  },
+  {
+   "id": "bench-102",
+   "arrivalS": 9.206309,
+   "inputTokens": 814,
+   "outputTokens": 745,
+   "firstTokenS": 50.205962,
+   "lastTokenS": 73.042628
+  },
+  {
+   "id": "bench-103",
+   "arrivalS": 9.278557,
+   "inputTokens": 787,
+   "outputTokens": 761,
+   "firstTokenS": 50.402714,
+   "lastTokenS": 74.068458
+  },
+  {
+   "id": "bench-104",
+   "arrivalS": 9.515339,
+   "inputTokens": 888,
+   "outputTokens": 769,
+   "firstTokenS": 50.402714,
+   "lastTokenS": 74.370336
+  },
+  {
+   "id": "bench-105",
+   "arrivalS": 9.54478,
+   "inputTokens": 494,
+   "outputTokens": 541,
+   "firstTokenS": 50.628651,
+   "lastTokenS": 67.332138
+  },
+  {
+   "id": "bench-106",
+   "arrivalS": 9.597299,
+   "inputTokens": 824,
+   "outputTokens": 767,
+   "firstTokenS": 50.628651,
+   "lastTokenS": 77.228724
+  },
+  {
+   "id": "bench-107",
+   "arrivalS": 9.739133,
+   "inputTokens": 616,
+   "outputTokens": 721,
+   "firstTokenS": 50.628651,
+   "lastTokenS": 77.939499
+  },
+  {
+   "id": "bench-108",
+   "arrivalS": 9.764848,
+   "inputTokens": 773,
+   "outputTokens": 769,
+   "firstTokenS": 50.715407,
+   "lastTokenS": 82.214908
+  },
+  {
+   "id": "bench-109",
+   "arrivalS": 9.771397,
+   "inputTokens": 262,
+   "outputTokens": 528,
+   "firstTokenS": 50.900772,
+   "lastTokenS": 76.746181
+  },
+  {
+   "id": "bench-110",
+   "arrivalS": 9.80596,
+   "inputTokens": 400,
+   "outputTokens": 524,
+   "firstTokenS": 50.900772,
+   "lastTokenS": 77.581612
+  },
+  {
+   "id": "bench-111",
+   "arrivalS": 9.823459,
+   "inputTokens": 448,
+   "outputTokens": 528,
+   "firstTokenS": 50.900772,
+   "lastTokenS": 78.602116
+  },
+  {
+   "id": "bench-112",
+   "arrivalS": 10.089117,
+   "inputTokens": 408,
+   "outputTokens": 572,
+   "firstTokenS": 50.900772,
+   "lastTokenS": 80.351876
+  },
+  {
+   "id": "bench-113",
+   "arrivalS": 10.254562,
+   "inputTokens": 1213,
+   "outputTokens": 614,
+   "firstTokenS": 51.194935,
+   "lastTokenS": 83.428949
+  },
+  {
+   "id": "bench-114",
+   "arrivalS": 10.356019,
+   "inputTokens": 373,
+   "outputTokens": 579,
+   "firstTokenS": 51.194935,
+   "lastTokenS": 83.176222
+  },
+  {
+   "id": "bench-115",
+   "arrivalS": 10.560209,
+   "inputTokens": 286,
+   "outputTokens": 566,
+   "firstTokenS": 52.122485,
+   "lastTokenS": 83.201028
+  },
+  {
+   "id": "bench-116",
+   "arrivalS": 10.722917,
+   "inputTokens": 353,
+   "outputTokens": 536,
+   "firstTokenS": 52.122485,
+   "lastTokenS": 82.879093
+  },
+  {
+   "id": "bench-117",
+   "arrivalS": 10.74355,
+   "inputTokens": 996,
+   "outputTokens": 610,
+   "firstTokenS": 66.644681,
+   "lastTokenS": 85.703849
+  },
+  {
+   "id": "bench-118",
+   "arrivalS": 10.966367,
+   "inputTokens": 952,
+   "outputTokens": 598,
+   "firstTokenS": 66.702591,
+   "lastTokenS": 85.044106
+  },
+  {
+   "id": "bench-119",
+   "arrivalS": 11.045152,
+   "inputTokens": 759,
+   "outputTokens": 770,
+   "firstTokenS": 67.023051,
+   "lastTokenS": 91.07306
+  },
+  {
+   "id": "bench-120",
+   "arrivalS": 11.208113,
+   "inputTokens": 266,
+   "outputTokens": 591,
+   "firstTokenS": 67.023051,
+   "lastTokenS": 85.068832
+  },
+  {
+   "id": "bench-121",
+   "arrivalS": 11.435548,
+   "inputTokens": 385,
+   "outputTokens": 539,
+   "firstTokenS": 67.023051,
+   "lastTokenS": 83.649412
+  },
+  {
+   "id": "bench-122",
+   "arrivalS": 11.47338,
+   "inputTokens": 630,
+   "outputTokens": 573,
+   "firstTokenS": 67.233135,
+   "lastTokenS": 84.623124
+  },
+  {
+   "id": "bench-123",
+   "arrivalS": 11.485316,
+   "inputTokens": 631,
+   "outputTokens": 655,
+   "firstTokenS": 67.233135,
+   "lastTokenS": 87.30558
+  },
+  {
+   "id": "bench-124",
+   "arrivalS": 11.511019,
+   "inputTokens": 373,
+   "outputTokens": 768,
+   "firstTokenS": 67.457443,
+   "lastTokenS": 91.507208
+  },
+  {
+   "id": "bench-125",
+   "arrivalS": 11.566925,
+   "inputTokens": 264,
+   "outputTokens": 575,
+   "firstTokenS": 67.457443,
+   "lastTokenS": 85.019205
+  },
+  {
+   "id": "bench-126",
+   "arrivalS": 11.737007,
+   "inputTokens": 524,
+   "outputTokens": 555,
+   "firstTokenS": 67.711043,
+   "lastTokenS": 84.499722
+  },
+  {
+   "id": "bench-127",
+   "arrivalS": 11.933619,
+   "inputTokens": 697,
+   "outputTokens": 566,
+   "firstTokenS": 68.01605,
+   "lastTokenS": 85.355605
+  },
+  {
+   "id": "bench-128",
+   "arrivalS": 11.934128,
+   "inputTokens": 1643,
+   "outputTokens": 768,
+   "firstTokenS": 68.21297,
+   "lastTokenS": 92.157669
+  },
+  {
+   "id": "bench-129",
+   "arrivalS": 12.006642,
+   "inputTokens": 1342,
+   "outputTokens": 626,
+   "firstTokenS": 68.722902,
+   "lastTokenS": 88.707436
+  },
+  {
+   "id": "bench-130",
+   "arrivalS": 12.061695,
+   "inputTokens": 516,
+   "outputTokens": 528,
+   "firstTokenS": 69.350428,
+   "lastTokenS": 86.261936
+  },
+  {
+   "id": "bench-131",
+   "arrivalS": 12.085587,
+   "inputTokens": 341,
+   "outputTokens": 596,
+   "firstTokenS": 70.402819,
+   "lastTokenS": 88.503613
+  },
+  {
+   "id": "bench-132",
+   "arrivalS": 12.098471,
+   "inputTokens": 733,
+   "outputTokens": 666,
+   "firstTokenS": 70.402819,
+   "lastTokenS": 90.852813
+  },
+  {
+   "id": "bench-133",
+   "arrivalS": 12.139884,
+   "inputTokens": 1017,
+   "outputTokens": 676,
+   "firstTokenS": 70.701364,
+   "lastTokenS": 91.65605
+  },
+  {
+   "id": "bench-134",
+   "arrivalS": 12.42531,
+   "inputTokens": 717,
+   "outputTokens": 578,
+   "firstTokenS": 70.701364,
+   "lastTokenS": 88.287436
+  },
+  {
+   "id": "bench-135",
+   "arrivalS": 12.465086,
+   "inputTokens": 368,
+   "outputTokens": 767,
+   "firstTokenS": 71.205026,
+   "lastTokenS": 94.790607
+  },
+  {
+   "id": "bench-136",
+   "arrivalS": 12.538313,
+   "inputTokens": 798,
+   "outputTokens": 604,
+   "firstTokenS": 71.205026,
+   "lastTokenS": 89.631241
+  },
+  {
+   "id": "bench-137",
+   "arrivalS": 12.659097,
+   "inputTokens": 365,
+   "outputTokens": 580,
+   "firstTokenS": 71.373222,
+   "lastTokenS": 88.928019
+  },
+  {
+   "id": "bench-138",
+   "arrivalS": 12.704181,
+   "inputTokens": 721,
+   "outputTokens": 544,
+   "firstTokenS": 71.373222,
+   "lastTokenS": 87.509048
+  },
+  {
+   "id": "bench-139",
+   "arrivalS": 13.061164,
+   "inputTokens": 1788,
+   "outputTokens": 633,
+   "firstTokenS": 71.667964,
+   "lastTokenS": 90.852813
+  },
+  {
+   "id": "bench-140",
+   "arrivalS": 13.389785,
+   "inputTokens": 1268,
+   "outputTokens": 767,
+   "firstTokenS": 71.911952,
+   "lastTokenS": 95.35831
+  },
+  {
+   "id": "bench-141",
+   "arrivalS": 13.418172,
+   "inputTokens": 621,
+   "outputTokens": 533,
+   "firstTokenS": 71.911952,
+   "lastTokenS": 87.889047
+  },
+  {
+   "id": "bench-142",
+   "arrivalS": 13.487636,
+   "inputTokens": 737,
+   "outputTokens": 530,
+   "firstTokenS": 72.495958,
+   "lastTokenS": 88.707436
+  },
+  {
+   "id": "bench-143",
+   "arrivalS": 13.523335,
+   "inputTokens": 727,
+   "outputTokens": 583,
+   "firstTokenS": 73.217984,
+   "lastTokenS": 90.648192
+  },
+  {
+   "id": "bench-144",
+   "arrivalS": 13.556742,
+   "inputTokens": 550,
+   "outputTokens": 707,
+   "firstTokenS": 73.291791,
+   "lastTokenS": 94.766108
+  },
+  {
+   "id": "bench-145",
+   "arrivalS": 13.560744,
+   "inputTokens": 1437,
+   "outputTokens": 770,
+   "firstTokenS": 73.638898,
+   "lastTokenS": 96.851561
+  },
+  {
+   "id": "bench-146",
+   "arrivalS": 13.654256,
+   "inputTokens": 522,
+   "outputTokens": 546,
+   "firstTokenS": 73.638898,
+   "lastTokenS": 89.922892
+  },
+  {
+   "id": "bench-147",
+   "arrivalS": 13.724107,
+   "inputTokens": 831,
+   "outputTokens": 772,
+   "firstTokenS": 73.759204,
+   "lastTokenS": 97.280843
+  },
+  {
+   "id": "bench-148",
+   "arrivalS": 13.729154,
+   "inputTokens": 654,
+   "outputTokens": 611,
+   "firstTokenS": 73.993313,
+   "lastTokenS": 93.591293
+  },
+  {
+   "id": "bench-149",
+   "arrivalS": 13.762364,
+   "inputTokens": 596,
+   "outputTokens": 518,
+   "firstTokenS": 73.993313,
+   "lastTokenS": 93.235722
+  },
+  {
+   "id": "bench-150",
+   "arrivalS": 14.002064,
+   "inputTokens": 512,
+   "outputTokens": 592,
+   "firstTokenS": 73.993313,
+   "lastTokenS": 96.878958
+  },
+  {
+   "id": "bench-151",
+   "arrivalS": 14.028797,
+   "inputTokens": 579,
+   "outputTokens": 769,
+   "firstTokenS": 74.220178,
+   "lastTokenS": 103.272498
+  },
+  {
+   "id": "bench-152",
+   "arrivalS": 14.04364,
+   "inputTokens": 465,
+   "outputTokens": 767,
+   "firstTokenS": 74.220178,
+   "lastTokenS": 104.345772
+  },
+  {
+   "id": "bench-153",
+   "arrivalS": 14.111462,
+   "inputTokens": 460,
+   "outputTokens": 588,
+   "firstTokenS": 74.496512,
+   "lastTokenS": 100.50603
+  },
+  {
+   "id": "bench-154",
+   "arrivalS": 14.535532,
+   "inputTokens": 390,
+   "outputTokens": 631,
+   "firstTokenS": 74.496512,
+   "lastTokenS": 102.475878
+  },
+  {
+   "id": "bench-155",
+   "arrivalS": 14.563947,
+   "inputTokens": 1099,
+   "outputTokens": 537,
+   "firstTokenS": 84.769246,
+   "lastTokenS": 100.999203
+  },
+  {
+   "id": "bench-156",
+   "arrivalS": 14.6754,
+   "inputTokens": 2090,
+   "outputTokens": 730,
+   "firstTokenS": 85.330415,
+   "lastTokenS": 107.178686
+  },
+  {
+   "id": "bench-157",
+   "arrivalS": 14.819713,
+   "inputTokens": 377,
+   "outputTokens": 561,
+   "firstTokenS": 85.330415,
+   "lastTokenS": 102.21821
+  },
+  {
+   "id": "bench-158",
+   "arrivalS": 14.845561,
+   "inputTokens": 1340,
+   "outputTokens": 530,
+   "firstTokenS": 85.579055,
+   "lastTokenS": 101.344504
+  },
+  {
+   "id": "bench-159",
+   "arrivalS": 14.975147,
+   "inputTokens": 741,
+   "outputTokens": 771,
+   "firstTokenS": 85.765795,
+   "lastTokenS": 109.873854
+  },
+  {
+   "id": "bench-160",
+   "arrivalS": 15.021068,
+   "inputTokens": 963,
+   "outputTokens": 557,
+   "firstTokenS": 87.638635,
+   "lastTokenS": 104.120208
+  },
+  {
+   "id": "bench-161",
+   "arrivalS": 15.122223,
+   "inputTokens": 1415,
+   "outputTokens": 539,
+   "firstTokenS": 88.063641,
+   "lastTokenS": 104.159985
+  },
+  {
+   "id": "bench-162",
+   "arrivalS": 15.221787,
+   "inputTokens": 536,
+   "outputTokens": 693,
+   "firstTokenS": 88.428294,
+   "lastTokenS": 109.479058
+  },
+  {
+   "id": "bench-163",
+   "arrivalS": 15.298717,
+   "inputTokens": 262,
+   "outputTokens": 754,
+   "firstTokenS": 88.428294,
+   "lastTokenS": 111.351786
+  },
+  {
+   "id": "bench-164",
+   "arrivalS": 15.309632,
+   "inputTokens": 627,
+   "outputTokens": 582,
+   "firstTokenS": 88.606891,
+   "lastTokenS": 106.078738
+  },
+  {
+   "id": "bench-165",
+   "arrivalS": 15.488755,
+   "inputTokens": 735,
+   "outputTokens": 768,
+   "firstTokenS": 88.928019,
+   "lastTokenS": 112.185528
+  },
+  {
+   "id": "bench-166",
+   "arrivalS": 15.526765,
+   "inputTokens": 380,
+   "outputTokens": 550,
+   "firstTokenS": 88.928019,
+   "lastTokenS": 105.387243
+  },
+  {
+   "id": "bench-167",
+   "arrivalS": 15.548014,
+   "inputTokens": 611,
+   "outputTokens": 521,
+   "firstTokenS": 88.928019,
+   "lastTokenS": 104.070574
+  },
+  {
+   "id": "bench-168",
+   "arrivalS": 15.551613,
+   "inputTokens": 822,
+   "outputTokens": 773,
+   "firstTokenS": 89.051918,
+   "lastTokenS": 112.460913
+  },
+  {
+   "id": "bench-169",
+   "arrivalS": 15.641054,
+   "inputTokens": 602,
+   "outputTokens": 527,
+   "firstTokenS": 89.051918,
+   "lastTokenS": 104.71307
+  },
+  {
+   "id": "bench-170",
+   "arrivalS": 15.754344,
+   "inputTokens": 899,
+   "outputTokens": 599,
+   "firstTokenS": 89.155339,
+   "lastTokenS": 107.151598
+  },
+  {
+   "id": "bench-171",
+   "arrivalS": 15.755864,
+   "inputTokens": 482,
+   "outputTokens": 768,
+   "firstTokenS": 89.772418,
+   "lastTokenS": 113.005484
+  },
+  {
+   "id": "bench-172",
+   "arrivalS": 15.827541,
+   "inputTokens": 1207,
+   "outputTokens": 685,
+   "firstTokenS": 90.802479,
+   "lastTokenS": 111.459724
+  },
+  {
+   "id": "bench-173",
+   "arrivalS": 15.853179,
+   "inputTokens": 1052,
+   "outputTokens": 553,
+   "firstTokenS": 91.07306,
+   "lastTokenS": 107.178686
+  },
+  {
+   "id": "bench-174",
+   "arrivalS": 15.958398,
+   "inputTokens": 1320,
+   "outputTokens": 770,
+   "firstTokenS": 91.07306,
+   "lastTokenS": 114.239242
+  },
+  {
+   "id": "bench-175",
+   "arrivalS": 15.977003,
+   "inputTokens": 2082,
+   "outputTokens": 766,
+   "firstTokenS": 91.382421,
+   "lastTokenS": 114.200237
+  },
+  {
+   "id": "bench-176",
+   "arrivalS": 16.094218,
+   "inputTokens": 627,
+   "outputTokens": 577,
+   "firstTokenS": 91.382421,
+   "lastTokenS": 108.481657
+  },
+  {
+   "id": "bench-177",
+   "arrivalS": 16.143364,
+   "inputTokens": 1734,
+   "outputTokens": 772,
+   "firstTokenS": 91.859193,
+   "lastTokenS": 115.091809
+  },
+  {
+   "id": "bench-178",
+   "arrivalS": 16.41857,
+   "inputTokens": 1313,
+   "outputTokens": 523,
+   "firstTokenS": 92.380694,
+   "lastTokenS": 107.178686
+  },
+  {
+   "id": "bench-179",
+   "arrivalS": 16.433318,
+   "inputTokens": 1617,
+   "outputTokens": 577,
+   "firstTokenS": 92.486944,
+   "lastTokenS": 110.52198
+  },
+  {
+   "id": "bench-180",
+   "arrivalS": 16.475005,
+   "inputTokens": 1603,
+   "outputTokens": 773,
+   "firstTokenS": 95.03398,
+   "lastTokenS": 118.256493
+  },
+  {
+   "id": "bench-181",
+   "arrivalS": 16.487373,
+   "inputTokens": 338,
+   "outputTokens": 562,
+   "firstTokenS": 95.548536,
+   "lastTokenS": 112.627084
+  },
+  {
+   "id": "bench-182",
+   "arrivalS": 16.746177,
+   "inputTokens": 954,
+   "outputTokens": 576,
+   "firstTokenS": 95.548536,
+   "lastTokenS": 115.56723
+  },
+  {
+   "id": "bench-183",
+   "arrivalS": 16.955278,
+   "inputTokens": 1096,
+   "outputTokens": 767,
+   "firstTokenS": 97.205629,
+   "lastTokenS": 122.28391
+  },
+  {
+   "id": "bench-184",
+   "arrivalS": 16.986035,
+   "inputTokens": 1361,
+   "outputTokens": 524,
+   "firstTokenS": 97.205629,
+   "lastTokenS": 116.813315
+  },
+  {
+   "id": "bench-185",
+   "arrivalS": 17.093545,
+   "inputTokens": 2764,
+   "outputTokens": 639,
+   "firstTokenS": 104.546891,
+   "lastTokenS": 123.873052
+  },
+  {
+   "id": "bench-186",
+   "arrivalS": 17.263935,
+   "inputTokens": 817,
+   "outputTokens": 570,
+   "firstTokenS": 104.546891,
+   "lastTokenS": 121.768251
+  },
+  {
+   "id": "bench-187",
+   "arrivalS": 17.344263,
+   "inputTokens": 391,
+   "outputTokens": 770,
+   "firstTokenS": 104.546891,
+   "lastTokenS": 128.126212
+  },
+  {
+   "id": "bench-188",
+   "arrivalS": 17.420223,
+   "inputTokens": 721,
+   "outputTokens": 544,
+   "firstTokenS": 104.687918,
+   "lastTokenS": 121.0297
+  },
+  {
+   "id": "bench-189",
+   "arrivalS": 17.447521,
+   "inputTokens": 726,
+   "outputTokens": 756,
+   "firstTokenS": 104.687918,
+   "lastTokenS": 127.645029
+  },
+  {
+   "id": "bench-190",
+   "arrivalS": 17.458475,
+   "inputTokens": 1447,
+   "outputTokens": 599,
+   "firstTokenS": 104.890741,
+   "lastTokenS": 123.625285
+  },
+  {
+   "id": "bench-191",
+   "arrivalS": 17.684766,
+   "inputTokens": 633,
+   "outputTokens": 568,
+   "firstTokenS": 106.205223,
+   "lastTokenS": 124.377541
+  },
+  {
+   "id": "bench-192",
+   "arrivalS": 17.915147,
+   "inputTokens": 493,
+   "outputTokens": 586,
+   "firstTokenS": 107.310735,
+   "lastTokenS": 125.400356
+  },
+  {
+   "id": "bench-193",
+   "arrivalS": 18.01622,
+   "inputTokens": 1747,
+   "outputTokens": 761,
+   "firstTokenS": 107.50968,
+   "lastTokenS": 130.871802
+  },
+  {
+   "id": "bench-194",
+   "arrivalS": 18.057009,
+   "inputTokens": 974,
+   "outputTokens": 628,
+   "firstTokenS": 107.706733,
+   "lastTokenS": 126.692658
+  },
+  {
+   "id": "bench-195",
+   "arrivalS": 18.100569,
+   "inputTokens": 638,
+   "outputTokens": 767,
+   "firstTokenS": 107.706733,
+   "lastTokenS": 131.226486
+  },
+  {
+   "id": "bench-196",
+   "arrivalS": 18.229981,
+   "inputTokens": 635,
+   "outputTokens": 768,
+   "firstTokenS": 107.706733,
+   "lastTokenS": 131.34644
+  },
+  {
+   "id": "bench-197",
+   "arrivalS": 18.45757,
+   "inputTokens": 509,
+   "outputTokens": 545,
+   "firstTokenS": 107.904405,
+   "lastTokenS": 123.897871
+  },
+  {
+   "id": "bench-198",
+   "arrivalS": 18.675127,
+   "inputTokens": 454,
+   "outputTokens": 575,
+   "firstTokenS": 107.904405,
+   "lastTokenS": 125.146459
+  },
+  {
+   "id": "bench-199",
+   "arrivalS": 18.828829,
+   "inputTokens": 1220,
+   "outputTokens": 570,
+   "firstTokenS": 107.938199,
+   "lastTokenS": 126.068457
+  },
+  {
+   "id": "bench-200",
+   "arrivalS": 18.93077,
+   "inputTokens": 806,
+   "outputTokens": 615,
+   "firstTokenS": 110.046021,
+   "lastTokenS": 128.778515
+  },
+  {
+   "id": "bench-201",
+   "arrivalS": 18.938523,
+   "inputTokens": 607,
+   "outputTokens": 607,
+   "firstTokenS": 110.046021,
+   "lastTokenS": 128.778515
+  },
+  {
+   "id": "bench-202",
+   "arrivalS": 18.955225,
+   "inputTokens": 536,
+   "outputTokens": 571,
+   "firstTokenS": 110.743874,
+   "lastTokenS": 127.923309
+  },
+  {
+   "id": "bench-203",
+   "arrivalS": 19.184421,
+   "inputTokens": 397,
+   "outputTokens": 692,
+   "firstTokenS": 110.743874,
+   "lastTokenS": 132.403248
+  },
+  {
+   "id": "bench-204",
+   "arrivalS": 19.278636,
+   "inputTokens": 833,
+   "outputTokens": 559,
+   "firstTokenS": 110.774589,
+   "lastTokenS": 128.326927
+  },
+  {
+   "id": "bench-205",
+   "arrivalS": 19.279092,
+   "inputTokens": 1109,
+   "outputTokens": 771,
+   "firstTokenS": 111.655274,
+   "lastTokenS": 135.282777
+  },
+  {
+   "id": "bench-206",
+   "arrivalS": 19.289081,
+   "inputTokens": 526,
+   "outputTokens": 769,
+   "firstTokenS": 111.655274,
+   "lastTokenS": 135.415301
+  },
+  {
+   "id": "bench-207",
+   "arrivalS": 19.398072,
+   "inputTokens": 1265,
+   "outputTokens": 597,
+   "firstTokenS": 112.360385,
+   "lastTokenS": 130.464529
+  },
+  {
+   "id": "bench-208",
+   "arrivalS": 19.398723,
+   "inputTokens": 505,
+   "outputTokens": 543,
+   "firstTokenS": 112.627084,
+   "lastTokenS": 128.958755
+  },
+  {
+   "id": "bench-209",
+   "arrivalS": 19.416549,
+   "inputTokens": 1231,
+   "outputTokens": 610,
+   "firstTokenS": 112.627084,
+   "lastTokenS": 131.201548
+  },
+  {
+   "id": "bench-210",
+   "arrivalS": 19.495619,
+   "inputTokens": 1581,
+   "outputTokens": 591,
+   "firstTokenS": 113.198403,
+   "lastTokenS": 132.594422
+  },
+  {
+   "id": "bench-211",
+   "arrivalS": 19.615147,
+   "inputTokens": 1941,
+   "outputTokens": 570,
+   "firstTokenS": 114.54458,
+   "lastTokenS": 132.099949
+  },
+  {
+   "id": "bench-212",
+   "arrivalS": 19.719532,
+   "inputTokens": 805,
+   "outputTokens": 519,
+   "firstTokenS": 114.710923,
+   "lastTokenS": 130.044722
+  },
+  {
+   "id": "bench-213",
+   "arrivalS": 19.744945,
+   "inputTokens": 867,
+   "outputTokens": 745,
+   "firstTokenS": 114.710923,
+   "lastTokenS": 137.133302
+  },
+  {
+   "id": "bench-214",
+   "arrivalS": 19.869408,
+   "inputTokens": 727,
+   "outputTokens": 736,
+   "firstTokenS": 115.315338,
+   "lastTokenS": 137.084668
+  },
+  {
+   "id": "bench-215",
+   "arrivalS": 19.895776,
+   "inputTokens": 738,
+   "outputTokens": 623,
+   "firstTokenS": 115.315338,
+   "lastTokenS": 134.757555
+  },
+  {
+   "id": "bench-216",
+   "arrivalS": 19.936233,
+   "inputTokens": 420,
+   "outputTokens": 621,
+   "firstTokenS": 115.364173,
+   "lastTokenS": 136.376373
+  },
+  {
+   "id": "bench-217",
+   "arrivalS": 20.072785,
+   "inputTokens": 1947,
+   "outputTokens": 651,
+   "firstTokenS": 118.53184,
+   "lastTokenS": 143.313652
+  },
+  {
+   "id": "bench-218",
+   "arrivalS": 20.177945,
+   "inputTokens": 1011,
+   "outputTokens": 773,
+   "firstTokenS": 124.09358,
+   "lastTokenS": 148.028924
+  },
+  {
+   "id": "bench-219",
+   "arrivalS": 20.367105,
+   "inputTokens": 545,
+   "outputTokens": 667,
+   "firstTokenS": 124.09358,
+   "lastTokenS": 144.335318
+  },
+  {
+   "id": "bench-220",
+   "arrivalS": 20.47451,
+   "inputTokens": 1077,
+   "outputTokens": 543,
+   "firstTokenS": 124.253236,
+   "lastTokenS": 140.404391
+  },
+  {
+   "id": "bench-221",
+   "arrivalS": 20.558325,
+   "inputTokens": 531,
+   "outputTokens": 537,
+   "firstTokenS": 124.253236,
+   "lastTokenS": 140.258315
+  },
+  {
+   "id": "bench-222",
+   "arrivalS": 20.567887,
+   "inputTokens": 363,
+   "outputTokens": 513,
+   "firstTokenS": 124.253236,
+   "lastTokenS": 139.671087
+  },
+  {
+   "id": "bench-223",
+   "arrivalS": 20.613436,
+   "inputTokens": 1583,
+   "outputTokens": 775,
+   "firstTokenS": 124.602839,
+   "lastTokenS": 148.389509
+  },
+  {
+   "id": "bench-224",
+   "arrivalS": 20.645717,
+   "inputTokens": 696,
+   "outputTokens": 584,
+   "firstTokenS": 124.651677,
+   "lastTokenS": 142.583781
+  },
+  {
+   "id": "bench-225",
+   "arrivalS": 20.672609,
+   "inputTokens": 1130,
+   "outputTokens": 537,
+   "firstTokenS": 125.548841,
+   "lastTokenS": 141.990733
+  },
+  {
+   "id": "bench-226",
+   "arrivalS": 21.033866,
+   "inputTokens": 520,
+   "outputTokens": 767,
+   "firstTokenS": 126.217613,
+   "lastTokenS": 150.186624
+  },
+  {
+   "id": "bench-227",
+   "arrivalS": 21.083297,
+   "inputTokens": 1288,
+   "outputTokens": 598,
+   "firstTokenS": 126.821324,
+   "lastTokenS": 145.134218
+  },
+  {
+   "id": "bench-228",
+   "arrivalS": 21.306433,
+   "inputTokens": 797,
+   "outputTokens": 528,
+   "firstTokenS": 127.797798,
+   "lastTokenS": 143.651429
+  },
+  {
+   "id": "bench-229",
+   "arrivalS": 21.405885,
+   "inputTokens": 634,
+   "outputTokens": 603,
+   "firstTokenS": 128.026036,
+   "lastTokenS": 146.382844
+  },
+  {
+   "id": "bench-230",
+   "arrivalS": 21.565047,
+   "inputTokens": 1179,
+   "outputTokens": 592,
+   "firstTokenS": 128.276709,
+   "lastTokenS": 146.153472
+  },
+  {
+   "id": "bench-231",
+   "arrivalS": 21.634034,
+   "inputTokens": 352,
+   "outputTokens": 534,
+   "firstTokenS": 128.502428,
+   "lastTokenS": 144.440634
+  },
+  {
+   "id": "bench-232",
+   "arrivalS": 21.719765,
+   "inputTokens": 476,
+   "outputTokens": 573,
+   "firstTokenS": 128.502428,
+   "lastTokenS": 145.692944
+  },
+  {
+   "id": "bench-233",
+   "arrivalS": 21.788093,
+   "inputTokens": 655,
+   "outputTokens": 551,
+   "firstTokenS": 128.502428,
+   "lastTokenS": 145.329125
+  },
+  {
+   "id": "bench-234",
+   "arrivalS": 21.810832,
+   "inputTokens": 1785,
+   "outputTokens": 674,
+   "firstTokenS": 129.171033,
+   "lastTokenS": 150.603557
+  },
+  {
+   "id": "bench-235",
+   "arrivalS": 21.93928,
+   "inputTokens": 1644,
+   "outputTokens": 731,
+   "firstTokenS": 130.689643,
+   "lastTokenS": 153.577333
+  },
+  {
+   "id": "bench-236",
+   "arrivalS": 21.970992,
+   "inputTokens": 466,
+   "outputTokens": 656,
+   "firstTokenS": 130.722666,
+   "lastTokenS": 151.651577
+  },
+  {
+   "id": "bench-237",
+   "arrivalS": 21.973767,
+   "inputTokens": 1871,
+   "outputTokens": 550,
+   "firstTokenS": 131.126984,
+   "lastTokenS": 147.673796
+  },
+  {
+   "id": "bench-238",
+   "arrivalS": 22.07676,
+   "inputTokens": 1087,
+   "outputTokens": 570,
+   "firstTokenS": 131.34644,
+   "lastTokenS": 148.898346
+  },
+  {
+   "id": "bench-239",
+   "arrivalS": 22.096351,
+   "inputTokens": 1624,
+   "outputTokens": 537,
+   "firstTokenS": 131.514185,
+   "lastTokenS": 147.271409
+  },
+  {
+   "id": "bench-240",
+   "arrivalS": 22.380118,
+   "inputTokens": 857,
+   "outputTokens": 561,
+   "firstTokenS": 131.70138,
+   "lastTokenS": 148.416341
+  },
+  {
+   "id": "bench-241",
+   "arrivalS": 22.687194,
+   "inputTokens": 361,
+   "outputTokens": 525,
+   "firstTokenS": 131.70138,
+   "lastTokenS": 146.984247
+  },
+  {
+   "id": "bench-242",
+   "arrivalS": 22.932603,
+   "inputTokens": 657,
+   "outputTokens": 633,
+   "firstTokenS": 131.70138,
+   "lastTokenS": 151.551868
+  },
+  {
+   "id": "bench-243",
+   "arrivalS": 22.979004,
+   "inputTokens": 675,
+   "outputTokens": 769,
+   "firstTokenS": 132.322493,
+   "lastTokenS": 155.702582
+  },
+  {
+   "id": "bench-244",
+   "arrivalS": 22.980987,
+   "inputTokens": 1054,
+   "outputTokens": 581,
+   "firstTokenS": 132.35364,
+   "lastTokenS": 149.827226
+  },
+  {
+   "id": "bench-245",
+   "arrivalS": 23.243864,
+   "inputTokens": 790,
+   "outputTokens": 585,
+   "firstTokenS": 132.520223,
+   "lastTokenS": 150.639877
+  },
+  {
+   "id": "bench-246",
+   "arrivalS": 23.299859,
+   "inputTokens": 730,
+   "outputTokens": 522,
+   "firstTokenS": 132.702303,
+   "lastTokenS": 149.694799
+  },
+  {
+   "id": "bench-247",
+   "arrivalS": 23.640863,
+   "inputTokens": 3998,
+   "outputTokens": 767,
+   "firstTokenS": 137.575323,
+   "lastTokenS": 165.222987
+  },
+  {
+   "id": "bench-248",
+   "arrivalS": 23.971348,
+   "inputTokens": 810,
+   "outputTokens": 770,
+   "firstTokenS": 142.193879,
+   "lastTokenS": 167.384955
+  },
+  {
+   "id": "bench-249",
+   "arrivalS": 24.164438,
+   "inputTokens": 904,
+   "outputTokens": 767,
+   "firstTokenS": 143.535961,
+   "lastTokenS": 168.045439
+  },
+  {
+   "id": "bench-250",
+   "arrivalS": 24.198417,
+   "inputTokens": 554,
+   "outputTokens": 750,
+   "firstTokenS": 143.535961,
+   "lastTokenS": 167.630405
+  },
+  {
+   "id": "bench-251",
+   "arrivalS": 24.246356,
+   "inputTokens": 371,
+   "outputTokens": 537,
+   "firstTokenS": 143.535961,
+   "lastTokenS": 160.180221
+  },
+  {
+   "id": "bench-252",
+   "arrivalS": 24.437903,
+   "inputTokens": 369,
+   "outputTokens": 595,
+   "firstTokenS": 143.574322,
+   "lastTokenS": 161.912217
+  },
+  {
+   "id": "bench-253",
+   "arrivalS": 24.475744,
+   "inputTokens": 502,
+   "outputTokens": 551,
+   "firstTokenS": 143.841995,
+   "lastTokenS": 160.86644
+  },
+  {
+   "id": "bench-254",
+   "arrivalS": 24.493533,
+   "inputTokens": 739,
+   "outputTokens": 663,
+   "firstTokenS": 143.841995,
+   "lastTokenS": 164.814986
+  },
+  {
+   "id": "bench-255",
+   "arrivalS": 24.575188,
+   "inputTokens": 359,
+   "outputTokens": 666,
+   "firstTokenS": 143.841995,
+   "lastTokenS": 165.698491
+  },
+  {
+   "id": "bench-256",
+   "arrivalS": 24.851061,
+   "inputTokens": 820,
+   "outputTokens": 519,
+   "firstTokenS": 144.561715,
+   "lastTokenS": 160.580577
+  },
+  {
+   "id": "bench-257",
+   "arrivalS": 24.970603,
+   "inputTokens": 877,
+   "outputTokens": 542,
+   "firstTokenS": 145.276822,
+   "lastTokenS": 161.872029
+  },
+  {
+   "id": "bench-258",
+   "arrivalS": 25.053614,
+   "inputTokens": 524,
+   "outputTokens": 770,
+   "firstTokenS": 145.458456,
+   "lastTokenS": 169.469282
+  },
+  {
+   "id": "bench-259",
+   "arrivalS": 25.06447,
+   "inputTokens": 387,
+   "outputTokens": 609,
+   "firstTokenS": 145.458456,
+   "lastTokenS": 164.377407
+  },
+  {
+   "id": "bench-260",
+   "arrivalS": 25.159289,
+   "inputTokens": 863,
+   "outputTokens": 772,
+   "firstTokenS": 145.814596,
+   "lastTokenS": 169.879538
+  },
+  {
+   "id": "bench-261",
+   "arrivalS": 25.620314,
+   "inputTokens": 405,
+   "outputTokens": 535,
+   "firstTokenS": 146.303786,
+   "lastTokenS": 162.741307
+  },
+  {
+   "id": "bench-262",
+   "arrivalS": 25.636204,
+   "inputTokens": 660,
+   "outputTokens": 513,
+   "firstTokenS": 146.303786,
+   "lastTokenS": 161.912217
+  },
+  {
+   "id": "bench-263",
+   "arrivalS": 25.708653,
+   "inputTokens": 640,
+   "outputTokens": 770,
+   "firstTokenS": 146.512023,
+   "lastTokenS": 170.166729
+  },
+  {
+   "id": "bench-264",
+   "arrivalS": 25.918617,
+   "inputTokens": 308,
+   "outputTokens": 766,
+   "firstTokenS": 146.512023,
+   "lastTokenS": 170.078576
+  },
+  {
+   "id": "bench-265",
+   "arrivalS": 26.064227,
+   "inputTokens": 1171,
+   "outputTokens": 715,
+   "firstTokenS": 147.497194,
+   "lastTokenS": 169.633215
+  },
+  {
+   "id": "bench-266",
+   "arrivalS": 26.173028,
+   "inputTokens": 888,
+   "outputTokens": 512,
+   "firstTokenS": 147.568683,
+   "lastTokenS": 163.117191
+  },
+  {
+   "id": "bench-267",
+   "arrivalS": 26.294359,
+   "inputTokens": 478,
+   "outputTokens": 539,
+   "firstTokenS": 147.568683,
+   "lastTokenS": 164.153313
+  },
+  {
+   "id": "bench-268",
+   "arrivalS": 26.33938,
+   "inputTokens": 389,
+   "outputTokens": 533,
+   "firstTokenS": 147.896852,
+   "lastTokenS": 164.100467
+  },
+  {
+   "id": "bench-269",
+   "arrivalS": 26.373605,
+   "inputTokens": 647,
+   "outputTokens": 635,
+   "firstTokenS": 147.896852,
+   "lastTokenS": 167.899589
+  },
+  {
+   "id": "bench-270",
+   "arrivalS": 26.538811,
+   "inputTokens": 392,
+   "outputTokens": 589,
+   "firstTokenS": 147.896852,
+   "lastTokenS": 166.44955
+  },
+  {
+   "id": "bench-271",
+   "arrivalS": 26.705211,
+   "inputTokens": 369,
+   "outputTokens": 526,
+   "firstTokenS": 147.896852,
+   "lastTokenS": 163.788616
+  },
+  {
+   "id": "bench-272",
+   "arrivalS": 26.908204,
+   "inputTokens": 441,
+   "outputTokens": 589,
+   "firstTokenS": 148.17889,
+   "lastTokenS": 166.775602
+  },
+  {
+   "id": "bench-273",
+   "arrivalS": 27.152186,
+   "inputTokens": 502,
+   "outputTokens": 587,
+   "firstTokenS": 148.17889,
+   "lastTokenS": 166.571682
+  },
+  {
+   "id": "bench-274",
+   "arrivalS": 27.223041,
+   "inputTokens": 275,
+   "outputTokens": 518,
+   "firstTokenS": 148.17889,
+   "lastTokenS": 163.762342
+  },
+  {
+   "id": "bench-275",
+   "arrivalS": 27.292666,
+   "inputTokens": 1176,
+   "outputTokens": 673,
+   "firstTokenS": 148.569225,
+   "lastTokenS": 169.21056
+  },
+  {
+   "id": "bench-276",
+   "arrivalS": 27.452864,
+   "inputTokens": 297,
+   "outputTokens": 769,
+   "firstTokenS": 148.569225,
+   "lastTokenS": 171.352304
+  },
+  {
+   "id": "bench-277",
+   "arrivalS": 27.558275,
+   "inputTokens": 1315,
+   "outputTokens": 634,
+   "firstTokenS": 148.765915,
+   "lastTokenS": 168.310318
+  },
+  {
+   "id": "bench-278",
+   "arrivalS": 27.679327,
+   "inputTokens": 587,
+   "outputTokens": 1021,
+   "firstTokenS": 148.765915,
+   "lastTokenS": 176.614169
+  },
+  {
+   "id": "bench-279",
+   "arrivalS": 27.837447,
+   "inputTokens": 921,
+   "outputTokens": 557,
+   "firstTokenS": 149.03072,
+   "lastTokenS": 166.196297
+  },
+  {
+   "id": "bench-280",
+   "arrivalS": 28.058182,
+   "inputTokens": 1634,
+   "outputTokens": 774,
+   "firstTokenS": 150.027202,
+   "lastTokenS": 172.329055
+  },
+  {
+   "id": "bench-281",
+   "arrivalS": 28.100129,
+   "inputTokens": 1400,
+   "outputTokens": 518,
+   "firstTokenS": 150.364297,
+   "lastTokenS": 168.453189
+  },
+  {
+   "id": "bench-282",
+   "arrivalS": 28.147515,
+   "inputTokens": 813,
+   "outputTokens": 577,
+   "firstTokenS": 150.827505,
+   "lastTokenS": 171.48297
+  },
+  {
+   "id": "bench-283",
+   "arrivalS": 28.156777,
+   "inputTokens": 803,
+   "outputTokens": 658,
+   "firstTokenS": 150.827505,
+   "lastTokenS": 173.827423
+  },
+  {
+   "id": "bench-284",
+   "arrivalS": 28.2432,
+   "inputTokens": 398,
+   "outputTokens": 593,
+   "firstTokenS": 150.992771,
+   "lastTokenS": 172.906537
+  },
+  {
+   "id": "bench-285",
+   "arrivalS": 28.246769,
+   "inputTokens": 1507,
+   "outputTokens": 769,
+   "firstTokenS": 150.992771,
+   "lastTokenS": 179.708282
+  },
+  {
+   "id": "bench-286",
+   "arrivalS": 28.309098,
+   "inputTokens": 1027,
+   "outputTokens": 773,
+   "firstTokenS": 151.797101,
+   "lastTokenS": 181.237661
+  },
+  {
+   "id": "bench-287",
+   "arrivalS": 28.387683,
+   "inputTokens": 1019,
+   "outputTokens": 761,
+   "firstTokenS": 164.297619,
+   "lastTokenS": 181.681565
+  },
+  {
+   "id": "bench-288",
+   "arrivalS": 28.421469,
+   "inputTokens": 1166,
+   "outputTokens": 583,
+   "firstTokenS": 164.575952,
+   "lastTokenS": 178.333908
+  },
+  {
+   "id": "bench-289",
+   "arrivalS": 28.510483,
+   "inputTokens": 483,
+   "outputTokens": 682,
+   "firstTokenS": 164.575952,
+   "lastTokenS": 180.450018
+  },
+  {
+   "id": "bench-290",
+   "arrivalS": 28.514013,
+   "inputTokens": 1126,
+   "outputTokens": 739,
+   "firstTokenS": 164.984488,
+   "lastTokenS": 181.736362
+  },
+  {
+   "id": "bench-291",
+   "arrivalS": 28.517586,
+   "inputTokens": 1458,
+   "outputTokens": 772,
+   "firstTokenS": 165.444811,
+   "lastTokenS": 182.361895
+  },
+  {
+   "id": "bench-292",
+   "arrivalS": 28.690217,
+   "inputTokens": 533,
+   "outputTokens": 719,
+   "firstTokenS": 165.642196,
+   "lastTokenS": 181.423182
+  },
+  {
+   "id": "bench-293",
+   "arrivalS": 28.735463,
+   "inputTokens": 1029,
+   "outputTokens": 597,
+   "firstTokenS": 165.642196,
+   "lastTokenS": 179.07899
+  },
+  {
+   "id": "bench-294",
+   "arrivalS": 28.750052,
+   "inputTokens": 1122,
+   "outputTokens": 589,
+   "firstTokenS": 165.698491,
+   "lastTokenS": 178.938782
+  },
+  {
+   "id": "bench-295",
+   "arrivalS": 28.82303,
+   "inputTokens": 1218,
+   "outputTokens": 758,
+   "firstTokenS": 165.852919,
+   "lastTokenS": 182.450342
+  },
+  {
+   "id": "bench-296",
+   "arrivalS": 28.969583,
+   "inputTokens": 506,
+   "outputTokens": 578,
+   "firstTokenS": 166.32557,
+   "lastTokenS": 179.07899
+  },
+  {
+   "id": "bench-297",
+   "arrivalS": 28.994059,
+   "inputTokens": 1743,
+   "outputTokens": 763,
+   "firstTokenS": 166.775602,
+   "lastTokenS": 183.150905
+  },
+  {
+   "id": "bench-298",
+   "arrivalS": 29.091882,
+   "inputTokens": 736,
+   "outputTokens": 574,
+   "firstTokenS": 166.940826,
+   "lastTokenS": 179.275789
+  },
+  {
+   "id": "bench-299",
+   "arrivalS": 29.100521,
+   "inputTokens": 582,
+   "outputTokens": 768,
+   "firstTokenS": 166.940826,
+   "lastTokenS": 183.5693
+  }
+ ]
+}

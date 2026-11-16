@@ -34,8 +34,8 @@ export interface Reduced {
   /** KV blocks one replica holds, of 16 tokens each. */
   kvBlocksPerReplica: number;
   requests: RequestRow[];
-  /** Preemptions over the whole run. */
-  preemptions: number;
+  /** Preemptions over the whole run; null where the reference did not record them. */
+  preemptions: number | null;
   /** Per replica: requests it received, indexed by replica. */
   requestsPerPod: number[];
   /** Run-level numbers a simulator reports beyond the rows; null where it reports none. */
@@ -78,6 +78,11 @@ export interface ReferenceFile {
 }
 
 export const requestKey = (r: { session: number; round: number }): string => `s${r.session}/r${r.round}`;
+
+/** The record with only the requests whose key (`requestKey`) is in `keys`; run-level numbers are kept as they were. */
+export function restrict(r: Reduced, keys: Set<string> | null): Reduced {
+  return keys === null ? r : { ...r, requests: r.requests.filter((x) => keys.has(requestKey(x))) };
+}
 
 export function sortRows(rows: RequestRow[]): RequestRow[] {
   return rows.slice().sort((a, b) => a.session - b.session || a.round - b.round);
@@ -172,6 +177,15 @@ export function metricOf(r: Reduced, metric: Metric): number | null {
       return mean(done.filter((x) => x.outputTokens > 1).map((x) => (x.lastTokenS! - x.firstTokenS!) / (x.outputTokens - 1)));
     case "e2e_mean_s":
       return mean(done.map((x) => x.lastTokenS! - x.arrivalS));
+    case "tpot_p50_s":
+      return percentile(done.filter((x) => x.outputTokens > 1).map((x) => (x.lastTokenS! - x.firstTokenS!) / (x.outputTokens - 1)), 50);
+    case "tpot_p99_s":
+      return percentile(done.filter((x) => x.outputTokens > 1).map((x) => (x.lastTokenS! - x.firstTokenS!) / (x.outputTokens - 1)), 99);
+    case "e2e_p99_s":
+      return percentile(
+        done.map((x) => x.lastTokenS! - x.arrivalS),
+        99
+      );
     case "e2e_p50_s":
       return percentile(
         done.map((x) => x.lastTokenS! - x.arrivalS),

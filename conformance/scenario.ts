@@ -79,6 +79,8 @@ export type ExactQuantity =
   | "request_fate"
   | "prefill_pool_requests";
 
+export type Subset = "all" | "calibration" | "held-out";
+
 /** Timings and rates a calibrated or directional check may use (see `record.ts`, `metricOf`). */
 export const METRICS = [
   "ttft_mean_s",
@@ -87,6 +89,9 @@ export const METRICS = [
   "tpot_mean_s",
   "e2e_mean_s",
   "e2e_p50_s",
+  "e2e_p99_s",
+  "tpot_p50_s",
+  "tpot_p99_s",
   "throughput_tokens_per_s",
   "kv_transfer_mean_s",
   "spec_tokens_per_step",
@@ -132,6 +137,18 @@ interface CheckBase {
   claim: string;
   /** One line: why this standard (equal, this relative tolerance, this factor band) is the right one. Written before the first run. */
   tolerance: string;
+  /**
+   * Which timing parameters the TypeScript model runs this check with: the site's `defaults`, or the
+   * ones `fitted` to the reference. Unstated: `fitted` where the scenario has a calibrated or
+   * directional check, `defaults` otherwise (the BLIS scenarios, where every timing check is held out).
+   */
+  params?: "defaults" | "fitted";
+  /**
+   * Which requests the check's metrics are computed over: `all`, the `calibration` requests (the
+   * first `split.calibrationRequests` by arrival) or the `held-out` rest. A check on the held-out
+   * requests with `params: fitted` tests a fit made on the others.
+   */
+  subset?: Subset;
   /**
    * The references this check applies to. Unstated: every reference that supports the scenario's
    * model, GPU and mechanisms and can state the check's quantity (`refs/reference.ts`, `checkReferences`).
@@ -254,6 +271,12 @@ export interface Scenario {
    * calibrated. Unstated: the only reference that covers the scenario.
    */
   fitReference?: string;
+  /**
+   * Fit the timing parameters to the reference's measurements of the first `calibrationRequests`
+   * requests (by arrival) of the main arm, and check on the rest. For references that are measured
+   * data, which has no separate calibration scenarios.
+   */
+  split?: { calibrationRequests: number };
   /** The deployments to run; one named `main` unless the scenario declares `arms`. */
   arms: Record<string, Deployment>;
   checks: Check[];
@@ -364,6 +387,14 @@ function deployment(file: string, raw: Record<string, unknown>): Deployment {
 function check(file: string, c: unknown, arms: string[]): Check {
   const o = obj(file, c, "a check");
   const base: CheckBase = { id: str(file, o, "id"), claim: str(file, o, "claim"), tolerance: str(file, o, "tolerance"), knownDifferences: [] };
+  if (o.params !== undefined) {
+    if (o.params !== "defaults" && o.params !== "fitted") fail(file, `check ${base.id}: params must be "defaults" or "fitted"`);
+    base.params = o.params as "defaults" | "fitted";
+  }
+  if (o.subset !== undefined) {
+    if (o.subset !== "all" && o.subset !== "calibration" && o.subset !== "held-out") fail(file, `check ${base.id}: subset must be "all", "calibration" or "held-out"`);
+    base.subset = o.subset as Subset;
+  }
   const references = o.references === undefined ? undefined : stringList(file, o.references, `check ${base.id}: "references"`);
   if (references) base.references = references;
   const differencesOf = (k: Record<string, unknown>, where: string): Differences => {
@@ -443,7 +474,8 @@ export function parseScenario(file: string, text: string): Scenario {
   if (path.basename(file, ".yaml") !== id) fail(file, `"id" (${id}) must equal the file name`);
   const role = raw.role === undefined ? "check" : raw.role;
   if (role !== "check" && role !== "calibration") fail(file, `role must be "check" or "calibration"`);
-  const { arms: armsRaw, checks: checksRaw, id: _id, title: _title, role: _role, fit_reference: fitRaw, ...baseRaw } = raw;
+  const { arms: armsRaw, checks: checksRaw, id: _id, title: _title, role: _role, fit_reference: fitRaw, split: splitRaw, ...baseRaw } = raw;
+  const split = splitRaw === undefined ? undefined : { calibrationRequests: num(file, obj(file, splitRaw, `"split"`), "calibration_requests") };
   const fitReference = fitRaw === undefined ? undefined : str(file, { fit_reference: fitRaw }, "fit_reference");
   const arms: Record<string, Deployment> = {};
   if (armsRaw === undefined) arms[MAIN_ARM] = deployment(file, baseRaw);
@@ -454,7 +486,7 @@ export function parseScenario(file: string, text: string): Scenario {
   const checks = (checksRaw as unknown[]).map((c) => check(file, c, Object.keys(arms)));
   if (role === "check" && !checks.length) fail(file, `a scenario with role "check" needs at least one check`);
   if (role === "calibration" && checks.length) fail(file, `a calibration scenario states no checks: it is the data the fit uses`);
-  return { id, title: str(file, raw, "title"), role: role as Scenario["role"], ...(fitReference ? { fitReference } : {}), arms, checks };
+  return { id, title: str(file, raw, "title"), role: role as Scenario["role"], ...(fitReference ? { fitReference } : {}), ...(split ? { split } : {}), arms, checks };
 }
 
 export function loadScenario(id: string): Scenario {
@@ -473,5 +505,23 @@ export function scenarioIds(): string[] {
 /** The arm a scenario without `arms` has. */
 export const mainArm = (s: Scenario): Deployment => s.arms[MAIN_ARM] ?? fail(s.id, `the scenario has arms; name one`);
 
-/** True when the TypeScript run must use the fitted timing parameters: a timing check is only meaningful after the fit. */
+/** True when a check of the scenario is a timing check that is meant to run with fitted parameters unless it says otherwise. */
 export const usesCalibration = (s: Scenario): boolean => s.checks.some((c) => c.kind === "calibrated" || c.kind === "directional");
+
+/** The timing parameters a check runs with. */
+export const paramsOf = (s: Scenario, c: Check): "defaults" | "fitted" => c.params ?? (usesCalibration(s) ? "fitted" : "defaults");
+
+/** True when any check of the scenario runs with fitted parameters, so a fit to a reference must exist. */
+export const needsFit = (s: Scenario): boolean => s.checks.some((c) => paramsOf(s, c) === "fitted");
+
+/**
+ * The (session, round) keys of the requests of a subset, by arrival order of the main arm. A subset
+ * other than `all` needs the scenario's `split`.
+ */
+export function subsetKeys(s: Scenario, subset: Subset): Set<string> | null {
+  if (subset === "all") return null;
+  if (!s.split) throw new Error(`${s.id}: a check on the ${subset} requests needs "split: { calibration_requests }" in the scenario`);
+  const rows = (s.arms[MAIN_ARM] ?? Object.values(s.arms)[0]!).requests.slice().sort((a, b) => a.at - b.at || a.session - b.session || a.round - b.round);
+  const picked = subset === "calibration" ? rows.slice(0, s.split.calibrationRequests) : rows.slice(s.split.calibrationRequests);
+  return new Set(picked.map((r) => `s${r.session}/r${r.round}`));
+}

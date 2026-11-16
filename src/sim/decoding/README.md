@@ -7,7 +7,7 @@ How many tokens a sequence gains per engine step, and at what cost.
 <!-- generated:approaches:start -->
 | Concept | Approach | What it does | Fidelity | Verified against | Sources |
 |---|---|---|---|---|---|
-| Decoding | Autoregressive | One token per sequence per step. | Exact | BLIS: 20 scenarios | [Vaswani et al., NeurIPS 2017](https://arxiv.org/abs/1706.03762) |
+| Decoding | Autoregressive | One token per sequence per step. | Exact | BLIS: 20 scenarios; Measured vLLM: `measured-8b-rtx-pro-6000`, `measured-8b-rtx-4090` | [Vaswani et al., NeurIPS 2017](https://arxiv.org/abs/1706.03762) |
 | Decoding | Speculative decoding | A draft model proposes several tokens; the target verifies them in one pass. | Exact | BLIS: `spec-decoding`, `calib-8b-h100-spec` | [Leviathan et al., ICML 2023](https://arxiv.org/abs/2211.17192) |
 <!-- generated:approaches:end -->
 

@@ -17,11 +17,12 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import type { Reduced } from "../record.js";
 import { DEFAULT_PARAMS } from "../../src/sim/index.js";
-import { calibrateAll } from "../calibration/calibrate.js";
+import { calibratePair, calibrationPairs } from "../calibration/calibrate.js";
+import { METHOD } from "../calibration/fit.js";
 import { loadFitted, pairKey } from "../calibration/fitted.js";
 import { REFERENCES, checkReferences, fitReferenceOf, loadReferenceFile, referencesOf } from "../refs/index.js";
 import { SPAN, REFERENCE_DIR, loadScenario, scenarioIds, usesCalibration } from "../scenario.js";
-import { compareScenario, runModel } from "../suite.js";
+import { ModelRuns, compareScenario, runModel } from "../suite.js";
 import { SUMMARY_FILE, buildSummary } from "../summary.js";
 
 describe("scenarios and references", () => {
@@ -73,8 +74,8 @@ for (const id of scenarioIds()) {
       });
     }
 
-    const ts: { runs?: Record<string, Reduced> } = {};
-    const typescript = (): Record<string, Reduced> => (ts.runs ??= runModel(scenario));
+    const runs = new ModelRuns(scenario);
+    const typescript = (): Record<string, Reduced> => runModel(scenario, runs);
 
     it("runs to completion in the TypeScript model with every request accounted for", () => {
       for (const [arm, reduced] of Object.entries(typescript())) expect(reduced.requests, arm).toHaveLength(scenario.arms[arm]!.requests.length);
@@ -91,7 +92,7 @@ for (const id of scenarioIds()) {
     scenario.checks.forEach((check, i) => {
       const covering = checkReferences(scenario, check).map((r) => r.id);
       it(`${check.id} (${check.kind}) against ${covering.join(" and ")}: ${check.knownDifferences.length || check.referenceGap ? "differs exactly as recorded" : "holds"}`, () => {
-        const c = compareScenario(scenario, typescript()).comparisons[i]!;
+        const c = compareScenario(scenario, runs).comparisons[i]!;
         expect(c.unusedRecords, `${check.id}: records that no comparison uses (a stale known_difference or reference_gap)`).toEqual([]);
         for (const a of c.assertions) {
           if (a.scope === "gap") expect(a.observed, `${check.id}: the references disagree with each other and the scenario does not explain the gap (reference_gap)`).toEqual(a.recorded);
@@ -103,9 +104,22 @@ for (const id of scenarioIds()) {
 }
 
 describe("calibration", () => {
-  it("fitted.json is what the fit produces from the committed references (run pnpm conformance:calibrate)", () => {
-    expect(calibrateAll()).toEqual(loadFitted());
-  }, 120_000);
+  // One test per fit: together they take over a minute, and a single test that long starves the test runner's worker of its heartbeat.
+  it("fitted.json names the method and exactly the references and pairs that have calibration data", () => {
+    const fitted = loadFitted();
+    expect(fitted.method).toBe(METHOD);
+    const expected = Object.fromEntries(REFERENCES.map((r) => [r.id, calibrationPairs(r)]).filter(([, pairs]) => (pairs as string[]).length));
+    expect(Object.fromEntries(Object.entries(fitted.references).map(([id, f]) => [id, Object.keys(f.pairs).sort((a, b) => a.localeCompare(b))]))).toEqual(expected);
+    for (const r of REFERENCES) if (fitted.references[r.id]) expect(fitted.references[r.id]!.lock).toBe(r.lock());
+  });
+  for (const r of REFERENCES) {
+    for (const key of calibrationPairs(r)) {
+      it(`fitted.json holds what the fit to ${r.id} produces for ${key} (run pnpm conformance:calibrate)`, async () => {
+        await new Promise((done) => setTimeout(done, 50)); // let the runner report the previous test: a fit is a long synchronous computation
+        expect(calibratePair(r, key)).toEqual(loadFitted().references[r.id]!.pairs[key]);
+      }, 120_000);
+    }
+  }
   it("has a fit for every pair that a calibrated or directional check uses", () => {
     const fitted = loadFitted();
     for (const id of scenarioIds()) {

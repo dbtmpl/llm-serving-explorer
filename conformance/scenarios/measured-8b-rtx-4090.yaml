@@ -1,0 +1,601 @@
+id: measured-8b-rtx-4090
+title: "Measured vLLM 0.19.0: Llama 3.1 8B on one RTX 4090, 300 ShareGPT requests at about 10 per second"
+# Replays the 300 measured requests of a real vLLM run (reference "vllm-measured": conformance/refs/vllm-measured/, measurements published with
+# LLMServingSim, MIT licence) through the TypeScript model: the same arrivals (client send times, microseconds), prompt and output token counts,
+# and the engine's own settings from the run's meta.json. The reference refuses a scenario whose requests or settings differ from the run.
+#
+# What the run was: vLLM 0.19.0, one GeForce RTX 4090 (the driver reported 25,250,627,584 bytes), gpu_memory_utilization 0.9, max_num_seqs 256, max_num_batched_tokens 2048, chunked prefill, prefix caching on; the engine reported 2,588 KV blocks (41,408 tokens). The same 300 ShareGPT prompts at about 10 requests per second; the KV pool, not max_num_seqs, limits the batch (at most 49 sequences ran) and a long queue builds (mean time to first token about a minute). Preemptions were not recorded in this run.
+# Not represented: prompt token ids (the model has no token content, so it sees no prefix reuse between requests; the real engine served an unrecorded number
+# of the 257,239 prompt tokens from its prefix cache), asynchronous scheduling, CUDA graphs, the API server's tokeniser pool, and max_model_len (the
+# model has no limit).
+#
+# Two readings of timing, kept apart:
+#   default-*  the site's DEFAULT efficiency parameters, no fit, over all 300 requests: how far the model is from real hardware out of the box.
+#   fitted-*   MBU, MFU and the two host-time terms fitted (conformance:calibrate) to the first 100 requests by arrival (the calibration subset),
+#              then checked on the other 200 (held out). The fit sees the measured time to first token of each calibration request and their
+#              mean time per token, nothing else, and nothing is fitted to the held-out requests.
+# The tolerances are the ones the BLIS timing checks use for the same metrics, written here before the first comparison; they are not tuned.
+model: llama-3.1-8b
+gpu: rtx-4090
+engine:
+  tp: 1
+  gpu_memory_utilisation: 0.9
+  max_num_seqs: 256
+  max_num_batched_tokens: 2048
+  block_size: 16
+  prefix_caching: true
+replicas: 1
+routing: prefix-aware
+fit_reference: vllm-measured
+split: { calibration_requests: 100 }
+requests:
+  - { session: 1, at: 0, turns: [[2358, 531]] }
+  - { session: 2, at: 0.265091, turns: [[1034, 769]] }
+  - { session: 3, at: 0.396147, turns: [[1320, 769]] }
+  - { session: 4, at: 0.488067, turns: [[685, 769]] }
+  - { session: 5, at: 0.5049, turns: [[298, 526]] }
+  - { session: 6, at: 0.521681, turns: [[399, 520]] }
+  - { session: 7, at: 0.527328, turns: [[1307, 758]] }
+  - { session: 8, at: 0.728436, turns: [[1379, 519]] }
+  - { session: 9, at: 0.820447, turns: [[289, 761]] }
+  - { session: 10, at: 0.94372, turns: [[1008, 692]] }
+  - { session: 11, at: 0.945714, turns: [[576, 729]] }
+  - { session: 12, at: 1.29612, turns: [[1479, 681]] }
+  - { session: 13, at: 1.474614, turns: [[305, 698]] }
+  - { session: 14, at: 1.498714, turns: [[2357, 766]] }
+  - { session: 15, at: 1.518825, turns: [[835, 527]] }
+  - { session: 16, at: 1.539036, turns: [[3452, 745]] }
+  - { session: 17, at: 1.575239, turns: [[1355, 769]] }
+  - { session: 18, at: 1.650633, turns: [[866, 769]] }
+  - { session: 19, at: 1.70679, turns: [[2884, 767]] }
+  - { session: 20, at: 1.740929, turns: [[539, 722]] }
+  - { session: 21, at: 1.835199, turns: [[1403, 772]] }
+  - { session: 22, at: 1.850297, turns: [[2197, 548]] }
+  - { session: 23, at: 1.885392, turns: [[483, 776]] }
+  - { session: 24, at: 1.930283, turns: [[461, 614]] }
+  - { session: 25, at: 1.991734, turns: [[268, 581]] }
+  - { session: 26, at: 2.145833, turns: [[437, 556]] }
+  - { session: 27, at: 2.168665, turns: [[348, 720]] }
+  - { session: 28, at: 2.239663, turns: [[327, 770]] }
+  - { session: 29, at: 2.329675, turns: [[363, 550]] }
+  - { session: 30, at: 2.334644, turns: [[624, 721]] }
+  - { session: 31, at: 2.427753, turns: [[519, 742]] }
+  - { session: 32, at: 2.447647, turns: [[319, 767]] }
+  - { session: 33, at: 2.453455, turns: [[346, 604]] }
+  - { session: 34, at: 2.751022, turns: [[1195, 557]] }
+  - { session: 35, at: 3.087848, turns: [[403, 734]] }
+  - { session: 36, at: 3.253069, turns: [[633, 767]] }
+  - { session: 37, at: 3.288994, turns: [[814, 768]] }
+  - { session: 38, at: 3.299728, turns: [[1092, 590]] }
+  - { session: 39, at: 3.41471, turns: [[1320, 770]] }
+  - { session: 40, at: 3.472693, turns: [[1484, 574]] }
+  - { session: 41, at: 3.485592, turns: [[455, 768]] }
+  - { session: 42, at: 3.554381, turns: [[468, 717]] }
+  - { session: 43, at: 3.557163, turns: [[611, 569]] }
+  - { session: 44, at: 3.797327, turns: [[393, 527]] }
+  - { session: 45, at: 3.827363, turns: [[1034, 532]] }
+  - { session: 46, at: 3.936554, turns: [[389, 565]] }
+  - { session: 47, at: 3.973178, turns: [[1135, 739]] }
+  - { session: 48, at: 4.047211, turns: [[1255, 779]] }
+  - { session: 49, at: 4.126468, turns: [[851, 633]] }
+  - { session: 50, at: 4.146282, turns: [[605, 708]] }
+  - { session: 51, at: 4.495444, turns: [[621, 713]] }
+  - { session: 52, at: 4.645694, turns: [[319, 765]] }
+  - { session: 53, at: 4.925762, turns: [[1313, 773]] }
+  - { session: 54, at: 5.152221, turns: [[908, 765]] }
+  - { session: 55, at: 5.242531, turns: [[1232, 768]] }
+  - { session: 56, at: 5.497271, turns: [[889, 751]] }
+  - { session: 57, at: 5.506395, turns: [[838, 783]] }
+  - { session: 58, at: 5.527837, turns: [[1078, 709]] }
+  - { session: 59, at: 5.53283, turns: [[1168, 777]] }
+  - { session: 60, at: 5.572728, turns: [[1141, 784]] }
+  - { session: 61, at: 5.621582, turns: [[305, 743]] }
+  - { session: 62, at: 5.653045, turns: [[824, 774]] }
+  - { session: 63, at: 5.829287, turns: [[610, 530]] }
+  - { session: 64, at: 5.874405, turns: [[843, 768]] }
+  - { session: 65, at: 5.90631, turns: [[1685, 767]] }
+  - { session: 66, at: 5.98439, turns: [[359, 770]] }
+  - { session: 67, at: 5.999363, turns: [[1402, 730]] }
+  - { session: 68, at: 6.161817, turns: [[368, 724]] }
+  - { session: 69, at: 6.169744, turns: [[1236, 679]] }
+  - { session: 70, at: 6.602723, turns: [[1007, 683]] }
+  - { session: 71, at: 6.75179, turns: [[728, 796]] }
+  - { session: 72, at: 6.772758, turns: [[288, 608]] }
+  - { session: 73, at: 6.773556, turns: [[605, 516]] }
+  - { session: 74, at: 6.943664, turns: [[587, 519]] }
+  - { session: 75, at: 7.065188, turns: [[802, 683]] }
+  - { session: 76, at: 7.195792, turns: [[574, 767]] }
+  - { session: 77, at: 7.343312, turns: [[391, 770]] }
+  - { session: 78, at: 7.351324, turns: [[436, 546]] }
+  - { session: 79, at: 7.395216, turns: [[372, 584]] }
+  - { session: 80, at: 7.408051, turns: [[918, 769]] }
+  - { session: 81, at: 7.606706, turns: [[496, 684]] }
+  - { session: 82, at: 7.70473, turns: [[906, 769]] }
+  - { session: 83, at: 7.744345, turns: [[629, 635]] }
+  - { session: 84, at: 7.751039, turns: [[429, 822]] }
+  - { session: 85, at: 7.788389, turns: [[752, 546]] }
+  - { session: 86, at: 7.827987, turns: [[518, 619]] }
+  - { session: 87, at: 7.958781, turns: [[750, 768]] }
+  - { session: 88, at: 8.05982, turns: [[1181, 701]] }
+  - { session: 89, at: 8.278402, turns: [[1102, 768]] }
+  - { session: 90, at: 8.341875, turns: [[1111, 706]] }
+  - { session: 91, at: 8.355071, turns: [[356, 715]] }
+  - { session: 92, at: 8.479235, turns: [[273, 769]] }
+  - { session: 93, at: 8.622232, turns: [[1363, 606]] }
+  - { session: 94, at: 8.705472, turns: [[1267, 552]] }
+  - { session: 95, at: 8.852437, turns: [[950, 677]] }
+  - { session: 96, at: 8.920311, turns: [[856, 769]] }
+  - { session: 97, at: 8.995354, turns: [[853, 545]] }
+  - { session: 98, at: 9.049814, turns: [[555, 601]] }
+  - { session: 99, at: 9.052466, turns: [[2641, 556]] }
+  - { session: 100, at: 9.064521, turns: [[480, 534]] }
+  - { session: 101, at: 9.067011, turns: [[264, 545]] }
+  - { session: 102, at: 9.168669, turns: [[615, 583]] }
+  - { session: 103, at: 9.206309, turns: [[814, 745]] }
+  - { session: 104, at: 9.278557, turns: [[787, 761]] }
+  - { session: 105, at: 9.515339, turns: [[888, 769]] }
+  - { session: 106, at: 9.54478, turns: [[494, 541]] }
+  - { session: 107, at: 9.597299, turns: [[824, 767]] }
+  - { session: 108, at: 9.739133, turns: [[616, 721]] }
+  - { session: 109, at: 9.764848, turns: [[773, 769]] }
+  - { session: 110, at: 9.771397, turns: [[262, 528]] }
+  - { session: 111, at: 9.80596, turns: [[400, 524]] }
+  - { session: 112, at: 9.823459, turns: [[448, 528]] }
+  - { session: 113, at: 10.089117, turns: [[408, 572]] }
+  - { session: 114, at: 10.254562, turns: [[1213, 614]] }
+  - { session: 115, at: 10.356019, turns: [[373, 579]] }
+  - { session: 116, at: 10.560209, turns: [[286, 566]] }
+  - { session: 117, at: 10.722917, turns: [[353, 536]] }
+  - { session: 118, at: 10.74355, turns: [[996, 610]] }
+  - { session: 119, at: 10.966367, turns: [[952, 598]] }
+  - { session: 120, at: 11.045152, turns: [[759, 770]] }
+  - { session: 121, at: 11.208113, turns: [[266, 591]] }
+  - { session: 122, at: 11.435548, turns: [[385, 539]] }
+  - { session: 123, at: 11.47338, turns: [[630, 573]] }
+  - { session: 124, at: 11.485316, turns: [[631, 655]] }
+  - { session: 125, at: 11.511019, turns: [[373, 768]] }
+  - { session: 126, at: 11.566925, turns: [[264, 575]] }
+  - { session: 127, at: 11.737007, turns: [[524, 555]] }
+  - { session: 128, at: 11.933619, turns: [[697, 566]] }
+  - { session: 129, at: 11.934128, turns: [[1643, 768]] }
+  - { session: 130, at: 12.006642, turns: [[1342, 626]] }
+  - { session: 131, at: 12.061695, turns: [[516, 528]] }
+  - { session: 132, at: 12.085587, turns: [[341, 596]] }
+  - { session: 133, at: 12.098471, turns: [[733, 666]] }
+  - { session: 134, at: 12.139884, turns: [[1017, 676]] }
+  - { session: 135, at: 12.42531, turns: [[717, 578]] }
+  - { session: 136, at: 12.465086, turns: [[368, 767]] }
+  - { session: 137, at: 12.538313, turns: [[798, 604]] }
+  - { session: 138, at: 12.659097, turns: [[365, 580]] }
+  - { session: 139, at: 12.704181, turns: [[721, 544]] }
+  - { session: 140, at: 13.061164, turns: [[1788, 633]] }
+  - { session: 141, at: 13.389785, turns: [[1268, 767]] }
+  - { session: 142, at: 13.418172, turns: [[621, 533]] }
+  - { session: 143, at: 13.487636, turns: [[737, 530]] }
+  - { session: 144, at: 13.523335, turns: [[727, 583]] }
+  - { session: 145, at: 13.556742, turns: [[550, 707]] }
+  - { session: 146, at: 13.560744, turns: [[1437, 770]] }
+  - { session: 147, at: 13.654256, turns: [[522, 546]] }
+  - { session: 148, at: 13.724107, turns: [[831, 772]] }
+  - { session: 149, at: 13.729154, turns: [[654, 611]] }
+  - { session: 150, at: 13.762364, turns: [[596, 518]] }
+  - { session: 151, at: 14.002064, turns: [[512, 592]] }
+  - { session: 152, at: 14.028797, turns: [[579, 769]] }
+  - { session: 153, at: 14.04364, turns: [[465, 767]] }
+  - { session: 154, at: 14.111462, turns: [[460, 588]] }
+  - { session: 155, at: 14.535532, turns: [[390, 631]] }
+  - { session: 156, at: 14.563947, turns: [[1099, 537]] }
+  - { session: 157, at: 14.6754, turns: [[2090, 730]] }
+  - { session: 158, at: 14.819713, turns: [[377, 561]] }
+  - { session: 159, at: 14.845561, turns: [[1340, 530]] }
+  - { session: 160, at: 14.975147, turns: [[741, 771]] }
+  - { session: 161, at: 15.021068, turns: [[963, 557]] }
+  - { session: 162, at: 15.122223, turns: [[1415, 539]] }
+  - { session: 163, at: 15.221787, turns: [[536, 693]] }
+  - { session: 164, at: 15.298717, turns: [[262, 754]] }
+  - { session: 165, at: 15.309632, turns: [[627, 582]] }
+  - { session: 166, at: 15.488755, turns: [[735, 768]] }
+  - { session: 167, at: 15.526765, turns: [[380, 550]] }
+  - { session: 168, at: 15.548014, turns: [[611, 521]] }
+  - { session: 169, at: 15.551613, turns: [[822, 773]] }
+  - { session: 170, at: 15.641054, turns: [[602, 527]] }
+  - { session: 171, at: 15.754344, turns: [[899, 599]] }
+  - { session: 172, at: 15.755864, turns: [[482, 768]] }
+  - { session: 173, at: 15.827541, turns: [[1207, 685]] }
+  - { session: 174, at: 15.853179, turns: [[1052, 553]] }
+  - { session: 175, at: 15.958398, turns: [[1320, 770]] }
+  - { session: 176, at: 15.977003, turns: [[2082, 766]] }
+  - { session: 177, at: 16.094218, turns: [[627, 577]] }
+  - { session: 178, at: 16.143364, turns: [[1734, 772]] }
+  - { session: 179, at: 16.41857, turns: [[1313, 523]] }
+  - { session: 180, at: 16.433318, turns: [[1617, 577]] }
+  - { session: 181, at: 16.475005, turns: [[1603, 773]] }
+  - { session: 182, at: 16.487373, turns: [[338, 562]] }
+  - { session: 183, at: 16.746177, turns: [[954, 576]] }
+  - { session: 184, at: 16.955278, turns: [[1096, 767]] }
+  - { session: 185, at: 16.986035, turns: [[1361, 524]] }
+  - { session: 186, at: 17.093545, turns: [[2764, 639]] }
+  - { session: 187, at: 17.263935, turns: [[817, 570]] }
+  - { session: 188, at: 17.344263, turns: [[391, 770]] }
+  - { session: 189, at: 17.420223, turns: [[721, 544]] }
+  - { session: 190, at: 17.447521, turns: [[726, 756]] }
+  - { session: 191, at: 17.458475, turns: [[1447, 599]] }
+  - { session: 192, at: 17.684766, turns: [[633, 568]] }
+  - { session: 193, at: 17.915147, turns: [[493, 586]] }
+  - { session: 194, at: 18.01622, turns: [[1747, 761]] }
+  - { session: 195, at: 18.057009, turns: [[974, 628]] }
+  - { session: 196, at: 18.100569, turns: [[638, 767]] }
+  - { session: 197, at: 18.229981, turns: [[635, 768]] }
+  - { session: 198, at: 18.45757, turns: [[509, 545]] }
+  - { session: 199, at: 18.675127, turns: [[454, 575]] }
+  - { session: 200, at: 18.828829, turns: [[1220, 570]] }
+  - { session: 201, at: 18.93077, turns: [[806, 615]] }
+  - { session: 202, at: 18.938523, turns: [[607, 607]] }
+  - { session: 203, at: 18.955225, turns: [[536, 571]] }
+  - { session: 204, at: 19.184421, turns: [[397, 692]] }
+  - { session: 205, at: 19.278636, turns: [[833, 559]] }
+  - { session: 206, at: 19.279092, turns: [[1109, 771]] }
+  - { session: 207, at: 19.289081, turns: [[526, 769]] }
+  - { session: 208, at: 19.398072, turns: [[1265, 597]] }
+  - { session: 209, at: 19.398723, turns: [[505, 543]] }
+  - { session: 210, at: 19.416549, turns: [[1231, 610]] }
+  - { session: 211, at: 19.495619, turns: [[1581, 591]] }
+  - { session: 212, at: 19.615147, turns: [[1941, 570]] }
+  - { session: 213, at: 19.719532, turns: [[805, 519]] }
+  - { session: 214, at: 19.744945, turns: [[867, 745]] }
+  - { session: 215, at: 19.869408, turns: [[727, 736]] }
+  - { session: 216, at: 19.895776, turns: [[738, 623]] }
+  - { session: 217, at: 19.936233, turns: [[420, 621]] }
+  - { session: 218, at: 20.072785, turns: [[1947, 651]] }
+  - { session: 219, at: 20.177945, turns: [[1011, 773]] }
+  - { session: 220, at: 20.367105, turns: [[545, 667]] }
+  - { session: 221, at: 20.47451, turns: [[1077, 543]] }
+  - { session: 222, at: 20.558325, turns: [[531, 537]] }
+  - { session: 223, at: 20.567887, turns: [[363, 513]] }
+  - { session: 224, at: 20.613436, turns: [[1583, 775]] }
+  - { session: 225, at: 20.645717, turns: [[696, 584]] }
+  - { session: 226, at: 20.672609, turns: [[1130, 537]] }
+  - { session: 227, at: 21.033866, turns: [[520, 767]] }
+  - { session: 228, at: 21.083297, turns: [[1288, 598]] }
+  - { session: 229, at: 21.306433, turns: [[797, 528]] }
+  - { session: 230, at: 21.405885, turns: [[634, 603]] }
+  - { session: 231, at: 21.565047, turns: [[1179, 592]] }
+  - { session: 232, at: 21.634034, turns: [[352, 534]] }
+  - { session: 233, at: 21.719765, turns: [[476, 573]] }
+  - { session: 234, at: 21.788093, turns: [[655, 551]] }
+  - { session: 235, at: 21.810832, turns: [[1785, 674]] }
+  - { session: 236, at: 21.93928, turns: [[1644, 731]] }
+  - { session: 237, at: 21.970992, turns: [[466, 656]] }
+  - { session: 238, at: 21.973767, turns: [[1871, 550]] }
+  - { session: 239, at: 22.07676, turns: [[1087, 570]] }
+  - { session: 240, at: 22.096351, turns: [[1624, 537]] }
+  - { session: 241, at: 22.380118, turns: [[857, 561]] }
+  - { session: 242, at: 22.687194, turns: [[361, 525]] }
+  - { session: 243, at: 22.932603, turns: [[657, 633]] }
+  - { session: 244, at: 22.979004, turns: [[675, 769]] }
+  - { session: 245, at: 22.980987, turns: [[1054, 581]] }
+  - { session: 246, at: 23.243864, turns: [[790, 585]] }
+  - { session: 247, at: 23.299859, turns: [[730, 522]] }
+  - { session: 248, at: 23.640863, turns: [[3998, 767]] }
+  - { session: 249, at: 23.971348, turns: [[810, 770]] }
+  - { session: 250, at: 24.164438, turns: [[904, 767]] }
+  - { session: 251, at: 24.198417, turns: [[554, 750]] }
+  - { session: 252, at: 24.246356, turns: [[371, 537]] }
+  - { session: 253, at: 24.437903, turns: [[369, 595]] }
+  - { session: 254, at: 24.475744, turns: [[502, 551]] }
+  - { session: 255, at: 24.493533, turns: [[739, 663]] }
+  - { session: 256, at: 24.575188, turns: [[359, 666]] }
+  - { session: 257, at: 24.851061, turns: [[820, 519]] }
+  - { session: 258, at: 24.970603, turns: [[877, 542]] }
+  - { session: 259, at: 25.053614, turns: [[524, 770]] }
+  - { session: 260, at: 25.06447, turns: [[387, 609]] }
+  - { session: 261, at: 25.159289, turns: [[863, 772]] }
+  - { session: 262, at: 25.620314, turns: [[405, 535]] }
+  - { session: 263, at: 25.636204, turns: [[660, 513]] }
+  - { session: 264, at: 25.708653, turns: [[640, 770]] }
+  - { session: 265, at: 25.918617, turns: [[308, 766]] }
+  - { session: 266, at: 26.064227, turns: [[1171, 715]] }
+  - { session: 267, at: 26.173028, turns: [[888, 512]] }
+  - { session: 268, at: 26.294359, turns: [[478, 539]] }
+  - { session: 269, at: 26.33938, turns: [[389, 533]] }
+  - { session: 270, at: 26.373605, turns: [[647, 635]] }
+  - { session: 271, at: 26.538811, turns: [[392, 589]] }
+  - { session: 272, at: 26.705211, turns: [[369, 526]] }
+  - { session: 273, at: 26.908204, turns: [[441, 589]] }
+  - { session: 274, at: 27.152186, turns: [[502, 587]] }
+  - { session: 275, at: 27.223041, turns: [[275, 518]] }
+  - { session: 276, at: 27.292666, turns: [[1176, 673]] }
+  - { session: 277, at: 27.452864, turns: [[297, 769]] }
+  - { session: 278, at: 27.558275, turns: [[1315, 634]] }
+  - { session: 279, at: 27.679327, turns: [[587, 1021]] }
+  - { session: 280, at: 27.837447, turns: [[921, 557]] }
+  - { session: 281, at: 28.058182, turns: [[1634, 774]] }
+  - { session: 282, at: 28.100129, turns: [[1400, 518]] }
+  - { session: 283, at: 28.147515, turns: [[813, 577]] }
+  - { session: 284, at: 28.156777, turns: [[803, 658]] }
+  - { session: 285, at: 28.2432, turns: [[398, 593]] }
+  - { session: 286, at: 28.246769, turns: [[1507, 769]] }
+  - { session: 287, at: 28.309098, turns: [[1027, 773]] }
+  - { session: 288, at: 28.387683, turns: [[1019, 761]] }
+  - { session: 289, at: 28.421469, turns: [[1166, 583]] }
+  - { session: 290, at: 28.510483, turns: [[483, 682]] }
+  - { session: 291, at: 28.514013, turns: [[1126, 739]] }
+  - { session: 292, at: 28.517586, turns: [[1458, 772]] }
+  - { session: 293, at: 28.690217, turns: [[533, 719]] }
+  - { session: 294, at: 28.735463, turns: [[1029, 597]] }
+  - { session: 295, at: 28.750052, turns: [[1122, 589]] }
+  - { session: 296, at: 28.82303, turns: [[1218, 758]] }
+  - { session: 297, at: 28.969583, turns: [[506, 578]] }
+  - { session: 298, at: 28.994059, turns: [[1743, 763]] }
+  - { session: 299, at: 29.091882, turns: [[736, 574]] }
+  - { session: 300, at: 29.100521, turns: [[582, 768]] }
+checks:
+  - id: kv-blocks-per-replica
+    claim: One replica holds the same number of KV blocks as the real engine reported, to within 0.1 percent.
+    kind: capacity
+    quantity: kv_blocks_per_replica
+    rel_tol: 0.001
+    params: defaults
+    tolerance: "0.1 percent: the capacity rule of 2026-11-16 (docs/parity.md), applied unchanged to a real engine. The terms that remain are estimates on both sides and a difference below one part in a thousand changes no admission decision; a larger one is explained term by term in the known difference."
+    known_difference:
+      reference: vllm-measured
+      cause: "The activation and graph terms of the model's memory budget are not the real engine's"
+      reason: &r_kv >-
+        Term by term, per the model's budget (src/sim/cost/memory.ts). Requested memory is ceil(25,250,627,584 x 0.9) = 22,725,564,826 bytes on both sides.
+        Weights are 16.06e9 bytes on both. The real engine set aside 22.726 - 16.061 - 5.427 (its 2,588 blocks of 2,097,152 bytes) = 1.238 GB for activations,
+        graphs and everything else; the model sets aside 1.895 GB (735,313,920 bytes of activations at an 8,192-token step, 1,159,725,056 bytes of graphs) and
+        gets 2,274 blocks, 314 fewer (658 MB, 12.1 percent). The engine profiled a 2,048-token step; scaling the model's activation term by 2,048/8,192 gives
+        183.8 MB and accounts for 263 blocks. The remaining 51 blocks (106 MB) are the model's graph term (the median of H100 start-up logs of another vLLM
+        version) against the 1.054 GB the run implies for graphs and other overhead, a remainder not a measurement. The pool is small here (weights take 71
+        percent of the requested memory), so the same fixed errors weigh 12 percent where they weigh 1.3 percent on the 96 GB card. Not tuned: the model's
+        budget is left as it is.
+      differences:
+        value: { typescript: 2274, vllm-measured: 2588 }
+  - id: default-ttft-mean
+    claim: Mean time to first token over all 300 requests, the site's default parameters agrees with the measured run.
+    kind: calibrated
+    metric: ttft_mean_s
+    rel_tol: 0.3
+    params: defaults
+    subset: all
+    tolerance: "30 percent: the standard the BLIS timing checks use for time to first token. Under queueing a small step-cost error is amplified into a larger wait, so this is the loosest of the timing standards."
+    known_difference:
+      reference: vllm-measured
+      cause: "Queue wait compounds the slower service rate: the engine is saturated from the first requests"
+      reason: &r_queue >-
+        The load (195,753 output tokens in 29 s, about 6,750 per second) is far above this card's measured service rate of 1,066 tokens per second, so a queue
+        builds from the start and the wait of the k-th request is the shortfall accumulated before it (mean time to first token for the first 100 requests is
+        already 17.9 s, then 64.7 s, then 113.9 s). The model at default parameters serves 590 tokens per second (-45 percent), so its queue grows 1.8 times
+        as fast: mean time to first token 135 s against 65.5 s, median 130 against 60, 99th percentile 274 against 137. The error is the decode-cost error
+        amplified by queueing.
+      differences:
+        value: { typescript: 135.1, vllm-measured: 65.49 }
+  - id: default-ttft-p50
+    claim: Median time to first token over all 300 requests, the site's default parameters agrees with the measured run.
+    kind: calibrated
+    metric: ttft_p50_s
+    rel_tol: 0.3
+    params: defaults
+    subset: all
+    tolerance: "30 percent: the same standard as the mean."
+    known_difference:
+      reference: vllm-measured
+      cause: "Queue wait compounds the slower service rate: the engine is saturated from the first requests"
+      reason: *r_queue
+      differences:
+        value: { typescript: 130.2, vllm-measured: 60.13 }
+  - id: default-ttft-p99
+    claim: 99th-percentile time to first token over all 300 requests, the site's default parameters agrees with the measured run.
+    kind: calibrated
+    metric: ttft_p99_s
+    rel_tol: 0.3
+    params: defaults
+    subset: all
+    tolerance: "30 percent: the same standard as the mean; the tail is set by the longest queue, which a step-cost error compounds."
+    known_difference:
+      reference: vllm-measured
+      cause: "Queue wait compounds the slower service rate: the engine is saturated from the first requests"
+      reason: *r_queue
+      differences:
+        value: { typescript: 274.1, vllm-measured: 137.4 }
+  - id: default-tpot-mean
+    claim: Mean time per output token over all 300 requests, the site's default parameters agrees with the measured run.
+    kind: calibrated
+    metric: tpot_mean_s
+    rel_tol: 0.12
+    params: defaults
+    subset: all
+    tolerance: "12 percent: the standard the BLIS timing checks use for time per token (memory-bound decoding, the best-conditioned timing)."
+    known_difference:
+      reference: vllm-measured
+      cause: "The model's decode step is slower than the real engine's at default parameters, and the fit goes to a bound"
+      reason: &r_decode >-
+        Default parameters: MBU 0.6, MFU 0.5, host time 1.5 ms plus 0.05 ms per sequence. The model's mean time per output token is 51.4 ms against 32.4 ms
+        measured (+58 percent). The weight read alone is 16.06 GB over 0.6 x 1,008 GB/s = 26.6 ms. At the largest batch the run reached (49 sequences of about
+        1,190 tokens of context, 7.6 GB of KV) the real step moves 23.7 GB in 32.4 ms, 731 GB/s, which is 73 percent of the datasheet bandwidth with no
+        allowance for host time, so no MBU below about 0.73 can reproduce it. The fit to the first 100 requests puts MBU at its upper bound, 1.0, host time at
+        its lower bound, and MFU at 0.8: parameters at their limits say that the structure of the decode cost, not a factor, is off; which part was not
+        isolated here. This card's pool also differs from the engine's (2,274 blocks against 2,588), and the model preempts 184 times at default parameters,
+        188 fitted; the run recorded no preemption count, so the effect of that on the real engine's decode is not known.
+      differences:
+        value: { typescript: 0.05136, vllm-measured: 0.03245 }
+  - id: default-tpot-p50
+    claim: Median time per output token over all 300 requests, the site's default parameters agrees with the measured run.
+    kind: calibrated
+    metric: tpot_p50_s
+    rel_tol: 0.12
+    params: defaults
+    subset: all
+    tolerance: "12 percent: the same standard as the mean."
+    known_difference:
+      reference: vllm-measured
+      cause: "The model's decode step is slower than the real engine's at default parameters, and the fit goes to a bound"
+      reason: *r_decode
+      differences:
+        value: { typescript: 0.04924, vllm-measured: 0.03076 }
+  - id: default-tpot-p99
+    claim: 99th-percentile time per output token over all 300 requests, the site's default parameters agrees with the measured run.
+    kind: calibrated
+    metric: tpot_p99_s
+    rel_tol: 0.2
+    params: defaults
+    subset: all
+    tolerance: "20 percent: the tail of time per token is set by the few steps that carry a long prefill chunk or a large batch, which a mean-fitted model reproduces less closely than the mean."
+    known_difference:
+      reference: vllm-measured
+      cause: "The model's decode step is slower than the real engine's at default parameters, and the fit goes to a bound"
+      reason: *r_decode
+      differences:
+        value: { typescript: 0.08653, vllm-measured: 0.056 }
+  - id: default-e2e-mean
+    claim: Mean end-to-end time over all 300 requests, the site's default parameters agrees with the measured run.
+    kind: calibrated
+    metric: e2e_mean_s
+    rel_tol: 0.15
+    params: defaults
+    subset: all
+    tolerance: "15 percent: the standard the BLIS timing checks use for end-to-end time."
+    known_difference:
+      reference: vllm-measured
+      cause: "End-to-end time is the queue wait plus a decode that is over half again too slow"
+      reason: &r_e2e >-
+        End-to-end time is time to first token plus the decode of about 650 tokens: at default parameters the model's mean is 168.6 s against 86.6 s measured
+        (+95 percent), median +94 percent, 99th percentile +96 percent. About 70 s of it is the queue (135 against 65.5 s) and the rest the slower decode
+        (51.4 against 32.4 ms over about 650 tokens).
+      differences:
+        value: { typescript: 168.6, vllm-measured: 86.61 }
+  - id: default-e2e-p50
+    claim: Median end-to-end time over all 300 requests, the site's default parameters agrees with the measured run.
+    kind: calibrated
+    metric: e2e_p50_s
+    rel_tol: 0.15
+    params: defaults
+    subset: all
+    tolerance: "15 percent: the same standard as the mean."
+    known_difference:
+      reference: vllm-measured
+      cause: "End-to-end time is the queue wait plus a decode that is over half again too slow"
+      reason: *r_e2e
+      differences:
+        value: { typescript: 161.6, vllm-measured: 83.42 }
+  - id: default-e2e-p99
+    claim: 99th-percentile end-to-end time over all 300 requests, the site's default parameters agrees with the measured run.
+    kind: calibrated
+    metric: e2e_p99_s
+    rel_tol: 0.2
+    params: defaults
+    subset: all
+    tolerance: "20 percent: the tail adds the longest queue to the longest answer."
+    known_difference:
+      reference: vllm-measured
+      cause: "End-to-end time is the queue wait plus a decode that is over half again too slow"
+      reason: *r_e2e
+      differences:
+        value: { typescript: 301.4, vllm-measured: 153.6 }
+  - id: default-throughput
+    claim: Output tokens per second from the first arrival to the last completion over all 300 requests, the site's default parameters agrees with the measured run.
+    kind: calibrated
+    metric: throughput_tokens_per_s
+    rel_tol: 0.1
+    params: defaults
+    subset: all
+    tolerance: "10 percent: the standard the BLIS timing checks use for throughput; the load is open loop, so throughput differs only through how late the last answers finish."
+    known_difference:
+      reference: vllm-measured
+      cause: "Throughput follows the slower service rate"
+      reason: &r_tput >-
+        Output tokens per second from the first arrival to the last completion: 590 in the model at default parameters, 1,066 measured (-44.7 percent). The
+        load exceeds the engine's capacity throughout, so throughput is the service rate, which is the decode speed (51.4 against 32.4 ms per token).
+      differences:
+        value: { typescript: 590, vllm-measured: 1066 }
+  - id: fitted-ttft-mean
+    claim: Mean time to first token over the 200 held-out requests, parameters fitted to the first 100 agrees with the measured run.
+    kind: calibrated
+    metric: ttft_mean_s
+    rel_tol: 0.3
+    params: fitted
+    subset: held-out
+    tolerance: "30 percent: the standard the BLIS timing checks use for time to first token. Under queueing a small step-cost error is amplified into a larger wait, so this is the loosest of the timing standards."
+  - id: fitted-ttft-p50
+    claim: Median time to first token over the 200 held-out requests, parameters fitted to the first 100 agrees with the measured run.
+    kind: calibrated
+    metric: ttft_p50_s
+    rel_tol: 0.3
+    params: fitted
+    subset: held-out
+    tolerance: "30 percent: the same standard as the mean."
+  - id: fitted-ttft-p99
+    claim: 99th-percentile time to first token over the 200 held-out requests, parameters fitted to the first 100 agrees with the measured run.
+    kind: calibrated
+    metric: ttft_p99_s
+    rel_tol: 0.3
+    params: fitted
+    subset: held-out
+    tolerance: "30 percent: the same standard as the mean; the tail is set by the longest queue, which a step-cost error compounds."
+  - id: fitted-tpot-mean
+    claim: Mean time per output token over the 200 held-out requests, parameters fitted to the first 100 agrees with the measured run.
+    kind: calibrated
+    metric: tpot_mean_s
+    rel_tol: 0.12
+    params: fitted
+    subset: held-out
+    tolerance: "12 percent: the standard the BLIS timing checks use for time per token (memory-bound decoding, the best-conditioned timing)."
+  - id: fitted-tpot-p50
+    claim: Median time per output token over the 200 held-out requests, parameters fitted to the first 100 agrees with the measured run.
+    kind: calibrated
+    metric: tpot_p50_s
+    rel_tol: 0.12
+    params: fitted
+    subset: held-out
+    tolerance: "12 percent: the same standard as the mean."
+  - id: fitted-tpot-p99
+    claim: 99th-percentile time per output token over the 200 held-out requests, parameters fitted to the first 100 agrees with the measured run.
+    kind: calibrated
+    metric: tpot_p99_s
+    rel_tol: 0.2
+    params: fitted
+    subset: held-out
+    tolerance: "20 percent: the tail of time per token is set by the few steps that carry a long prefill chunk or a large batch, which a mean-fitted model reproduces less closely than the mean."
+    known_difference:
+      reference: vllm-measured
+      cause: "The real run has a heavier tail of per-token time than the model reproduces; not explained"
+      reason: &r_p99 >-
+        On the 200 held-out requests with the fitted parameters the model's 99th-percentile time per output token is 37.5 ms against 55.0 ms measured (-31.9
+        percent), while its median (28.2 against 30.8 ms) and mean (28.2 against 31.7 ms, -10.9 percent) are inside tolerance. The measured tail is 1.8 times
+        its median, the model's 1.3 times. Candidates, none tested here: stalls from preemption and recompute in the real engine (the run did not record
+        preemptions, so this cannot be checked; the model's own pool is smaller and it preempts 188 times); step-time variance of the real card (clocks, host
+        jitter) that a deterministic model does not have; prefix-cache hits (not representable). Recorded as a miss, not tuned.
+      differences:
+        value: { typescript: 0.03747, vllm-measured: 0.05501 }
+  - id: fitted-e2e-mean
+    claim: Mean end-to-end time over the 200 held-out requests, parameters fitted to the first 100 agrees with the measured run.
+    kind: calibrated
+    metric: e2e_mean_s
+    rel_tol: 0.15
+    params: fitted
+    subset: held-out
+    tolerance: "15 percent: the standard the BLIS timing checks use for end-to-end time."
+  - id: fitted-e2e-p50
+    claim: Median end-to-end time over the 200 held-out requests, parameters fitted to the first 100 agrees with the measured run.
+    kind: calibrated
+    metric: e2e_p50_s
+    rel_tol: 0.15
+    params: fitted
+    subset: held-out
+    tolerance: "15 percent: the same standard as the mean."
+  - id: fitted-e2e-p99
+    claim: 99th-percentile end-to-end time over the 200 held-out requests, parameters fitted to the first 100 agrees with the measured run.
+    kind: calibrated
+    metric: e2e_p99_s
+    rel_tol: 0.2
+    params: fitted
+    subset: held-out
+    tolerance: "20 percent: the tail adds the longest queue to the longest answer."
+  - id: fitted-throughput
+    claim: Output tokens per second from the first arrival to the last completion over the 200 held-out requests, parameters fitted to the first 100 agrees with the measured run.
+    kind: calibrated
+    metric: throughput_tokens_per_s
+    rel_tol: 0.1
+    params: fitted
+    subset: held-out
+    tolerance: "10 percent: the standard the BLIS timing checks use for throughput; the load is open loop, so throughput differs only through how late the last answers finish."

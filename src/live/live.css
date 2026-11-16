@@ -185,6 +185,7 @@ body,
 }
 .lv-seg {
   display: flex;
+  flex-wrap: wrap;
   background: var(--soft);
   border-radius: 9px;
   padding: 2px;

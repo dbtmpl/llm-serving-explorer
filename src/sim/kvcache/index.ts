@@ -10,6 +10,7 @@ import { leastRecentlyUsed, type EvictionPolicy } from "./eviction.js";
 import { preemptNewest, type PreemptionPolicy } from "./preemption.js";
 import { blockHashPrefix, type PrefixMatcher } from "./prefix.js";
 import { adaptiveReload, type ReloadPolicy } from "./reload.js";
+import { MEASURED } from "../verification.js";
 import { tieredCache } from "./tiers.js";
 
 export const pagedBlocks: ApproachMeta = {
@@ -18,7 +19,7 @@ export const pagedBlocks: ApproachMeta = {
   summary: "KV memory is handed out in fixed 16-token blocks as tokens are written, like virtual-memory pages.",
   citations: ["kwon2023"],
   fidelity: "structural",
-  verification: ["kv-budget-8b-h100", "kv-budget-70b-h200-tp4", "preemption-overflow", "eviction-pressure"]
+  verification: ["kv-budget-8b-h100", "kv-budget-70b-h200-tp4", "preemption-overflow", "eviction-pressure", ...MEASURED]
 };
 
 export const KV_LAYOUT: Concept = {

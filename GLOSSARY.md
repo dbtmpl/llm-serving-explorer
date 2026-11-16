@@ -40,3 +40,4 @@
 - **Known difference:** A check that does not hold as written, recorded per reference in the scenario with its cause and the exact values that differ. The test fails if the difference changes or disappears.
 - **Reference gap:** Two references that both cover a check disagree with each other; the scenario records and explains the gap, asserted exactly, and the model is held against the span the references leave.
 - **Span:** The range between the values of references that disagree with each other, against which the model is held for such a check.
+- **Measured data (as a reference):** Real vLLM runs reduced to the same record as a simulator: per-request times, engine settings and KV block count. Only reduced values are committed, with attribution and the source's hashes (`conformance/refs/vllm-measured/`).

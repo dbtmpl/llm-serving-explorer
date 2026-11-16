@@ -20,8 +20,8 @@ const MAX_SIMULATED_S = 3600;
  * calibrated or directional check, otherwise the site's defaults (an empty override). The reference
  * is the one the scenario names (`fit_reference`) or the only one that covers it.
  */
-export function timingFor(s: Scenario, arm: string, fitted?: FittedFile, reference?: string): TimingOverride {
-  if (!usesCalibration(s)) return {};
+export function timingFor(s: Scenario, arm: string, fitted?: FittedFile, reference?: string, mode: "defaults" | "fitted" = usesCalibration(s) ? "fitted" : "defaults"): TimingOverride {
+  if (mode === "defaults") return {};
   const d = s.arms[arm]!;
   const f = fittedFor(fitted ?? loadFitted(), reference ?? fitReferenceOf(s), d.model, d.gpu, d.engine.tp);
   return {
@@ -157,8 +157,8 @@ export function reduceTypescript(s: Scenario, w: World, arm: string = MAIN_ARM):
 }
 
 /** Run every arm of a scenario; a scenario with a timing check uses the fitted values. */
-export function runTypescriptArms(s: Scenario, fitted?: FittedFile, reference?: string): Record<string, Reduced> {
+export function runTypescriptArms(s: Scenario, fitted?: FittedFile, reference?: string, mode?: "defaults" | "fitted"): Record<string, Reduced> {
   const out: Record<string, Reduced> = {};
-  for (const arm of Object.keys(s.arms)) out[arm] = runTypescript(s, arm, timingFor(s, arm, fitted, reference)).reduced;
+  for (const arm of Object.keys(s.arms)) out[arm] = runTypescript(s, arm, timingFor(s, arm, fitted, reference, mode)).reduced;
   return out;
 }

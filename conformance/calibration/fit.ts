@@ -30,7 +30,7 @@
  * Bounds: mbu, mfu in [0.05, 1]; hostMsBase in [0.01, 50]; hostMsPerSeq in [0.001, 5].
  */
 import { DEFAULT_PARAMS } from "../../src/sim/index.js";
-import { metricOf, type Reduced } from "../record.js";
+import { metricOf, restrict, type Reduced } from "../record.js";
 import { runTypescript } from "../run/typescript.js";
 import { MAIN_ARM, type Scenario } from "../scenario.js";
 import type { TimingParams, ScenarioResidual } from "./fitted.js";
@@ -51,6 +51,8 @@ export interface Calibration {
   scenario: Scenario;
   /** What the model is fitted to: the reference's record of the scenario. */
   reference: Reduced;
+  /** The requests the fit uses (`requestKey`s); null for all of them. Measured references are fitted to a subset and checked on the rest. */
+  subset?: Set<string> | null;
 }
 
 const key = (r: { session: number; round: number }) => `${r.session}/${r.round}`;
@@ -70,9 +72,11 @@ export interface ScenarioScore {
   tpotMeanError: number;
 }
 
-export function score(c: Calibration, ts: Reduced): ScenarioScore {
+export function score(c: Calibration, full: Reduced): ScenarioScore {
+  const ts = restrict(full, c.subset ?? null);
+  const reference = restrict(c.reference, c.subset ?? null);
   const a = ttfts(ts);
-  const b = ttfts(c.reference);
+  const b = ttfts(reference);
   let sum = 0;
   for (const [k, y] of b) {
     const x = a.get(k);
@@ -80,12 +84,12 @@ export function score(c: Calibration, ts: Reduced): ScenarioScore {
     sum += Math.log(x / y) ** 2;
   }
   const tTpot = metricOf(ts, "tpot_mean_s")!;
-  const bTpot = metricOf(c.reference, "tpot_mean_s")!;
+  const bTpot = metricOf(reference, "tpot_mean_s")!;
   return {
     scenario: c.scenario.id,
     ttftLogSq: sum / b.size,
     tpotLogSq: Math.log(tTpot / bTpot) ** 2,
-    ttftMeanError: metricOf(ts, "ttft_mean_s")! / metricOf(c.reference, "ttft_mean_s")! - 1,
+    ttftMeanError: metricOf(ts, "ttft_mean_s")! / metricOf(reference, "ttft_mean_s")! - 1,
     tpotMeanError: tTpot / bTpot - 1
   };
 }

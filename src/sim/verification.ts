@@ -20,5 +20,8 @@ export const TIMING_8B_H100 = [...calibration("8b-h100"), "timing-8b-h100-chat",
 export const TIMING_8B_B200 = [...calibration("8b-b200"), "timing-8b-b200-chat"] as const;
 export const TIMING_70B_H200 = [...calibration("70b-h200"), "timing-70b-h200-chat"] as const;
 
-/** Every scenario that checks time to first token, time per token or throughput after calibration. */
-export const TIMING = [...TIMING_8B_H100, ...TIMING_8B_B200, ...TIMING_70B_H200] as const;
+/** Replays of real vLLM runs on two workstation GPUs: timing under default and fitted parameters, and the KV pool the engine reported. */
+export const MEASURED = ["measured-8b-rtx-pro-6000", "measured-8b-rtx-4090"] as const;
+
+/** Every scenario that checks time to first token, time per token or throughput after calibration (and, for the measured ones, before it too). */
+export const TIMING = [...TIMING_8B_H100, ...TIMING_8B_B200, ...TIMING_70B_H200, ...MEASURED] as const;
