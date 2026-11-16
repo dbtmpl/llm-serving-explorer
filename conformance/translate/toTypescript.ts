@@ -12,7 +12,7 @@ export const TS_SEED = 7;
 export const TS_COLD_START_S = 0.1;
 
 /** The parameters a calibration sets; everything else keeps the site's value. */
-export type TimingOverride = Partial<Pick<Params, "mbu" | "mfu" | "hostMsBase" | "hostMsPerSeq" | "specCost" | "linkGbps">>;
+export type TimingOverride = Partial<Pick<Params, "mbu" | "mfu" | "hostMsBase" | "hostMsPerSeq" | "commEff" | "commLatencyUs" | "specCost" | "linkGbps">>;
 
 export interface TypescriptInput {
   params: Params;
@@ -54,6 +54,8 @@ export function toTypescript(s: Scenario, arm: string = MAIN_ARM, timing: Timing
     maxNumSeqs: d.engine.maxNumSeqs,
     tokenBudget: d.engine.maxNumBatchedTokens,
     prefixCaching: d.engine.prefixCaching,
+    // host work overlaps the GPU step when the engine schedules asynchronously (vLLM's default since 0.11); otherwise it adds
+    overlap: d.engine.asyncScheduling === true,
     batching: "continuous",
     admission: "on-demand",
     routing: d.routing,
