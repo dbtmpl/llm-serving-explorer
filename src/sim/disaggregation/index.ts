@@ -39,7 +39,7 @@ export const decodeFirstThreshold: DisaggregationDecider = {
   summary: "Pick the decode pod first; use the prefill pool only when enough of the prompt is uncached there.",
   citations: ["llmdDisaggregation", "zhong2024", "patel2023"],
   fidelity: "structural",
-  verification: ["pd-disaggregation", "calib-8b-h100-pd"],
+  verification: ["pd-disaggregation", "calib-8b-h100-pd", "lss-pd-disaggregation"],
   usePrefillPool: (uncachedPromptTokens, thresholdTokens) => uncachedPromptTokens > thresholdTokens
 };
 

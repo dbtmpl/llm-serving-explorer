@@ -120,7 +120,7 @@ export function toLss(s: Scenario, arm: string): LssInput {
     const instances = d.disagg
       ? [...Array.from({ length: d.disagg.prefillReplicas }, () => instance("prefill")), ...Array.from({ length: d.disagg.decodeReplicas }, () => instance("decode"))]
       : Array.from({ length: d.replicas }, () => instance(null));
-    const node = { ...structuredClone((base.cluster.nodes as Record<string, any>[])[0]!), num_instances: instances.length, instances };
+    const node: Record<string, any> = { ...structuredClone((base.cluster.nodes as Record<string, any>[])[0]!), num_instances: instances.length, instances };
     if (d.offload) node.cpu_mem = { ...node.cpu_mem, mem_size: d.offload.cpuGB * (1e9 / 2 ** 30) };
     cluster = { ...structuredClone(base.cluster), nodes: [node] };
     // `mem_util` in the example's instance is its authors' calibration to one real engine; a scenario's own utilisation replaces it

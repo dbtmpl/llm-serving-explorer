@@ -36,6 +36,6 @@ export const blockHashPrefix: PrefixMatcher = {
   summary: "Reuse whole KV blocks whose entire token prefix matches; always compute the last token.",
   citations: ["vllmPrefixCaching", "kwon2023"],
   fidelity: "exact",
-  verification: ["prefix-cache", "routing-prefix-aware", "eviction-pressure", "routing-prefix-vs-round-robin"],
+  verification: ["prefix-cache", "routing-prefix-aware", "eviction-pressure", "routing-prefix-vs-round-robin", "lss-prefix-cache"],
   reusableTokens: (cachedTokens, contextTokens) => Math.floor(Math.min(cachedTokens, contextTokens - 1) / BLOCK_TOKENS) * BLOCK_TOKENS
 };

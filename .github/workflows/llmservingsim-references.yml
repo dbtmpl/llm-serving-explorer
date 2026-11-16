@@ -37,7 +37,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends build-essential cmake git protobuf-compiler libprotobuf-dev
 
-      # its Dockerfile-free route: the Python it was developed with (3.10), the pinned packages, and Chakra from the checkout itself
+      # Its Docker image is not pinned by digest, so the build is done directly: the Python it was developed with (3.10), the pinned packages (requirements.txt), and Chakra from the checkout itself
       - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
@@ -48,8 +48,8 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r conformance/refs/llmservingsim/requirements.txt
           bash conformance/refs/llmservingsim/build.sh "$RUNNER_TEMP/LLMServingSim"
-          python -m pip install "$RUNNER_TEMP/LLMServingSim/astra-sim/extern/graph_frontend/chakra"
           echo "LLMSERVINGSIM_DIR=$RUNNER_TEMP/LLMServingSim" >> "$GITHUB_ENV"
+          echo "LLMSERVINGSIM_PYTHONPATH=$RUNNER_TEMP/LLMServingSim/.chakra-shim" >> "$GITHUB_ENV"
           echo "LLMSERVINGSIM_PYTHON=$(which python)" >> "$GITHUB_ENV"
 
       - uses: pnpm/action-setup@v4
@@ -68,7 +68,7 @@ jobs:
         run: |
           set -euo pipefail
           cd "$LLMSERVINGSIM_DIR"
-          python -m serving --cluster-config bench/examples/RTXPRO6000/Llama-3.1-8B/config.json --dataset workloads/sharegpt-llama-3.1-8b-300-sps10.jsonl \
+          PYTHONPATH="$LLMSERVINGSIM_PYTHONPATH" python -m serving --cluster-config bench/examples/RTXPRO6000/Llama-3.1-8B/config.json --dataset workloads/sharegpt-llama-3.1-8b-300-sps10.jsonl \
             --output "$RUNNER_TEMP/pro6000.csv" --num-reqs 300 --max-num-seqs 128 --max-num-batched-tokens 2048 --block-size 16 --log-level WARNING --network-backend analytical > /dev/null
           cmp "$RUNNER_TEMP/pro6000.csv" bench/examples/RTXPRO6000/Llama-3.1-8B/outputs/sim.csv
 

@@ -6,9 +6,8 @@
 # Needs git, cmake, a C++17 compiler, protoc and its headers (Linux: build-essential cmake protobuf-compiler libprotobuf-dev; macOS: brew install cmake
 # protobuf), and Python 3.10 with `requirements.txt` installed (<python> defaults to python3). Takes about five minutes. It does not run
 # `scripts/compile.sh` (which needs `nproc`) and builds only the congestion-unaware analytical backend, which is the one the simulator uses by default;
-# the ns-3 and htsim submodules are not fetched. Chakra is not pip-installed: on Linux CI the workflow does `pip install` of the checkout's copy;
-# on macOS point LLMSERVINGSIM_PYTHONPATH at a directory that holds its `chakra` package (the checkout's astra-sim/extern/graph_frontend/chakra/src works
-# when its protobuf module is generated, which this script does).
+# the ns-3 and htsim submodules are not fetched. Chakra is not pip-installed: the simulator imports `chakra.src.converter...` from the checkout's copy of
+# it, so this script makes `<dir>/.chakra-shim/chakra` (symlinks to that copy's `src` and `schema`) and the runs use `LLMSERVINGSIM_PYTHONPATH=<dir>/.chakra-shim`.
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 dir="${1:?usage: build.sh <dir> [<python>]}"
@@ -34,5 +33,13 @@ if [ "$(uname)" = Darwin ]; then
   flags+=("-DCMAKE_CXX_FLAGS=-D_LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION" "-DCMAKE_EXE_LINKER_FLAGS=-L$brew_lib $(ls "$brew_lib"/libabsl_*.dylib | grep -v '\.[0-9]*\.[0-9]*\.[0-9]*\.dylib$' | tr '\n' ' ')")
 fi
 ( cd "$build" && cmake .. -DBUILDTARGET=congestion_unaware "${flags[@]}" && cmake --build . -j "$jobs" )
+# the simulator starts the binary through this path (the upstream build script makes the same link)
+mkdir -p "$build/AnalyticalAstra/bin"
+ln -sfn "$build/bin/AstraSim_Analytical_Congestion_Unaware" "$build/AnalyticalAstra/bin/AnalyticalAstra"
+chakra="$dir/astra-sim/extern/graph_frontend/chakra"
+mkdir -p "$dir/.chakra-shim/chakra"
+touch "$dir/.chakra-shim/chakra/__init__.py"
+ln -sfn "$chakra/src" "$dir/.chakra-shim/chakra/src"
+ln -sfn "$chakra/schema" "$dir/.chakra-shim/chakra/schema"
 test -x "$build/bin/AstraSim_Analytical_Congestion_Unaware" || { echo "the analytical binary was not built" >&2; exit 1; }
-echo "built $dir at $commit"
+echo "built $dir at $commit; run with LLMSERVINGSIM_DIR=$dir LLMSERVINGSIM_PYTHONPATH=$dir/.chakra-shim LLMSERVINGSIM_PYTHON=<python with requirements.txt>"

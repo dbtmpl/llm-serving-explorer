@@ -37,7 +37,7 @@ export const kvFootprint: ApproachMeta = {
   summary: "Two vectors per layer and KV head per token; the KV pool is what weights, activations, CUDA graphs and headroom leave of the memory the driver reports.",
   citations: ["kwon2023", "vllmEngineArgs", "vllmMemoryProfiling", "blisSubstrateMemory"],
   fidelity: "exact",
-  verification: ["kv-budget-8b-h100", "kv-budget-70b-h200-tp4", ...MEASURED]
+  verification: ["kv-budget-8b-h100", "kv-budget-70b-h200-tp4", "lss-kv-budget-8b-rtx-pro-6000", ...MEASURED]
 };
 
 export const tensorParallelism: ApproachMeta = {
@@ -64,7 +64,7 @@ export const chunkedPrefill: ApproachMeta = {
   summary: "A long prompt is prefilled in chunks sharing each step with decodes, bounded by a per-step token budget.",
   citations: ["agrawal2024", "agrawal2023", "vllmScheduler", "vllmSchedulerConfig"],
   fidelity: "structural",
-  verification: ["timing-8b-h100-burst", "timing-8b-h100-heavy", "preemption-overflow", ...MEASURED]
+  verification: ["timing-8b-h100-burst", "timing-8b-h100-heavy", "preemption-overflow", "lss-preemption-overflow", ...MEASURED]
 };
 
 export const COST_MODEL: Concept = {
