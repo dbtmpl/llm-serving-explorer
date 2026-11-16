@@ -225,7 +225,7 @@ export function planStep(w: World, pod: Pod): void {
   }
 
   const bytes = weightBytes(m, pod.spec.precision) + kvBytes;
-  const cost = stepCost(pod.spec, { tokens: used, flops, bytes }, p.mbu, p.mfu);
+  const cost = stepCost(pod.spec, { tokens: used, flops, bytes }, p);
   const tCpu = hostSeconds(p.hostMsBase, p.hostMsPerSeq, items.length);
   const tExtra = decodeTok > 0 ? decoding.overheadFactor(settings) * cost.tGpu : 0;
   const dur = stepSeconds(tCpu, cost.tGpu, p.overlap) + tExtra;

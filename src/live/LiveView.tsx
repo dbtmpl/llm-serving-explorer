@@ -128,7 +128,7 @@ interface Preset {
 
 const PRESETS: Preset[] = [
   { id: "evict", label: "Idle sessions → eviction", hint: panelText("scenario.evict"), params: { promptTokens: 10000, outputTokens: 60, maxPods: 1, gpuMemUtil: 0.5, dramGB: 4, ssdGB: 8, returnProb: 0.6, thinkTimeS: 5, scaleDownIdleS: 120 }, speed: 0.25, burst: [40, 8] },
-  { id: "preempt", label: "Outputs outgrow the pool → preemption", hint: panelText("scenario.preempt"), params: { promptTokens: 4000, outputTokens: 1500, maxPods: 1, gpuMemUtil: 0.3, returnProb: 0 }, speed: 0.5, burst: [12, 0] },
+  { id: "preempt", label: "Outputs outgrow the pool → preemption", hint: panelText("scenario.preempt"), params: { promptTokens: 4000, outputTokens: 1500, maxPods: 1, gpuMemUtil: 0.28, returnProb: 0 }, speed: 0.5, burst: [12, 0] },
   { id: "70b", label: "70B on 4 × H100", hint: panelText("scenario.70b"), params: { model: "llama-3.1-70b", tp: 4, maxPods: 4 }, speed: 0.1, burst: [20, 0] },
   { id: "churn", label: "Conversations with churn", hint: panelText("scenario.churn"), params: { arrivalRate: 2, returnProb: 0.8, thinkTimeS: 3, maxTurns: 8, maxPods: 12 }, speed: 0.25, burst: [100, 2] }
 ];

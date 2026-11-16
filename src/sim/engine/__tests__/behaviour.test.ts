@@ -44,7 +44,7 @@ describe("simulation behaviour snapshots", () => {
   const cases: Record<string, () => unknown> = {
     "default stack, 30 sessions with follow-ups": () => play({}, [[0, 30, 2]], 40),
     "tiers under pressure": () => play({ promptTokens: 24000, outputTokens: 40, maxPods: 1, dramGB: 8, ssdGB: 16, remoteGB: 12, returnProb: 0.6, thinkTimeS: 8, maxTurns: 4, scaleDownIdleS: 1e9 }, [[0, 40, 15]], 120),
-    "on-demand admission overload (preemption)": () => play({ promptTokens: 36000, outputTokens: 1200, maxPods: 1, maxNumSeqs: 16, returnProb: 0 }, [[0, 16, 0]], 300),
+    "on-demand admission overload (preemption)": () => play({ promptTokens: 36000, outputTokens: 3000, maxPods: 1, maxNumSeqs: 16, returnProb: 0 }, [[0, 16, 0]], 300),
     "whole-prompt admission": () => play({ admission: "prompt", promptTokens: 20000, maxPods: 1, returnProb: 0 }, [[0, 20, 1]], 80),
     "static batching, reserve to completion, round-robin": () => play({ batching: "static", admission: "reserve", tokenBudget: 65536, prefixCaching: false, routing: "round-robin", dramGB: 0, ssdGB: 0, remoteGB: 0 }, [[0, 20, 3]], 60),
     "least-loaded routing, no prefix cache": () => play({ routing: "least-loaded", prefixCaching: false }, [[0, 40, 4]], 40),

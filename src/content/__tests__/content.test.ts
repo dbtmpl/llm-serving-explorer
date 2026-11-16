@@ -172,7 +172,7 @@ describe("callouts produced by real simulations", () => {
   const scenarios: [string, Parameters<typeof world>[0], number, number][] = [
     ["defaults", {}, 20, 40],
     ["tiers under pressure", { promptTokens: 10000, outputTokens: 60, maxPods: 1, gpuMemUtil: 0.5, dramGB: 4, ssdGB: 8, returnProb: 0.6, thinkTimeS: 5 }, 40, 120],
-    ["preemption", { promptTokens: 4000, outputTokens: 1500, maxPods: 1, gpuMemUtil: 0.3, returnProb: 0 }, 12, 90],
+    ["preemption", { promptTokens: 4000, outputTokens: 1500, maxPods: 1, gpuMemUtil: 0.28, returnProb: 0 }, 12, 90],
     ["disaggregated and speculative", { disagg: true, specDecode: true, overlap: true, shedAfterS: 1, maxPods: 3 }, 60, 60],
     ["round robin, no prefix cache", { routing: "round-robin", prefixCaching: false, batching: "static", admission: "reserve" }, 20, 40],
     ["model does not fit", { model: "llama-3.1-70b", tp: 1, maxPods: 1 }, 2, 10],
@@ -210,7 +210,7 @@ describe("the step-through script produced from real simulations", () => {
     ["least loaded with a deadline", { routing: "least-loaded", shedAfterS: 1, maxPods: 1 }, 30, 30],
     ["round robin", { routing: "round-robin", minPods: 2 }, 8, 30],
     ["disaggregated", { disagg: true, returnProb: 1, maxTurns: 2, thinkTimeS: 1 }, 6, 50],
-    ["preemption", { promptTokens: 4000, outputTokens: 1500, maxPods: 1, gpuMemUtil: 0.3, returnProb: 0 }, 12, 90],
+    ["preemption", { promptTokens: 4000, outputTokens: 1500, maxPods: 1, gpuMemUtil: 0.28, returnProb: 0 }, 12, 90],
     ["tiers under pressure", { promptTokens: 10000, outputTokens: 60, maxPods: 1, gpuMemUtil: 0.5, dramGB: 1, ssdGB: 1, remoteGB: 1, returnProb: 0.8, thinkTimeS: 3 }, 30, 100],
     ["model does not fit", { model: "llama-3.1-70b", tp: 1, maxPods: 1 }, 2, 10]
   ];
