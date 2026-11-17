@@ -132,9 +132,9 @@ export function calloutFor(e: SimEvent, w: World): Callout[] {
     case "pod.loading":
       return p ? [make("pod.loading", { key: "loading", once: true, target: pod("gpu"), tone: "info" }, { weights: fmtGB(p.budget.weights), cold: `${w.params.coldStartS} s` })] : [];
     case "pod.ready":
-      return p ? [make("pod.ready", { key: "ready", once: true, target: pod("gpu"), tone: "info" }, { weights: fmtGB(p.budget.weights), work: fmtGB(p.budget.activations + p.budget.graphs), headroom: fmtGB(p.budget.headroom), kv: fmtGB(p.budget.kv), blocks: fmtInt(p.budget.poolBlocks) })] : [];
+      return p ? [make("pod.ready", { key: "ready", once: true, target: pod("gpu"), tone: "info" }, { weights: fmtGB(p.budget.weights), work: fmtGB(p.budget.activations + p.budget.graphs + p.budget.runtime), headroom: fmtGB(p.budget.headroom), kv: fmtGB(p.budget.kv), blocks: fmtInt(p.budget.poolBlocks) })] : [];
     case "pod.failed":
-      return p ? [make("pod.failed", { key: `failed${e.podId}`, target: pod("gpu"), tone: "evict" }, { fixed: fmtGB(p.budget.weights + p.budget.activations + p.budget.graphs), usable: fmtGB(p.budget.device - p.budget.headroom) })] : [];
+      return p ? [make("pod.failed", { key: `failed${e.podId}`, target: pod("gpu"), tone: "evict" }, { fixed: fmtGB(p.budget.weights + p.budget.activations + p.budget.graphs + p.budget.runtime), usable: fmtGB(p.budget.device - p.budget.headroom) })] : [];
     case "req.routed": {
       const policy = w.params.routing;
       return [

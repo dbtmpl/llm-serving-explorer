@@ -19,9 +19,9 @@
 - **KV block:** A fixed-size page of KV cache (16 tokens here). A block is used, cached (unreferenced but still reusable) or free.
 - **Prefix caching:** Reusing KV blocks across requests that share the same leading tokens.
 - **Eviction:** Dropping a cached KV block, or moving it to a lower memory tier, to make room.
-- **Preemption:** Taking a running request out of the batch and freeing its KV blocks when memory runs out. The request is recomputed later.
+- **Preemption:** Taking a running request out of the batch and freeing its KV blocks when memory runs out. With prefix caching on, the freed blocks keep their contents until the pool hands them out again (last block first), so when the request is let back in it recomputes only what is gone by then.
 - **HBM:** High-bandwidth memory, the GPU's own memory. Holds the weights, working space, captured CUDA graphs and the KV cache. A GPU's name rounds its size ("80 GB"); the driver reports a little more (85.0 GB for an H100), and the engine budgets from that figure.
-- **Headroom:** The part of a GPU's memory above `gpu_memory_utilization`, which the engine leaves unused. The KV pool is what remains of the share it may use after weights, activations (sized by the token budget and `max_num_seqs`) and CUDA graphs.
+- **Headroom:** The part of a GPU's memory above `gpu_memory_utilization`, which the engine leaves unused. The KV pool is what remains of the share it may use after weights, activations (sized by the token budget and `max_num_seqs`), CUDA graphs and a fitted 0.7 GB for memory the process holds outside PyTorch (the CUDA context and library workspaces).
 - **Load shedding:** Rejecting excess work early (here with HTTP 429 once a request has waited past its deadline) so the work that is accepted still meets its deadline.
 - **Memory tiers:** The places KV can live below HBM: host DRAM, local SSD and a remote pool shared by all pods.
 - **P/D disaggregation:** Running prefill and decode on separate pools of pods and transferring the KV cache between them.

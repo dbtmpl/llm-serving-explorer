@@ -146,9 +146,9 @@ function hbmSplit(pod: Pod, g: { x: number; y: number; w: number; h: number }) {
   const y = g.y + 22;
   const h = g.h - 30;
   const kv = Math.max(0, b.kv);
-  const total = b.weights + b.activations + b.graphs + kv + b.headroom;
+  const total = b.weights + b.activations + b.graphs + b.runtime + kv + b.headroom;
   const ww = (w * b.weights) / total;
-  const aw = Math.max(2, (w * (b.activations + b.graphs)) / total);
+  const aw = Math.max(2, (w * (b.activations + b.graphs + b.runtime)) / total);
   const hw = (w * b.headroom) / total;
   const kw = Math.max(0, w - ww - aw - hw);
   const rows = Math.max(1, Math.round(Math.sqrt((CELLS * h) / Math.max(1, kw))));
@@ -397,7 +397,7 @@ export class Scene {
         // the strip of activations and graphs can be a couple of pixels wide: give it a margin on both sides
         const slack = 3 / this.cam.s;
         const part: GpuPart = lx >= s.x0 + s.ww - slack && lx <= s.x0 + s.ww + s.aw + slack ? "work" : lx < s.x0 + s.ww ? "weights" : lx < s.kx + s.kw ? "kv" : "headroom";
-        const bytes = part === "weights" ? b.weights : part === "work" ? b.activations + b.graphs : part === "kv" ? Math.max(0, b.kv) : b.headroom;
+        const bytes = part === "weights" ? b.weights : part === "work" ? b.activations + b.graphs + b.runtime : part === "kv" ? Math.max(0, b.kv) : b.headroom;
         return { podId: pod.id, part, bytes };
       }
     }

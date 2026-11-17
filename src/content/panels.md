@@ -101,14 +101,14 @@ Weights
 ### text
 The model's learned numbers, copied into GPU memory at start-up. They are read in full for every step, so they set how fast a token can be made.
 
-## `gpu.work` Activations and CUDA graphs segment
+## `gpu.work` Activations, CUDA graphs and runtime segment
 _Where:_ Hover tooltip over the thin strip after the weights in a GPU's memory box; the size is per GPU.
 
 ### title
-Activations and CUDA graphs
+Activations, CUDA graphs and runtime
 
 ### text
-Working space of the start-up profiling pass plus the captured CUDA graphs that launch a step cheaply. The pass is one step of `max_num_batched_tokens` tokens (the intermediate results between layers) and the sampler's rows over the whole vocabulary, so a larger token budget or `max_num_seqs` makes this strip wider and the KV pool smaller; the graphs are one per batch size on the capture list. It is reserved once, before the KV pool is sized.
+Working space of the start-up profiling pass, the captured CUDA graphs that launch a step cheaply, and about 0.7 GB the process holds outside PyTorch (the CUDA context and library workspaces, a figure fitted to two measured vLLM runs). The pass is one step of `max_num_batched_tokens` tokens (the intermediate results between layers) and the sampler's rows over the whole vocabulary, so a larger token budget or `max_num_seqs` makes this strip wider and the KV pool smaller; the graphs are one per batch size on the capture list. It is reserved once, before the KV pool is sized.
 
 ## `gpu.kv` KV pool segment
 _Where:_ Hover tooltip over the grid of cells in a GPU's memory box; the size is per GPU.

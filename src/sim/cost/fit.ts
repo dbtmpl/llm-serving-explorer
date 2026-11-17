@@ -62,7 +62,7 @@ export function fitOf(p: Params): Fit {
   return {
     fits,
     budget,
-    needBytes: budget.weights + budget.activations + budget.graphs,
+    needBytes: budget.weights + budget.activations + budget.graphs + budget.runtime,
     usableBytes: budget.device - budget.headroom,
     poolTokens,
     poolRequests,

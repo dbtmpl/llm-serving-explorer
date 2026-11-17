@@ -24,6 +24,20 @@ export const SAMPLER_BYTES_PER_LOGIT = 2 + 4 + 4;
 /** Bytes one captured CUDA graph costs beyond the pool that all graphs share: vLLM counts at least 1 MiB per graph (`profile_cudagraph_memory`, gpu_model_runner.py: `max(mem_samples[1], 1 << 20)`). */
 export const GRAPH_BYTES_FLOOR = 1 << 20;
 
+/**
+ * Memory each GPU of a running engine holds outside what the model above derives, bytes: the CUDA context,
+ * cuBLAS and NCCL workspaces, allocator slack and the part of the CUDA graphs beyond vLLM's 1 MiB floor.
+ * vLLM measures it at start-up as the non-PyTorch increase and the graph capture, and subtracts it before
+ * it sizes the KV pool (`determine_available_memory`, gpu_worker.py); no closed form gives it.
+ *
+ * Empirical, fitted to the two measured vLLM runs (conformance/refs/vllm-measured): with this term at zero
+ * the model's pool was larger than the engine's by 0.64 GB of KV on the RTX PRO 6000 and 0.77 GB on the
+ * RTX 4090. 0.7 GB, rounded, is their midpoint; it leaves the PRO 6000 within 0.1 percent of the engine's
+ * block count and the 4090, whose v0.19 engine accounts for graphs differently, 1.2 percent above it.
+ * BLIS charges more (an assumed 1.16 GB median for graphs alone), see conformance/scenarios/kv-budget-*.
+ */
+export const RUNTIME_OVERHEAD_BYTES = 0.7e9;
+
 /** A replica whose KV pool holds fewer blocks than this cannot serve a single short request. */
 export const MIN_USABLE_POOL_BLOCKS = 8;
 
@@ -127,6 +141,8 @@ export interface MemoryBudget {
   activations: number;
   /** Captured CUDA graphs, per GPU. */
   graphs: number;
+  /** CUDA context, library workspaces and other memory outside the derived terms, per GPU (`RUNTIME_OVERHEAD_BYTES`). */
+  runtime: number;
   /** Memory the engine is told not to use: what is left of the device after its requested share. */
   headroom: number;
   /** KV pool per GPU, bytes. Negative when the model does not fit. */
@@ -143,27 +159,30 @@ export interface MemoryBudget {
  * Split one GPU's memory into its five pools.
  *
  *     requested = ceil(device · gpu_memory_utilization)
- *     kv        = requested − weights / tp − activations − CUDA graphs
+ *     kv        = requested − weights / tp − activations − CUDA graphs − runtime overhead
  *
  * vLLM sizes its KV block pool this way at start-up (`request_memory` and `determine_available_memory`,
  * vllm/v1/worker/utils.py and gpu_worker.py): it requests `gpu_memory_utilization` of the memory the driver
- * reports for the device, measures what the weights, one profiling pass and the CUDA-graph capture take,
- * and gives the remainder to the cache. Tensor parallelism splits the weights and each KV block evenly
+ * reports for the device, measures what the weights, one profiling pass, the CUDA-graph capture and
+ * everything outside PyTorch take, and gives the remainder to the cache. The last is the empirical
+ * `RUNTIME_OVERHEAD_BYTES`. Tensor parallelism splits the weights and each KV block evenly
  * over the `tp` GPUs (Shoeybi et al., 2019), so the replica's pool is `tp` times one GPU's.
  *
- * Example: Llama 3.1 8B on one H100 (85.03 GB reported, sold as 80 GB) at 0.9 utilisation:
- * 76.53 − 16.06 − 0.74 − 1.16 = 58.57 GB of KV, or 27,926 blocks of 16 tokens. The same replica on
- * a 80 GB datasheet figure would have 26,323 blocks, 6% fewer than vLLM's logs give.
+ * Example: Llama 3.1 8B on one H100 (85.03 GB reported, sold as 80 GB) at 0.9 utilisation, 12 sequences
+ * and an 8,192-token budget: 76.53 − 16.06 − 0.60 − 0.01 − 0.70 = 59.15 GB of KV, or 28,205 blocks of 16
+ * tokens (BLIS, which charges 1.16 GB for graphs, gives 27,926). Counting on the 80 GB datasheet figure
+ * instead would give about 6% fewer.
  */
 export function memoryBudget(r: ReplicaSpec): MemoryBudget {
   const weights = weightBytes(r.model, r.precision) / r.tp;
   const activations = activationBytes(r.model, r.tp, r.maxNumBatchedTokens, r.maxNumSeqs);
   const graphs = graphBytes(r.model, r.tp, r.maxNumSeqs, r.maxNumBatchedTokens);
   const requested = Math.ceil(r.gpu.memory * r.gpuMemUtil);
-  const kv = requested - weights - activations - graphs;
+  const runtime = RUNTIME_OVERHEAD_BYTES;
+  const kv = requested - weights - activations - graphs - runtime;
   const blockBytes = BLOCK_TOKENS * kvBytesPerToken(r.model);
   const poolBlocks = Math.max(0, Math.floor((r.tp * kv) / blockBytes));
-  return { hbm: r.gpu.hbm, device: r.gpu.memory, weights, activations, graphs, headroom: r.gpu.memory - requested, kv, poolBlocks, blockBytes, fits: poolBlocks >= MIN_USABLE_POOL_BLOCKS };
+  return { hbm: r.gpu.hbm, device: r.gpu.memory, weights, activations, graphs, runtime, headroom: r.gpu.memory - requested, kv, poolBlocks, blockBytes, fits: poolBlocks >= MIN_USABLE_POOL_BLOCKS };
 }
 
 /**

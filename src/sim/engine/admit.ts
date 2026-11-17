@@ -149,6 +149,7 @@ export function admit(w: World, pod: Pod, r: Req): boolean {
   }
   e.tokens = cached;
   e.active = true;
+  e.preempted = false;
   syncCells(pod, e);
   pod.waiting.shift();
   pod.running.push(r.id);

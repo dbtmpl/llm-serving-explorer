@@ -28,9 +28,9 @@ describe("fitOf", () => {
   it("70B in FP8 on one H100 fits but holds only a few requests", () => {
     const f = fitOf(p({ model: "llama-3.1-70b", precision: "fp8" }));
     expect(f.fits).toBe(true);
-    expect(f.budget.poolBlocks).toBe(907);
-    expect(f.tight).toBe(false); // 4.6 average requests: just above the line for "very small"
-    expect(f.poolRequests).toBeLessThan(5);
+    expect(f.budget.poolBlocks).toBe(773);
+    expect(f.tight).toBe(true); // 3.9 average requests: just below the line for "very small"
+    expect(f.poolRequests).toBeGreaterThan(3);
   });
   it("treats an unknown model or GPU (a replay's) as fitting", () => {
     expect(fitOf(p({ model: "something-else" })).fits).toBe(true);

@@ -56,12 +56,6 @@ checks:
     rel_tol: 0.3
     params: defaults
     tolerance: "30 percent: the standard the BLIS timing checks use for time to first token; queueing amplifies a step-cost error into the wait."
-    known_difference:
-      reference: llmservingsim
-      cause: "Front-end tokenisation LLMServingSim lacks, and prefill priced at default MFU"
-      reason: "At the site's default parameters the model's mean time to first token is 1936 ms against LLMServingSim's 1182 ms (+64 percent). Two things add up and this check does not separate them: the model's front end assembles and tokenises every prompt (30 ms plus 4 microseconds per token, about 36 ms for the prompts of this scenario), which LLMServingSim does not model at all; and its prefill is priced at MFU 0.5 of the catalogue's peak, where LLMServingSim sums per-layer kernel times profiled on this GPU. With parameters fitted to LLMServingSim's calibration scenarios the same metric holds (the fitted-ttft-mean check of this scenario). A first-token time this short is mostly fixed overhead, so a fixed 36 ms is a large share of it."
-      differences:
-        value: { typescript: 1.936, llmservingsim: 1.182 }
   - id: default-tpot-mean
     claim: "Mean time per output token, the site's default parameters (no fit), agrees with LLMServingSim."
     kind: calibrated
@@ -69,12 +63,6 @@ checks:
     rel_tol: 0.12
     params: defaults
     tolerance: "12 percent: the standard the BLIS timing checks use for time per token (memory-bound decoding, the best-conditioned timing)."
-    known_difference:
-      reference: llmservingsim
-      cause: "Default memory-bandwidth utilisation makes the model's decode step 60 percent slower than profiled kernels"
-      reason: "At the site's default parameters (MBU 0.6) the model's decode step reads the weights at 0.6 of 1,597 GB/s and adds host time; its mean time per output token is 32.9 ms against LLMServingSim's 20.5 ms (+60 percent), whose step is the sum of per-layer kernel times profiled on this GPU. The same shape, +51 percent, is in the measured-8b-rtx-pro-6000 scenario against the real engine, so the default MBU is too low for this GPU, not an artefact of this simulator. Fitted to the calibration scenarios (MBU 0.94) the check holds."
-      differences:
-        value: { typescript: 0.03292, llmservingsim: 0.02053 }
   - id: default-e2e-mean
     claim: "Mean end-to-end time, the site's default parameters (no fit), agrees with LLMServingSim."
     kind: calibrated
@@ -82,12 +70,6 @@ checks:
     rel_tol: 0.15
     params: defaults
     tolerance: "15 percent: the standard the BLIS timing checks use for end-to-end time."
-    known_difference:
-      reference: llmservingsim
-      cause: "End-to-end time follows the slower default decode step"
-      reason: "End-to-end time is the first token plus the decode of about 200 tokens: the model's 8.49 s against LLMServingSim's 5.27 s (+61 percent) is the slower decode step (and, for a short answer, the extra time to first token) at the site's default parameters, as in the time per token check of this scenario. Fitted to the calibration scenarios the check holds."
-      differences:
-        value: { typescript: 8.488, llmservingsim: 5.268 }
   - id: default-throughput
     claim: "Output tokens per second over the run, the site's default parameters (no fit), agrees with LLMServingSim."
     kind: calibrated
@@ -95,12 +77,6 @@ checks:
     rel_tol: 0.1
     params: defaults
     tolerance: "10 percent: the standard the BLIS timing checks use for throughput; the load is open loop, so throughput differs only through how late the last answers finish."
-    known_difference:
-      reference: llmservingsim
-      cause: "Throughput follows the slower default decode step"
-      reason: "Output tokens per second over the run: the model's 749 against LLMServingSim's 1207 (-38 percent). The burst is thirty-two simultaneous requests that drain at the decode rate of a batch of 32, which the model's default parameters make 60 percent slower than the profiled kernels (the time per token check of this scenario), so the whole batch takes proportionally longer. Fitted, it holds."
-      differences:
-        value: { typescript: 749.3, llmservingsim: 1207 }
   - id: fitted-ttft-mean
     claim: "Mean time to first token, parameters fitted to the calibration scenarios calib-lss-8b-rtx-pro-6000-*, agrees with LLMServingSim."
     kind: calibrated

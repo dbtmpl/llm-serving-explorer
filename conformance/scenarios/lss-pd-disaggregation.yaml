@@ -70,9 +70,9 @@ checks:
       reference: llmservingsim
       cause: "LLMServingSim's time to first token ends at the prefill replica, before the hand-over"
       reason: >-
-        The effect has the opposite direction. The model's split arm has a mean time to first token of 217 ms against 169 ms colocated (x1.28): its first token is delivered after the KV cache has crossed to a decode replica, so it includes the hand-over
+        The effect has the opposite direction. The model's split arm has a mean time to first token of 223 ms against 175 ms colocated (x1.27): its first token is delivered after the KV cache has crossed to a decode replica, so it includes the hand-over
         and the wait for a decode slot. LLMServingSim's is 129 ms against 146 ms (x0.89): its time to first token is "the time when the computation of the first token is completed" (a comment in its main loop), on the prefill replica, so it
         excludes the hand-over, and the dedicated prefill replica is not delayed by decode steps, which makes it lower than colocated. The two define the first token differently; the hand-over itself is not reported by LLMServingSim, so the link cannot be fitted to it either.
         Neither is wrong, and neither is measured here: vLLM's disaggregated deployments differ in which instance returns the first token.
       differences:
-        effect: { typescript: 1.279, llmservingsim: 0.8865 }
+        effect: { typescript: 1.273, llmservingsim: 0.8865 }

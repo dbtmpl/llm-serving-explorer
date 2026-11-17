@@ -671,7 +671,7 @@
           "tp": 1,
           "timing": {
             "mbu": 0.95,
-            "mfu": 0.748,
+            "mfu": 0.818182,
             "hostMsBase": 1.5,
             "hostMsPerSeq": 0.05
           },
@@ -687,46 +687,46 @@
               "parameter": "mbu",
               "fitted": {
                 "value": 0.95,
-                "loss": 0.293182
+                "loss": 0.0710319
               },
               "held": [
                 {
                   "value": 0.5,
-                  "loss": 0.500377
+                  "loss": 0.266775
                 },
                 {
                   "value": 0.7,
-                  "loss": 0.349811
+                  "loss": 0.112637
                 },
                 {
                   "value": 0.9,
-                  "loss": 0.297764
+                  "loss": 0.0718817
                 }
               ],
-              "spread": 0.706714,
+              "spread": 2.7557,
               "flat": false
             },
             {
               "parameter": "mfu",
               "fitted": {
-                "value": 0.748,
-                "loss": 0.293182
+                "value": 0.818182,
+                "loss": 0.0710319
               },
               "held": [
                 {
                   "value": 0.3,
-                  "loss": 0.98659
+                  "loss": 0.915206
                 },
                 {
                   "value": 0.5,
-                  "loss": 0.454557
+                  "loss": 0.355512
                 },
                 {
                   "value": 0.8,
-                  "loss": 0.304674
+                  "loss": 0.0733248
                 }
               ],
-              "spread": 2.36512,
+              "spread": 11.8844,
               "flat": false
             }
           ],
@@ -736,20 +736,20 @@
             "hostMsBase": 1.5,
             "hostMsPerSeq": 0.05
           },
-          "lossAtDefaults": 0.319325,
-          "lossAtFit": 0.293182,
+          "lossAtDefaults": 0.134459,
+          "lossAtFit": 0.0710319,
           "residuals": [
             {
               "scenario": "measured-8b-rtx-4090",
-              "ttftMean": -0.131084,
-              "tpotMean": 0.137085
+              "ttftMean": -0.0236459,
+              "tpotMean": 0.00258811
             }
           ],
           "residualsAtDefaults": [
             {
               "scenario": "measured-8b-rtx-4090",
-              "ttftMean": -0.0273658,
-              "tpotMean": 0.247424
+              "ttftMean": 0.152708,
+              "tpotMean": 0.105648
             }
           ]
         },
@@ -849,78 +849,131 @@
           "gpu": "rtx-pro-6000",
           "tp": 1,
           "timing": {
-            "mbu": 0.942322,
-            "mfu": 0.833333,
-            "hostMsBase": 0.0260873,
-            "hostMsPerSeq": 0.0480584
+            "mbu": 0.904762,
+            "mfu": 0.818182,
+            "hostMsBase": 0.698692,
+            "hostMsPerSeq": 0.385019
           },
+          "group": "llama-3.1-8b/rtx-pro-6000",
+          "groupTps": [
+            1
+          ],
+          "atBound": [],
+          "identifiability": [
+            {
+              "parameter": "mbu",
+              "fitted": {
+                "value": 0.904762,
+                "loss": 0.0827625
+              },
+              "held": [
+                {
+                  "value": 0.5,
+                  "loss": 0.267259
+                },
+                {
+                  "value": 0.7,
+                  "loss": 0.125892
+                },
+                {
+                  "value": 0.9,
+                  "loss": 0.0839086
+                }
+              ],
+              "spread": 2.22922,
+              "flat": false
+            },
+            {
+              "parameter": "mfu",
+              "fitted": {
+                "value": 0.818182,
+                "loss": 0.0827625
+              },
+              "held": [
+                {
+                  "value": 0.3,
+                  "loss": 1.6246
+                },
+                {
+                  "value": 0.5,
+                  "loss": 0.252728
+                },
+                {
+                  "value": 0.8,
+                  "loss": 0.0850014
+                }
+              ],
+              "spread": 18.6296,
+              "flat": false
+            }
+          ],
           "defaults": {
-            "mbu": 0.6,
-            "mfu": 0.5,
+            "mbu": 0.85,
+            "mfu": 0.7,
             "hostMsBase": 1.5,
             "hostMsPerSeq": 0.05
           },
-          "lossAtDefaults": 0.39408,
-          "lossAtFit": 0.0736104,
+          "lossAtDefaults": 0.121,
+          "lossAtFit": 0.0827625,
           "residuals": [
             {
               "scenario": "calib-lss-8b-rtx-pro-6000-batch16",
-              "ttftMean": 0.272251,
-              "tpotMean": -0.0111631
+              "ttftMean": 0.329641,
+              "tpotMean": 0.0499069
             },
             {
               "scenario": "calib-lss-8b-rtx-pro-6000-batch16-long",
-              "ttftMean": -0.126416,
-              "tpotMean": -0.0167339
+              "ttftMean": -0.0770614,
+              "tpotMean": 0.0296058
             },
             {
               "scenario": "calib-lss-8b-rtx-pro-6000-batch4",
-              "ttftMean": 0.287537,
-              "tpotMean": -0.0278214
+              "ttftMean": 0.312522,
+              "tpotMean": 0.0811998
             },
             {
               "scenario": "calib-lss-8b-rtx-pro-6000-batch48",
-              "ttftMean": 0.220796,
-              "tpotMean": -0.0304986
+              "ttftMean": 0.247878,
+              "tpotMean": 0.00750928
             },
             {
               "scenario": "calib-lss-8b-rtx-pro-6000-isolated",
-              "ttftMean": 0.257796,
-              "tpotMean": -0.0492411
+              "ttftMean": 0.288385,
+              "tpotMean": 0.072013
             }
           ],
           "residualsAtDefaults": [
             {
               "scenario": "calib-lss-8b-rtx-pro-6000-batch16",
-              "ttftMean": 0.804136,
-              "tpotMean": 0.646243
+              "ttftMean": 0.449332,
+              "tpotMean": 0.119541
             },
             {
               "scenario": "calib-lss-8b-rtx-pro-6000-batch16-long",
-              "ttftMean": 1.54062,
-              "tpotMean": 0.598413
+              "ttftMean": 0.352936,
+              "tpotMean": 0.104596
             },
             {
               "scenario": "calib-lss-8b-rtx-pro-6000-batch4",
-              "ttftMean": 0.872811,
-              "tpotMean": 0.64492
+              "ttftMean": 0.487132,
+              "tpotMean": 0.14706
             },
             {
               "scenario": "calib-lss-8b-rtx-pro-6000-batch48",
-              "ttftMean": 0.679196,
-              "tpotMean": 0.585002
+              "ttftMean": 0.358134,
+              "tpotMean": 0.0251056
             },
             {
               "scenario": "calib-lss-8b-rtx-pro-6000-isolated",
-              "ttftMean": 0.882351,
-              "tpotMean": 0.617035
+              "ttftMean": 0.444257,
+              "tpotMean": 0.135379
             }
           ],
           "specCost": {
-            "value": 0.00284091,
+            "value": 0.0001,
             "defaultValue": 0.04,
             "scenario": "calib-lss-8b-rtx-pro-6000-spec",
-            "residualTpot": -0.0000961823
+            "residualTpot": 0.11607
           }
         }
       }

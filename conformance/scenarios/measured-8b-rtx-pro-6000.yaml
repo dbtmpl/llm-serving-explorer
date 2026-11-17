@@ -341,21 +341,15 @@ checks:
     rel_tol: 0.001
     params: defaults
     tolerance: "0.1 percent: the capacity rule of 2026-11-16 (docs/parity.md), applied unchanged to a real engine. The terms that remain are estimates on both sides and a difference below one part in a thousand changes no admission decision; a larger one is explained term by term in the known difference."
-    known_difference:
-      reference: vllm-measured
-      cause: "The model's pool is larger: the engine's profile counted memory the model has no term for"
-      reason: &r_kv >-
-        Term by term, per the model's budget (src/sim/cost/memory.ts). Requested memory, the weights (16.06e9 bytes) and the block size are the same on both sides. The real engine set aside
-        ceil(101,976,440,832 x 0.92) - 16.061 - 76.859 (its 36,649 blocks of 2,097,152 bytes) = 0.900 GB for everything else, including the CUDA-graph estimate that vLLM 0.31.0 subtracts; the model
-        sets aside 0.254 GB and gets 36,956 blocks, 307 more (644 MB, +0.8 percent). The model's 0.254 GB is derived from the run's own settings: the start-up profiling pass is a forward
-        pass over max_num_batched_tokens = 2,048 tokens (151.0 MB) followed by the sampler over min(2,048, 128) rows of the 128,256-token vocabulary (2,048 x 4,096 x 2 + 128 x 128,256 x 10 = 180.9 MB,
-        the larger of the two), plus 73.4 MB for the 35 + 19 graphs of the capture list (a shared pool the size of a 256-token pass, and vLLM's floor of 1 MiB for each further graph; a lower
-        bound, since a real graph of a 32-layer model is larger). The 0.644 GB left is what the engine's profile counted and the model has no term for: memory the process holds outside
-        torch's allocator, the real size of the graphs, and the allocator's rounding; the run records none of them. The RTX 4090 run (vLLM 0.19.0) leaves a similar 0.64 GB unexplained after its
-        own derivation, which suggests a property of the engine, but one such pair is not enough to derive a term. Not tuned: the budget is left as the sources give it. Before the budget was
-        derived from the settings the model was 475 blocks (1.3 percent) short here, with a flat 1.895 GB; it is now 307 blocks over.
+    reference_gap:
+      reason: >-
+        The real engine reported 36,649 KV blocks; LLMServingSim derives 37,090 from the same memory utilisation (0.92 of the 94.97 GiB its hardware file states, less the 16.06 GB of weights, over
+        2,097,152 bytes per block), 441 blocks or 1.2 percent more. It sets nothing aside for the activation peak, CUDA graphs or memory outside PyTorch (its own documentation: "an upper bound on
+        vLLM's at the same value"), which is the 0.900 GB the real engine set aside. So the two references differ by exactly the terms the simulator leaves out; its figure is arithmetic on its
+        input, not a second measurement of how vLLM sizes its pool. The model sets aside 0.954 GB (a 180.9 MB profiling pass, 73.4 MB of graphs and the empirical 0.7 GB), gets 36,622 blocks, 27
+        fewer than the engine (-0.07 percent), and holds against the span of the two.
       differences:
-        value: { typescript: 36956, vllm-measured: 36649 }
+        value: { vllm-measured: 36649, llmservingsim: 37090 }
   - id: preemptions
     claim: The real engine preempted nothing in this run, and neither does the model.
     kind: exact
@@ -370,6 +364,22 @@ checks:
     params: defaults
     subset: all
     tolerance: "5 percent relative: both sides count whole 16-token blocks of the same 257,239 prompt tokens, so two engines that find the same sharing differ by a handful of blocks (5 percent is about 970 tokens); a model that sees no sharing at all is 100 percent off."
+    known_difference:
+      - reference: vllm-measured
+        cause: "The model's prefix cache is per conversation; the trace carries no shared prefixes"
+        reason: &r_prefix >-
+          The 300 requests are separate ShareGPT conversations, but some prompts begin with the same tokens (a shared instruction, a repeated question), and vLLM's block-hash cache finds those blocks
+          whichever request wrote them: 7.6 percent of prompt tokens on the RTX PRO 6000 (19,552 of 257,239 in the real run, 19,520 in LLMServingSim) and 1.9 percent in LLMServingSim's run of the RTX
+          4090 workload, whose small pool evicts most of them. The model's prefix cache is kept per conversation (src/sim/kvcache), and a trace scenario gives each request its token counts, not its
+          tokens, so the model finds no sharing at all. The prefix structure of these requests is committed (conformance/refs/llmservingsim/data: for each request, the earlier request sharing its
+          longest prefix and the length shared), so closing the gap needs a prefix cache shared across conversations, with shared blocks counted once: a change to the model, not to this check.
+        differences:
+          value: { typescript: 0, vllm-measured: 0.07601 }
+      - reference: llmservingsim
+        cause: "The model's prefix cache is per conversation; the trace carries no shared prefixes"
+        reason: *r_prefix
+        differences:
+          value: { typescript: 0, llmservingsim: 0.07588 }
   - id: default-ttft-mean
     claim: Mean time to first token over all 300 requests, the site's default parameters agrees with the measured run.
     kind: calibrated
@@ -539,17 +549,22 @@ checks:
     subset: all
     tolerance: "30 percent: the standard of the default and held-out checks of this scenario. The parameters (MBU, MFU, host time) were fitted to the first 100 requests of the RTX 4090 run and never saw this GPU: the held-out reading that needs no split."
     known_difference:
-      reference: vllm-measured
-      cause: "Parameters fitted on the other card carry the recompute error of its run"
-      reason: &r_cross >-
-        The parameters are the RTX 4090 run's: MBU 0.95 (the upper bound of the fit), MFU 0.748, host time 1.5 ms plus 0.05 ms per sequence. They were fitted to the first 100 requests of a run that
-        saturates and preempts heavily (see the 4090 scenario: the model's recompute from zero has no prefix-cache reuse), and with the recompute error absorbed into MBU the fit reaches its
-        bound. A decode step at MBU 0.95 streams the RTX PRO 6000's weights 12 percent faster than the 0.85 the measured runs show on both cards, so the model is too fast: mean time per token
-        -14.7 percent, mean time to first token -35.2 percent (the run's queue is shorter when service is faster), end to end -19.7 percent, throughput +14.1 percent. The reading says that parameters
-        fitted to a run dominated by one unmodelled mechanism do not carry over to another GPU; the reverse transfer (fitted on this card, checked on the 4090) holds three of four checks.
-        Not tuned.
-      differences:
-        value: { typescript: 4.22, vllm-measured: 6.515 }
+      - reference: vllm-measured
+        cause: "Parameters fitted on the other card sit at their MBU bound"
+        reason: &r_cross >-
+          The parameters are the RTX 4090 run's: MBU 0.95 (the upper bound of the fit), MFU 0.818, host time 1.5 ms plus 0.05 ms per sequence. A decode step at MBU 0.95 streams the RTX PRO 6000's
+          weights 12 percent faster than the 0.85 the measured runs show on both cards, so the model is too fast here: mean time per token -16.7 percent, mean time to first token -41.3 percent (the
+          queue is shorter when service is faster), end to end -22.6 percent, throughput +16.4 percent; LLMServingSim, which agrees with the real run to 1 percent, gives the same reading. The 4090 fit
+          reaches its bound because the model's time per token on that run is still about 10 percent high at realistic bandwidth. Until preempted blocks were kept in the prefix cache (2026-11-17) that
+          excess was 22 percent and came mostly from recomputing preempted requests from zero; what remains is not identified. Parameters fitted to a run with an unexplained excess do not carry over
+          to another GPU. Not tuned.
+        differences:
+          value: { typescript: 3.827, vllm-measured: 6.515 }
+      - reference: llmservingsim
+        cause: "Parameters fitted on the other card sit at their MBU bound"
+        reason: *r_cross
+        differences:
+          value: { typescript: 3.827, llmservingsim: 6.556 }
   - id: crossfit-tpot-mean
     claim: "Mean time per output token over all 300 requests, parameters fitted to the RTX 4090 run (a different GPU) agrees with the measured run."
     kind: calibrated
@@ -559,11 +574,16 @@ checks:
     subset: all
     tolerance: "12 percent: the standard of the default and held-out checks of this scenario. The parameters (MBU, MFU, host time) were fitted to the first 100 requests of the RTX 4090 run and never saw this GPU: the held-out reading that needs no split."
     known_difference:
-      reference: vllm-measured
-      cause: "Parameters fitted on the other card carry the recompute error of its run"
-      reason: *r_cross
-      differences:
-        value: { typescript: 0.0268, vllm-measured: 0.03144 }
+      - reference: vllm-measured
+        cause: "Parameters fitted on the other card sit at their MBU bound"
+        reason: *r_cross
+        differences:
+          value: { typescript: 0.0262, vllm-measured: 0.03144 }
+      - reference: llmservingsim
+        cause: "Parameters fitted on the other card sit at their MBU bound"
+        reason: *r_cross
+        differences:
+          value: { typescript: 0.0262, llmservingsim: 0.03151 }
   - id: crossfit-e2e-mean
     claim: "Mean end-to-end time over all 300 requests, parameters fitted to the RTX 4090 run (a different GPU) agrees with the measured run."
     kind: calibrated
@@ -573,11 +593,16 @@ checks:
     subset: all
     tolerance: "15 percent: the standard of the default and held-out checks of this scenario. The parameters (MBU, MFU, host time) were fitted to the first 100 requests of the RTX 4090 run and never saw this GPU: the held-out reading that needs no split."
     known_difference:
-      reference: vllm-measured
-      cause: "Parameters fitted on the other card carry the recompute error of its run"
-      reason: *r_cross
-      differences:
-        value: { typescript: 21.64, vllm-measured: 26.95 }
+      - reference: vllm-measured
+        cause: "Parameters fitted on the other card sit at their MBU bound"
+        reason: *r_cross
+        differences:
+          value: { typescript: 20.85, vllm-measured: 26.95 }
+      - reference: llmservingsim
+        cause: "Parameters fitted on the other card sit at their MBU bound"
+        reason: *r_cross
+        differences:
+          value: { typescript: 20.85, llmservingsim: 27.03 }
   - id: crossfit-throughput
     claim: "Throughput over all 300 requests, parameters fitted to the RTX 4090 run (a different GPU) agrees with the measured run."
     kind: calibrated
@@ -587,8 +612,14 @@ checks:
     subset: all
     tolerance: "10 percent: the standard of the default and held-out checks of this scenario. The parameters (MBU, MFU, host time) were fitted to the first 100 requests of the RTX 4090 run and never saw this GPU: the held-out reading that needs no split."
     known_difference:
-      reference: vllm-measured
-      cause: "Parameters fitted on the other card carry the recompute error of its run"
-      reason: *r_cross
-      differences:
-        value: { typescript: 3500, vllm-measured: 3068 }
+      - reference: vllm-measured
+        cause: "Parameters fitted on the other card sit at their MBU bound"
+        reason: *r_cross
+        differences:
+          value: { typescript: 3570, vllm-measured: 3068 }
+
+      - reference: llmservingsim
+        cause: "Parameters fitted on the other card sit at their MBU bound"
+        reason: *r_cross
+        differences:
+          value: { typescript: 3570, llmservingsim: 3070 }
