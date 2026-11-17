@@ -1,7 +1,7 @@
 {
   "scenario": "lss-routing-round-robin",
   "reference": "llmservingsim",
-  "inputHash": "732fd4cdf0f9602ccb28f91086e73149625bf668c1f9cab3f1609520082dbd55",
+  "inputHash": "ba47cd57b27976f44ee01ea93764c51a60be4ed791b625bcfba2eedae0eb6301",
   "provenance": {
     "lock": "49df63f2af61230da63dd2136044a2dbf9bd4161",
     "replay": "no"

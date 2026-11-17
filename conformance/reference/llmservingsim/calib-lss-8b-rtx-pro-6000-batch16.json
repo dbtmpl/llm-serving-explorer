@@ -1,7 +1,7 @@
 {
   "scenario": "calib-lss-8b-rtx-pro-6000-batch16",
   "reference": "llmservingsim",
-  "inputHash": "56b7750eb0cb1851f5ad2f81644d3db351b41ea45d822448abf9e925b0f94609",
+  "inputHash": "f06c8dffaf2a59b79537c966cc18954156d4e379f9e5b0b8ac1b37dba30e3c77",
   "provenance": {
     "lock": "49df63f2af61230da63dd2136044a2dbf9bd4161",
     "replay": "no"

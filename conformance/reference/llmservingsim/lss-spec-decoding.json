@@ -1,7 +1,7 @@
 {
   "scenario": "lss-spec-decoding",
   "reference": "llmservingsim",
-  "inputHash": "3aabc9b5e3c8d171e8ae190a7383ea1d2fdeb4ab927cacb508fb3a8fc8a3bd53",
+  "inputHash": "80149db781a4d419c92151ff0d6c8e1270b9f00f202b3f5003e8b478b5d6e652",
   "provenance": {
     "lock": "49df63f2af61230da63dd2136044a2dbf9bd4161",
     "replay": "no"

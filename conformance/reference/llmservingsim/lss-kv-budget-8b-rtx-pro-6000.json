@@ -1,7 +1,7 @@
 {
   "scenario": "lss-kv-budget-8b-rtx-pro-6000",
   "reference": "llmservingsim",
-  "inputHash": "68f70a454d20ceb826fd917bcded9417076b6506b59bdb43f707f92e6ce11871",
+  "inputHash": "0dfd6f5dae546c7ba5b7a2e37e80c7b28baace3b292e37449ea346c74a4034b0",
   "provenance": {
     "lock": "49df63f2af61230da63dd2136044a2dbf9bd4161",
     "replay": "no"
