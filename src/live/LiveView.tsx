@@ -41,8 +41,10 @@ interface Calibrated {
 }
 /** Seconds of animation every explanation box stays before it flies into the history; the same for all. */
 const CALLOUT_TTL = 5;
-/** Most explanation boxes on screen at once, on a phone and on a wide screen. */
-const MAX_CALLOUTS = { narrow: 3, wide: 4 };
+/** Most explanation boxes on screen or waiting at once; past it the oldest leaves early. */
+const MAX_CALLOUTS = 12;
+/** While a box waits for room the clock runs at this share of the chosen speed, so the picture keeps pace with the text. */
+const CROWDED_SLOWDOWN = 0.25;
 /** Space between stacked boxes and between a stack and the graph, px. */
 const STACK_GAP = 8;
 /** Seconds the restart note keeps the router's node to itself before other notes may take it. */
@@ -53,12 +55,21 @@ interface Shown extends Callout {
   born: number;
   /** simulated seconds when it was shown, for the history log */
   simT?: number;
+  /** waiting, hidden, for room beside the graph; `born` counts from when it is shown */
+  waiting?: boolean;
+  /** animation seconds when it was created */
+  created?: number;
 }
 
 /** Below this width the screen is a phone: menus start closed, explanation boxes dock under the metrics. */
 const NARROW_PX = 900;
-/** In the step-through a pod's cold start (container, then weights) plays at least this fast, so the visitor does not wait on it. */
-const COLD_START_SPEED = 1.2;
+/**
+ * A pod's cold start (container, then weights) plays at least this fast while there is nothing else to watch:
+ * in the step-through, and in the live view while no pod is ready yet.
+ */
+const COLD_START_SPEED = 2.4;
+/** In the live view the cold start speeds up only once every explanation box on screen is this many seconds old. */
+const COLD_START_READ_S = 2;
 
 /** The speed picker on a phone: one row tall; scroll it, or tap a neighbour, to change the speed. */
 function SpeedWheel({ speeds, value, onChange }: { speeds: number[]; value: number; onChange: (s: number) => void }) {
@@ -381,57 +392,119 @@ export function LiveView() {
 
     /** Where each explanation box is drawn now; boxes glide to their places instead of jumping when pushed. */
     const placed = new Map<number, { x: number; y: number }>();
+    /** The side each box was given when it first appeared: above its node or the graph, or below the graph. It keeps it. */
+    const sides = new Map<number, "above" | "below">();
     /**
      * Lay out the explanation boxes. Newest first, each box sits nearest to what it explains and pushes the older
-     * ones away from it. On a phone they form one stack just above the graph, or just below it when there is no
-     * room above; on a wide screen each node has its own stack, above the node (below for the tokenizer and the
-     * stream), kept clear of the metrics strip and the corner menus.
+     * ones on its side away from it. A new box goes above when there is room there, else below the graph; with
+     * room on neither side it waits, hidden, until an older box leaves, so every box gets its full time. On a
+     * phone the two stacks are one above and one below the whole graph; on a wide screen each node has its own,
+     * above the node (the tokenizer's and the stream's below it) or below the graph, kept clear of the metrics
+     * strip, the corner menus and the transport bar. Returns the oldest box of a side that has run out of room,
+     * which then leaves early, or null.
      */
-    const placeCallouts = (list: Shown[], world: World, cw: number, ch: number, bannerH: number) => {
+    const placeCallouts = (list: Shown[], world: World, cw: number, ch: number, bannerH: number): Shown | null => {
       const scene = sceneRef.current;
       const want = new Map<number, { x: number; y: number }>();
       const items = [...list].reverse().flatMap((c) => {
         const el = calloutEls.current.get(c.id);
         return el ? [{ c, el, h: el.offsetHeight, w: el.offsetWidth }] : [];
       });
-      if (cw < NARROW_PX) {
-        const top = (hudRef.current?.getBoundingClientRect().bottom ?? 70) + STACK_GAP + bannerH;
-        const bottom = ch - (scene.panels.bottom || 96);
-        const g = scene.contentOnScreen() ?? { l: 0, t: ch / 2, r: cw, b: ch / 2 };
-        const total = items.reduce((n, it) => n + it.h + STACK_GAP, 0);
-        const roomAbove = g.t - STACK_GAP - top;
-        const roomBelow = bottom - (g.b + STACK_GAP);
-        const above = roomAbove >= total || roomAbove >= roomBelow;
-        let y = above ? Math.max(g.t - STACK_GAP, top + total) : Math.min(g.b + STACK_GAP, bottom - total);
-        for (const it of items) {
-          if (above) {
-            y -= it.h;
-            want.set(it.c.id, { x: cw / 2, y });
-            y -= STACK_GAP;
-          } else {
-            want.set(it.c.id, { x: cw / 2, y });
-            y += it.h + STACK_GAP;
+      const g = scene.contentOnScreen() ?? { l: 0, t: ch / 2, r: cw, b: ch / 2 };
+      const bottom = ch - (scene.panels.bottom || 96);
+      // stacks: a key, the room each side has, and what is already in it; older boxes keep their side
+      type Stack = { room: { above: number; below: number }; used: { above: number; below: number }; boxes: { above: typeof items; below: typeof items } };
+      const stacks = new Map<string, Stack>();
+      const stackOf = (key: string, room: Stack["room"]) => {
+        let s = stacks.get(key);
+        if (!s) stacks.set(key, (s = { room, used: { above: 0, below: 0 }, boxes: { above: [], below: [] } }));
+        return s;
+      };
+      const top = (hudRef.current?.getBoundingClientRect().bottom ?? 70) + STACK_GAP + bannerH;
+      const anchors = new Map<number, { x: number; y: number }>();
+      const keyOf = (it: (typeof items)[number]): string | null => {
+        if (cw < NARROW_PX) {
+          stackOf("all", { above: g.t - STACK_GAP - top, below: bottom - (g.b + STACK_GAP) });
+          return "all";
+        }
+        const a = scene.anchor(world, it.c.target);
+        if (!a) return null;
+        const p = scene.toScreen(a);
+        anchors.set(it.c.id, p);
+        const under = it.c.target.type === "tokenizer" || it.c.target.type === "stream";
+        const key = `${it.c.target.type}:${"id" in it.c.target ? it.c.target.id : ""}`;
+        // the tokenizer and the stream sit low in the graph: their only side is just under their node
+        stackOf(key, under ? { above: 0, below: bottom - (p.y + 12) } : { above: p.y - 12 - 84, below: bottom - (g.b + STACK_GAP) });
+        return key;
+      };
+      // boxes already shown first, then waiting ones oldest first, so a new box sees the room its elders take
+      const order = [...items].reverse();
+      // a stack where a box is waiting takes no newer box before it: first come, first shown
+      const blocked = new Set<string>();
+      for (const it of [...order.filter((x) => !x.c.waiting), ...order.filter((x) => x.c.waiting)]) {
+        const key = keyOf(it);
+        if (key === null) continue;
+        const st = stacks.get(key)!;
+        const h = it.h + STACK_GAP;
+        let side = sides.get(it.c.id);
+        if (!side) {
+          const fits = blocked.has(key) ? null : st.used.above + h <= st.room.above ? "above" : st.used.below + h <= st.room.below ? "below" : null;
+          // no room on either side: wait, unless nothing else is there (then it overlaps rather than never shows)
+          if (!fits && (blocked.has(key) || st.boxes.above.length + st.boxes.below.length > 0)) {
+            it.c.born = scene.vt;
+            blocked.add(key);
+            continue;
+          }
+          side = fits ?? (st.room.above - st.used.above >= st.room.below - st.used.below ? "above" : "below");
+          sides.set(it.c.id, side);
+          if (it.c.waiting) {
+            it.c.waiting = false;
+            it.c.born = scene.vt;
           }
         }
-      } else {
-        const stacks = new Map<string, number>();
-        for (const it of items) {
-          const a = scene.anchor(world, it.c.target);
-          if (!a) continue;
-          const s = scene.toScreen(a);
-          const below = it.c.target.type === "tokenizer" || it.c.target.type === "stream";
-          const slot = `${it.c.target.type}:${"id" in it.c.target ? it.c.target.id : ""}`;
-          const used = stacks.get(slot) ?? 0;
-          stacks.set(slot, used + it.h + STACK_GAP);
-          // the top edge of this box: newest next to the node, older ones further out
-          let y = below ? s.y + 12 + used : s.y - 12 - used - it.h;
-          if (!below) y = Math.max(y, 84);
-          // never under the transport bar
-          y = Math.min(y, ch - (scene.panels.bottom || 96) - it.h);
-          const hw = it.w / 2 + 8;
-          const minX = y < scene.panels.lh ? scene.panels.lw + hw : hw;
-          const maxX = y < scene.panels.rh ? cw - scene.panels.rw - hw : cw - hw;
-          want.set(it.c.id, { x: Math.max(minX, Math.min(maxX, s.x)), y });
+        st.used[side] += h;
+        st.boxes[side].unshift(it);
+      }
+      // newest nearest the graph (or the node), older ones further out
+      let evict: Shown | null = null;
+      for (const [key, st] of stacks) {
+        for (const side of ["above", "below"] as const) {
+          const list = st.boxes[side];
+          if (!list.length) continue;
+          const total = st.used[side];
+          // out of room: the oldest of this side leaves early, unless it is the only box there
+          if (total > st.room[side] + STACK_GAP && list.length > 1) {
+            const oldest = list[list.length - 1]!.c;
+            if (!evict || oldest.born < evict.born) evict = oldest;
+          }
+          if (key === "all") {
+            let y = side === "above" ? Math.max(g.t - STACK_GAP, top + total) : Math.min(g.b + STACK_GAP, bottom - total);
+            for (const it of list) {
+              if (side === "above") {
+                y -= it.h;
+                want.set(it.c.id, { x: cw / 2, y });
+                y -= STACK_GAP;
+              } else {
+                want.set(it.c.id, { x: cw / 2, y });
+                y += it.h + STACK_GAP;
+              }
+            }
+            continue;
+          }
+          const under = st.room.above === 0;
+          let used = 0;
+          for (const it of list) {
+            const s = anchors.get(it.c.id)!;
+            let y = side === "above" ? s.y - 12 - used - it.h : (under ? s.y + 12 : g.b + STACK_GAP) + used;
+            used += it.h + STACK_GAP;
+            if (side === "above") y = Math.max(y, 84);
+            // never under the transport bar
+            y = Math.min(y, bottom - it.h);
+            const hw = it.w / 2 + 8;
+            const minX = y < scene.panels.lh ? scene.panels.lw + hw : hw;
+            const maxX = y < scene.panels.rh ? cw - scene.panels.rw - hw : cw - hw;
+            want.set(it.c.id, { x: Math.max(minX, Math.min(maxX, s.x)), y });
+          }
         }
       }
       for (const it of items) {
@@ -447,6 +520,8 @@ export function LiveView() {
         it.el.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px) translate(-50%, 0)`;
       }
       for (const id of placed.keys()) if (!list.some((c) => c.id === id)) placed.delete(id);
+      for (const id of sides.keys()) if (!list.some((c) => c.id === id)) sides.delete(id);
+      return evict;
     };
 
     const frame = (now: number) => {
@@ -485,12 +560,17 @@ export function LiveView() {
       const replay = st.replay;
       const running = st.playing && !st.held && !frozen;
       const animating = st.playing && (!st.held || !!st.held.animate || !!replay);
+      // a box waiting for room slows the clock until it can be shown
+      const crowded = !st.stepMode && st.callouts.some((c) => c.waiting && scene.vt - (c.created ?? scene.vt) > 0.15);
       if (calibrated) {
         if (st.playing) run.advance(dt * st.speed);
       } else if (running) {
-        // a cold start in the step-through is waited for, not studied: it plays at least at COLD_START_SPEED
-        const cold = st.stepMode && world.pods.some((p) => p.state === "creating" || p.state === "loading");
-        advance(world, dt * (cold ? Math.max(st.speed, COLD_START_SPEED) : st.speed));
+        // a cold start is waited for, not studied: with nothing else to watch it plays at least at COLD_START_SPEED
+        const starting = world.pods.some((p) => p.state === "creating" || p.state === "loading");
+        // in the live view it waits until the newest explanation box has been up for a while, so the boxes about the start are read first
+        const read = st.callouts.every((c) => scene.vt - c.born > COLD_START_READ_S);
+        const cold = starting && (st.stepMode || (read && !world.pods.some((p) => p.state === "ready")));
+        advance(world, dt * (cold ? Math.max(st.speed, COLD_START_SPEED) : crowded ? st.speed * CROWDED_SLOWDOWN : st.speed));
       }
       else if (replay && st.playing && world.t < replay.t) advance(world, Math.min(dt * replay.rate, replay.t - world.t));
       const events = shown.events.splice(0);
@@ -559,11 +639,11 @@ export function LiveView() {
           st.lastShown.set(family, scene.vt);
           // a new box joins the stack and pushes the older ones away; only a newer version of the same note replaces it
           next = (next ?? [...st.callouts]).filter((x) => x.key !== c.key);
-          next.push({ ...c, id: st.nextId++, born: scene.vt, simT: elapsed(world) });
+          next.push({ ...c, id: st.nextId++, born: scene.vt, created: scene.vt, waiting: true, simT: elapsed(world) });
         }
         if (next) {
           // past the most the screen holds, the oldest leaves early
-          const kept = next.slice(-(cw < NARROW_PX ? MAX_CALLOUTS.narrow : MAX_CALLOUTS.wide));
+          const kept = next.slice(-MAX_CALLOUTS);
           for (const c of st.callouts) if (!kept.includes(c)) st.toLog(c, "callout", true);
           st.callouts = kept;
           setCallouts(st.callouts);
@@ -574,7 +654,12 @@ export function LiveView() {
         st.callouts = st.callouts.filter((c) => scene.vt - c.born <= CALLOUT_TTL);
         setCallouts(st.callouts);
       }
-      placeCallouts(st.callouts, world, cw, ch, bannerH);
+      const squeezed = placeCallouts(st.callouts, world, cw, ch, bannerH);
+      if (squeezed) {
+        st.toLog(squeezed, "callout", true);
+        st.callouts = st.callouts.filter((c) => c !== squeezed);
+        setCallouts(st.callouts);
+      }
       if (st.tour !== null) placeRing(ringEl.current, TOUR[st.tour]!.target);
       if (now - lastRefresh > 200) {
         lastRefresh = now;
