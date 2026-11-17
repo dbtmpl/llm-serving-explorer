@@ -958,6 +958,14 @@ body,
   .lv-clock {
     min-width: 50px;
   }
+  .lv-transport {
+    gap: 6px;
+  }
+  .lv-menus-btn {
+    padding: 7px 11px;
+    font-size: 12.5px !important;
+    gap: 5px;
+  }
   .lv-log {
     bottom: 62px;
   }
@@ -1174,6 +1182,64 @@ body,
 }
 .lv-back:hover {
   border-color: var(--ink);
+}
+
+/* the menus button: the key control, so it looks like one */
+.lv-menus-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 99px;
+  padding: 8px 14px;
+  background: linear-gradient(135deg, var(--accent), var(--prefill));
+  color: #fff !important;
+  font-size: 13px !important;
+  font-weight: 750 !important;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.32);
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+.lv-menus-btn span {
+  font-size: 14px;
+  line-height: 1;
+}
+.lv-menus-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 9px 22px rgba(37, 99, 235, 0.4);
+}
+.lv-menus-btn.on {
+  background: var(--ink);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.25);
+}
+/* until it has been used once, a soft ring pulses around it */
+.lv-menus-btn.invite::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 99px;
+  border: 2px solid var(--accent);
+  opacity: 0;
+  animation: lv-invite 1.8s ease-out infinite;
+  pointer-events: none;
+}
+@keyframes lv-invite {
+  0% {
+    opacity: 0.7;
+    transform: scale(0.96);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.18);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lv-menus-btn.invite::after {
+    animation: none;
+    opacity: 0.6;
+  }
 }
 
 /* the "more" menu in the transport bar */

@@ -69,10 +69,10 @@ export function flyToLog(el: HTMLElement, button: HTMLElement | null): void {
   anim.oncancel = done;
 }
 
-export function LogButton({ count, open, onToggle, unread, buttonRef }: { count: number; open: boolean; onToggle: () => void; unread: boolean; buttonRef: React.Ref<HTMLButtonElement> }) {
+export function LogButton({ count, open, onToggle, unread, buttonRef, compact }: { count: number; open: boolean; onToggle: () => void; unread: boolean; buttonRef: React.Ref<HTMLButtonElement>; compact?: boolean }) {
   return (
-    <button ref={buttonRef} className={`lv-ghost lv-log-btn ${open ? "on" : ""}`} data-testid="log-toggle" aria-expanded={open} aria-controls="lv-log" onClick={onToggle} title="Every explanation shown so far">
-      history
+    <button ref={buttonRef} className={`lv-ghost lv-log-btn ${open ? "on" : ""}`} data-testid="log-toggle" aria-expanded={open} aria-controls="lv-log" onClick={onToggle} title="Every explanation shown so far" aria-label="History of explanations">
+      {compact ? <span aria-hidden="true">🕘</span> : "history"}
       <span className={`lv-log-count ${unread ? "new" : ""}`} data-testid="log-count">
         {count}
       </span>
