@@ -46,6 +46,14 @@ export interface GpuSpec {
   memorySource: CitationKey;
   /** Memory bandwidth, bytes/s. */
   bw: number;
+  /**
+   * Bandwidth of one GPU's link to the others in its pod, bytes/s in one direction: what a tensor-parallel all-reduce
+   * moves its data over. NVLink figures are the datasheets' totals halved (900 GB/s for H100 and H200, 1.8 TB/s per
+   * B200 from DGX B200's 14.4 TB/s over eight GPUs); the MI300X's is its Infinity Fabric's 896 GB/s halved (AMD product
+   * page, not re-read when this was written); the two RTX cards have no NVLink and go over PCIe (Gen 4 x16 is 31.5 GB/s per direction,
+   * Gen 5 x16 63 GB/s).
+   */
+  link: number;
   source: CitationKey;
 }
 
@@ -68,21 +76,22 @@ export const MODELS: Record<string, ModelSpec> = {
  *
  * The RTX PRO 6000 and RTX 4090 `memory` values are `device_total_memory_bytes` of the `meta.json` of real vLLM runs on those
  * devices (101.98 GB = 94.97 GiB; 25.25 GB = 23.52 GiB). The RTX 4090's peak is the whitepaper's BF16 tensor figure with FP32
- * accumulate, dense (165.2; 330.4 with sparsity). NVIDIA's page for the RTX PRO 6000 Server Edition gives one figure,
- * "FP16 | BF16 Tensor Core 1 PFLOP", without saying whether it assumes sparsity; as for the other Blackwell parts it is read as the sparse
- * headline and halved, to 500e12. That is probably generous for BF16 with FP32 accumulate (third-party sheets list about half
- * of it), and a fitted MFU absorbs the difference; it is stated here because the number is not confirmed by a first-party table.
+ * accumulate, dense (165.2; 330.4 with sparsity). The RTX PRO 6000's peak is the whitepaper's BF16 tensor figure with FP32 accumulate, dense: 503.8
+ * TFLOP/s (1007.6 with sparsity; table 4 of the NVIDIA RTX Blackwell GPU architecture whitepaper, v1.1). NVIDIA's page for the Server
+ * Edition prints "FP16 | BF16 Tensor Core 1 PFLOP" without saying so; that is the sparse figure, and the model uses the dense one.
+ * (An earlier 500e12 here was that headline halved without a first-party table to confirm it; the table gives 503.8.) The whitepaper
+ * prints the Workstation Edition's 1792 GB/s; the model keeps the Server Edition's 1597 GB/s, the card the run used.
  *
- * Peak compute is the dense figure. Vendors of Hopper and Blackwell parts headline a number that
+ Peak compute is the dense figure. Vendors of Hopper and Blackwell parts headline a number that
  * assumes structured sparsity; it is halved here, because LLM weights are dense.
  */
 export const GPUS: Record<string, GpuSpec> = {
-  h100: { id: "h100", label: "H100 SXM", peak: 989.5e12, hbm: 80e9, memory: 85_029_158_912, memorySource: "vllmUsageStats", bw: 3.35e12, source: "nvidiaH100" },
-  h200: { id: "h200", label: "H200 SXM", peak: 989.5e12, hbm: 141e9, memory: 150_109_880_320, memorySource: "blisSubstrateCatalog", bw: 4.8e12, source: "nvidiaH200" },
-  b200: { id: "b200", label: "B200", peak: 2250e12, hbm: 180e9, memory: 191_503_007_744, memorySource: "blisSubstrateCatalog", bw: 7.7e12, source: "nvidiaB200" },
-  "rtx-pro-6000": { id: "rtx-pro-6000", label: "RTX PRO 6000", peak: 500e12, hbm: 96e9, memory: 101_976_440_832, memorySource: "llmservingsimBench", bw: 1.597e12, source: "nvidiaRtxPro6000" },
-  "rtx-4090": { id: "rtx-4090", label: "RTX 4090", peak: 165.2e12, hbm: 24e9, memory: 25_250_627_584, memorySource: "llmservingsimBench", bw: 1.008e12, source: "nvidiaAda" },
-  mi300x: { id: "mi300x", label: "MI300X", peak: 1307.4e12, hbm: 192e9, memory: 192e9, memorySource: "amdMi300x", bw: 5.3e12, source: "amdMi300x" }
+  h100: { id: "h100", label: "H100 SXM", peak: 989.5e12, hbm: 80e9, memory: 85_029_158_912, memorySource: "vllmUsageStats", bw: 3.35e12, link: 450e9, source: "nvidiaH100" },
+  h200: { id: "h200", label: "H200 SXM", peak: 989.5e12, hbm: 141e9, memory: 150_109_880_320, memorySource: "blisSubstrateCatalog", bw: 4.8e12, link: 450e9, source: "nvidiaH200" },
+  b200: { id: "b200", label: "B200", peak: 2250e12, hbm: 180e9, memory: 191_503_007_744, memorySource: "blisSubstrateCatalog", bw: 7.7e12, link: 900e9, source: "nvidiaB200" },
+  "rtx-pro-6000": { id: "rtx-pro-6000", label: "RTX PRO 6000", peak: 503.8e12, hbm: 96e9, memory: 101_976_440_832, memorySource: "llmservingsimBench", bw: 1.597e12, link: 63e9, source: "nvidiaRtxPro6000" },
+  "rtx-4090": { id: "rtx-4090", label: "RTX 4090", peak: 165.2e12, hbm: 24e9, memory: 25_250_627_584, memorySource: "llmservingsimBench", bw: 1.008e12, link: 31.5e9, source: "nvidiaAda" },
+  mi300x: { id: "mi300x", label: "MI300X", peak: 1307.4e12, hbm: 192e9, memory: 192e9, memorySource: "amdMi300x", bw: 5.3e12, link: 448e9, source: "amdMi300x" }
 };
 
 /** Weight storage formats and their size per parameter. */
@@ -98,4 +107,8 @@ export interface ReplicaSpec {
   tp: number;
   /** vLLM's `gpu_memory_utilization`: the share of HBM the engine may use. */
   gpuMemUtil: number;
+  /** vLLM's `max_num_batched_tokens`: the largest step; sizes the profiling pass and the CUDA graph capture list. */
+  maxNumBatchedTokens: number;
+  /** vLLM's `max_num_seqs`: sequences per step; sizes the sampler's rows and the capture list. */
+  maxNumSeqs: number;
 }

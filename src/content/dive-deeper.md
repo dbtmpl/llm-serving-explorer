@@ -114,10 +114,10 @@ _Where:_ Dive deeper drop-down in the step-through box, under the steps `pod.loa
 The GPU memory budget
 
 ### body
-Every GPU's memory is shared by a few pools, and the batch an engine can run is whatever the last one allows. The engine requests a fraction `gpu_memory_utilization` of the memory the driver reports [@vllmEngineArgs]; it then measures what the weights, one profiling pass and the captured CUDA graphs take, and gives the rest to the KV cache [@vllmMemoryProfiling]. Memory outside the requested share is left for other processes on the device. With tensor parallelism the weights and the KV heads are split over the GPUs of a pod, so each GPU holds a slice of every sequence [@shoeybi2019]. If the weights leave no room, the model does not fit, as in the failed pod. The model is the one in the formula below; the box on the screen draws it to scale.
+Every GPU's memory is shared by a few pools, and the batch an engine can run is whatever the last one allows. The engine requests a fraction `gpu_memory_utilization` of the memory the driver reports [@vllmEngineArgs]; it then measures what the weights, one profiling pass and the captured CUDA graphs take, and gives the rest to the KV cache [@vllmMemoryProfiling]. The profiling pass is one step of `max_num_batched_tokens` tokens followed by the sampler over `max_num_seqs` rows of the whole vocabulary, so a bigger token budget or a longer sequence limit takes memory from the cache; the graphs are one per batch size on vLLM's capture list [@vllmProfileRun]. Memory outside the requested share is left for other processes on the device. With tensor parallelism the weights and the KV heads are split over the GPUs of a pod, so each GPU holds a slice of every sequence [@shoeybi2019]. If the weights leave no room, the model does not fit, as in the failed pod. The model is the one in the formula below; the box on the screen draws it to scale.
 
 ### formula
-$$M_{\text{KV}} = u \cdot M_{\text{device}} - M_{\text{weights}} - M_{\text{activations}} - M_{\text{graphs}}$$
+$$M_{\text{KV}} = u \cdot M_{\text{device}} - M_{\text{weights}} - M_{\text{activations}}(T_{\max},\ S_{\max}) - M_{\text{graphs}}(S_{\max})$$
 
 ## `kvbytes` KV bytes per token and the batch cap
 _Where:_ Dive deeper drop-down in the step-through box, under the steps `walk.cost`, `pod.ready`, `pod.failed`, `walk.kvmap`, `req.preempted`.
@@ -210,10 +210,10 @@ _Where:_ Dive deeper drop-down in the step-through box, under the steps `walk.ro
 Memory-bound decode, MBU and MFU
 
 ### body
-Decode makes one token per sequence per step but must read all the weights and every sequence's KV cache to do it, so each step moves a lot of data for little arithmetic [@pope2022], [@databricksInference]. Its time is then set by bandwidth, and a bigger batch amortises only the weight read, not the KV read of each sequence, which is why throughput saturates with the batch and why context length matters. Two efficiency ratios say how close a stack gets to the hardware: MFU, the share of peak arithmetic achieved, and MBU, the share of peak memory bandwidth achieved [@databricksInference]. Decode is judged by MBU, prefill by MFU. Neither is a property of the chip alone; kernels, launch overhead and the parallel layout move them. Every sequence waits for the whole step, so the time per output token is the price of the batch.
+Decode makes one token per sequence per step but must read all the weights and every sequence's KV cache to do it, so each step moves a lot of data for little arithmetic [@pope2022], [@databricksInference]. Its time is then set by bandwidth, and a bigger batch amortises only the weight read, not the KV read of each sequence, which is why throughput saturates with the batch and why context length matters. Two efficiency ratios say how close a stack gets to the hardware: MFU, the share of peak arithmetic achieved, and MBU, the share of peak memory bandwidth achieved [@databricksInference]. Decode is judged by MBU, prefill by MFU. Two real GPUs streamed weights and KV cache in a vLLM decode step at 0.83 to 0.85 of datasheet bandwidth, the default MBU. A step is the larger of its memory and arithmetic times, plus the all-reduces of tensor parallelism and the launch of each layer's kernels. Every sequence waits for the whole step, so the time per output token is the price of the batch.
 
 ### formula
-$$T_{\text{step}} \approx \frac{M_{\text{weights}} + B\,L\,M_{\text{token}}}{BW \cdot \text{MBU}}$$
+$$T_{\text{step}} \approx \frac{M_{\text{weights}} + B\,L\,M_{\text{token}}}{BW \cdot \text{MBU}} + T_{\text{all-reduce}} + T_{\text{launch}}$$
 
 ## `ttft` TTFT and TPOT: two phases, two latencies
 _Where:_ Dive deeper drop-down in the step-through box, under the steps `req.firstToken`, `walk.reply`.

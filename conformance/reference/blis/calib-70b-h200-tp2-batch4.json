@@ -1,0 +1,85 @@
+{
+  "scenario": "calib-70b-h200-tp2-batch4",
+  "reference": "blis",
+  "inputHash": "1bc8624a7c80a804b8cc496001f43d52af14163fa3d67464af85d05ffd533aed",
+  "provenance": {
+    "lock": "c79c745619b16a8019339e3bbc79ee5e2923b258",
+    "catalogHash": "db74e4bb49f75d658e5d0850934da60daf513274b937a03b7ab994760bd6d21f",
+    "registryHash": "8dbcf3b85eed842f2bc798b34d2b95716fc58117750f4164d869b26770353fe0",
+    "engineVersion": "0.32.0",
+    "routerModule": "github.com/llm-d/llm-d-router v1.0.0-blis.4"
+  },
+  "records": {
+    "main": {
+      "source": "blis",
+      "scenario": "calib-70b-h200-tp2-batch4",
+      "kvBlocksPerReplica": 23846,
+      "requests": [
+        {
+          "session": 1,
+          "round": 0,
+          "inputTokens": 1000,
+          "outputTokens": 300,
+          "cachedTokens": 0,
+          "pod": 0,
+          "arrivalS": 1,
+          "firstTokenS": 1.17014,
+          "lastTokenS": 10.638063,
+          "fate": "completed",
+          "preemptions": null
+        },
+        {
+          "session": 2,
+          "round": 0,
+          "inputTokens": 1000,
+          "outputTokens": 300,
+          "cachedTokens": 0,
+          "pod": 0,
+          "arrivalS": 1.08,
+          "firstTokenS": 1.330179,
+          "lastTokenS": 10.699077,
+          "fate": "completed",
+          "preemptions": null
+        },
+        {
+          "session": 3,
+          "round": 0,
+          "inputTokens": 1000,
+          "outputTokens": 300,
+          "cachedTokens": 0,
+          "pod": 0,
+          "arrivalS": 1.16,
+          "firstTokenS": 1.584109,
+          "lastTokenS": 10.759739,
+          "fate": "completed",
+          "preemptions": null
+        },
+        {
+          "session": 4,
+          "round": 0,
+          "inputTokens": 1000,
+          "outputTokens": 300,
+          "cachedTokens": 0,
+          "pod": 0,
+          "arrivalS": 1.24,
+          "firstTokenS": 1.584109,
+          "lastTokenS": 10.759739,
+          "fate": "completed",
+          "preemptions": null
+        }
+      ],
+      "preemptions": 0,
+      "requestsPerPod": [
+        4
+      ],
+      "aggregates": {
+        "prefixHitRate": 0,
+        "cpuTierHitRate": 0,
+        "kvTransferMeanS": null,
+        "specTokensPerStep": null,
+        "prefillPoolRequests": null,
+        "peakReplicas": 1
+      }
+    }
+  }
+}

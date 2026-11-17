@@ -180,6 +180,48 @@ export const CITATIONS = {
     kind: "source",
     url: "https://github.com/vllm-project/vllm/blob/main/vllm/v1/worker/gpu_worker.py"
   },
+  vllmProfileRun: {
+    short: "vLLM v0.31.0 source, start-up profiling pass and sampler",
+    title: "vLLM v0.31.0 gpu_model_runner.py: profile_run (a forward pass over max_num_batched_tokens, then the sampler over min(tokens, max_num_seqs) rows), _dummy_sampler_run, profile_cudagraph_memory (shared pool plus at least 1 MiB per graph); sampler.py: logits.to(torch.float32); topk_topp_sampler.py: softmax in float32",
+    kind: "source",
+    url: "https://github.com/vllm-project/vllm/blob/v0.31.0/vllm/v1/worker/gpu_model_runner.py#L6409-L6440"
+  },
+  vllmCudagraphSizes: {
+    short: "vLLM v0.31.0 source, CUDA graph capture sizes",
+    title: "vLLM v0.31.0 vllm/config/vllm.py _set_cudagraph_sizes: capture sizes 1, 2, 4, multiples of 8 below 256, then of 16, up to min(2 x max_num_seqs, 512)",
+    kind: "source",
+    url: "https://github.com/vllm-project/vllm/blob/v0.31.0/vllm/config/vllm.py#L2388-L2420"
+  },
+  vllmMemoryProfilingV019: {
+    short: "vLLM v0.19.0 source, worker memory profiling",
+    title: "vLLM v0.19.0 gpu_worker.py determine_available_memory: the CUDA-graph estimate is computed only when VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS is set, which defaults to off (on from v0.21)",
+    kind: "source",
+    url: "https://github.com/vllm-project/vllm/blob/v0.19.0/vllm/v1/worker/gpu_worker.py"
+  },
+  nvidiaBlackwellProWhitepaper: {
+    short: "NVIDIA RTX Blackwell GPU architecture whitepaper",
+    title: "NVIDIA RTX Blackwell GPU Architecture v1.1, appendix A, table 4: RTX PRO 6000 Blackwell Workstation Edition, peak BF16 tensor TFLOPS with FP32 accumulate 503.8 dense / 1007.6 with sparsity (the Server Edition's \"1 PFLOP\" is the sparse figure)",
+    kind: "datasheet",
+    url: "https://www.nvidia.com/content/dam/en-zz/Solutions/design-visualization/quadro-product-literature/pdf/NVIDIA-RTX-Blackwell-PRO-GPU-Architecture-v1_1.pdf"
+  },
+  ncclTestsPerformance: {
+    short: "NCCL tests, performance notes",
+    title: "NVIDIA nccl-tests doc/PERFORMANCE.md: algorithm bandwidth and bus bandwidth; a ring all-reduce moves 2(n-1)/n of the message through each rank",
+    kind: "docs",
+    url: "https://github.com/NVIDIA/nccl-tests/blob/master/doc/PERFORMANCE.md"
+  },
+  vllmCudaGraphs: {
+    short: "vLLM docs, CUDA graphs",
+    title: "vLLM design document: CUDA Graphs (steps up to the largest capture size replay a graph; larger ones run without)",
+    kind: "docs",
+    url: "https://docs.vllm.ai/en/latest/design/cuda_graphs/"
+  },
+  blisSubstrateHost: {
+    short: "BLIS substrate registry, host overheads",
+    title: "blis-substrate registry cost-model-host-overheads: assumed (not measured) per-launch and per-layer CPU costs of its kernel model",
+    kind: "source",
+    url: "https://github.com/inference-sim/blis-substrate/blob/main/registry/coefficients/cost-model-host-overheads.yaml"
+  },
   vllmUsageStats: {
     short: "vLLM pull request 26836",
     title: "vLLM usage stats of an H100 80GB HBM3: gpu_memory_per_device 85029158912 bytes (79.19 GiB)",
@@ -482,7 +524,7 @@ export const CITATIONS = {
   },
   nvidiaRtxPro6000: {
     short: "NVIDIA RTX PRO 6000 Blackwell Server Edition datasheet",
-    title: "NVIDIA RTX PRO 6000 Blackwell Server Edition (96 GB GDDR7, 1597 GB/s, FP16/BF16 Tensor Core 1 PFLOP)",
+    title: "NVIDIA RTX PRO 6000 Blackwell Server Edition (96 GB GDDR7, 1597 GB/s; its \"FP16/BF16 Tensor Core 1 PFLOP\" is the sparse figure)",
     kind: "datasheet",
     url: "https://www.nvidia.com/en-us/data-center/rtx-pro-6000-blackwell-server-edition/"
   },

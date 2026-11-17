@@ -51,7 +51,7 @@ checks:
         the 5 s load time the new replicas serve from 6.1, 7.1 and 8.1 s, four replicas in all. BLIS's saturation analyzer (the llm-d workload-variant autoscaler's
         token-based rule) compares the tokens in the queue and in KV memory with 80 percent of the pool, so it waits until the queue holds enough prompt tokens:
         its first added replica serves from 11 s, its second from 18 s, and it stops at three. The queue therefore drains later and less in BLIS, and mean time
-        to first token falls to 0.40 of the fixed arm's (8.3 s against 20.7 s) where the TypeScript model's falls to 0.083 (1.7 s against 20.5 s). The rules differ
+        to first token falls to 0.40 of the fixed arm's (8.3 s against 20.7 s) where the TypeScript model's falls to 0.084 (1.8 s against 21.0 s). The rules differ
         by design; the direction is the same.
       differences:
-        effect: { typescript: 0.08289, blis: 0.4021 }
+        effect: { typescript: 0.08448, blis: 0.4021 }

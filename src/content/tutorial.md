@@ -81,7 +81,7 @@ _Where:_ Tutorial card 9, pointing at the roofline strip of a pod.
 Forward pass and arithmetic intensity
 
 ### text
-The strip sweeps once per engine step, through every layer. The dot below shows arithmetic intensity: how many arithmetic operations (FLOPs) the step does per byte it reads from memory. A GPU can do only so many operations and read only so many bytes per second; the ridge, the number on the gauge, is where the two limits meet [@williams2009]. Left of it a step waits on memory (decode, blue); right of it on arithmetic (prefill, orange). A prefill joining the batch throws the dot right and slows every stream.
+The strip sweeps once per engine step, through every layer. The dot below shows arithmetic intensity: how many arithmetic operations (FLOPs) the step does per byte it reads from memory. A GPU can do only so many operations and read only so many bytes per second; the ridge, the number on the gauge, is where the two limits meet [@williams2009]. Left of it a step waits on memory (decode, blue); right of it on arithmetic (prefill, orange). A prefill joining the batch throws the dot right and slows every stream. The step's time is the larger of its memory and arithmetic times, plus, across several GPUs, the all-reduces of tensor parallelism, plus the time to launch each layer's kernels.
 
 ## `stream` Output tokens
 _Where:_ Tutorial card 10, pointing at the output token stream.

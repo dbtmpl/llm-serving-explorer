@@ -57,7 +57,7 @@ export function emit(w: World, kind: string, data: Omit<SimEvent, "t" | "kind"> 
 }
 
 export function replicaSpec(p: Params): ReplicaSpec {
-  return { model: MODELS[p.model]!, gpu: GPUS[p.gpu]!, precision: p.precision, tp: p.tp, gpuMemUtil: p.gpuMemUtil };
+  return { model: MODELS[p.model]!, gpu: GPUS[p.gpu]!, precision: p.precision, tp: p.tp, gpuMemUtil: p.gpuMemUtil, maxNumBatchedTokens: p.tokenBudget, maxNumSeqs: p.maxNumSeqs };
 }
 
 /** Requests a pod is running, holding in its queue, or about to receive. */

@@ -3,6 +3,7 @@
  * comparison. None of this needs BLIS.
  */
 import { describe, expect, it } from "vitest";
+import { DEFAULT_PARAMS } from "../../src/sim/index.js";
 import { evaluate, round4 } from "../compare.js";
 import { metricOf, quantityOf, NO_AGGREGATES, type Reduced, type RequestRow } from "../record.js";
 import { reduceBlis } from "../refs/blis/run.js";
@@ -83,7 +84,7 @@ describe("translation to the TypeScript model", () => {
   });
   it("applies a timing override on top of the site's values and nothing else", () => {
     const { params } = toTypescript(tiny(), MAIN_ARM, { mbu: 0.31, hostMsBase: 4 });
-    expect(params).toMatchObject({ mbu: 0.31, hostMsBase: 4, mfu: 0.5, hostMsPerSeq: 0.05 });
+    expect(params).toMatchObject({ mbu: 0.31, hostMsBase: 4, mfu: DEFAULT_PARAMS.mfu, hostMsPerSeq: DEFAULT_PARAMS.hostMsPerSeq });
   });
   it("turns BLIS's mean tokens per step into the per-token acceptance that gives it", () => {
     for (const [length, k] of [[3, 4], [2.2, 3], [4.5, 7]] as const) {

@@ -18,7 +18,7 @@ const calibration = (pair: string): string[] => CALIBRATION.map((r) => `calib-${
 
 export const TIMING_8B_H100 = [...calibration("8b-h100"), "timing-8b-h100-chat", "timing-8b-h100-heavy", "timing-8b-h100-burst"] as const;
 export const TIMING_8B_B200 = [...calibration("8b-b200"), "timing-8b-b200-chat"] as const;
-export const TIMING_70B_H200 = [...calibration("70b-h200"), "timing-70b-h200-chat"] as const;
+export const TIMING_70B_H200 = [...calibration("70b-h200"), ...calibration("70b-h200-tp2"), ...calibration("70b-h200-tp8"), "timing-70b-h200-chat"] as const;
 
 /** Replays of real vLLM runs on two workstation GPUs: timing under default and fitted parameters, and the KV pool the engine reported. */
 export const MEASURED = ["measured-8b-rtx-pro-6000", "measured-8b-rtx-4090"] as const;

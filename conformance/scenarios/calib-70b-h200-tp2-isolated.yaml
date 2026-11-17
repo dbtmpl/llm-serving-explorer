@@ -1,0 +1,22 @@
+id: calib-70b-h200-tp2-isolated
+title: Calibration data, one request at a time, Llama 3.1 70B on two H200s
+role: calibration
+# Five requests 15 s apart, so each runs alone: its time to first token is prefill of 128 to 8,000 tokens plus fixed overhead, and its time per token is a decode step at batch 1.
+model: llama-70b
+gpu: h200
+engine:
+  tp: 2
+  gpu_memory_utilisation: 0.9
+  max_num_seqs: 64
+  max_num_batched_tokens: 8192
+  block_size: 16
+  prefix_caching: true
+replicas: 1
+routing: round-robin
+requests:
+  - { session: 1, at: 1.0, turns: [[128, 64]] }
+  - { session: 2, at: 16.0, turns: [[512, 64]] }
+  - { session: 3, at: 31.0, turns: [[2048, 64]] }
+  - { session: 4, at: 46.0, turns: [[4096, 64]] }
+  - { session: 5, at: 61.0, turns: [[8000, 64]] }
+checks: []

@@ -8,35 +8,21 @@ import { BLOCK_TOKENS } from "../kvcache/blocks.js";
 /** Bytes per stored key or value element: the KV cache is kept in 16-bit floats. */
 export const KV_BYTES_PER_ELEMENT = 2;
 
-/**
- * Sizing assumptions for the activation and workspace pool. It is small next to weights and KV,
- * so it is sized once for a full step rather than tracked per step.
- */
-export const ACTIVATION_SIZING = {
-  /** Tokens in the largest step the pool must hold (the default per-step token budget). */
-  stepTokens: 8192,
-  /** Sequences whose logits are held at once for sampling. */
-  samplingSequences: 256,
-  /** Bytes per hidden activation (16-bit). */
-  bytesPerActivation: 2,
-  /** Bytes per logit (32-bit). */
-  bytesPerLogit: 4
-} as const;
+/** Bytes per element of the hidden activations the forward pass keeps (16-bit). */
+const BYTES_PER_ACTIVATION = 2;
 
 /**
- * Device memory that the engine's captured CUDA graphs hold, per GPU: 1,159,725,056 bytes (1.08 GiB).
- *
- * vLLM captures CUDA graphs after it has sized the KV pool, so since v0.21 it measures what the capture will
- * take and subtracts it from the KV budget (`determine_available_memory` in vllm/v1/worker/gpu_worker.py:
- * `requested - non_kv_cache_memory - cudagraph_memory_estimate`). The real figure grows with the largest
- * captured batch and the model's width. This is a flat figure, as the BLIS substrate registry carries it:
- * the median of 22 vLLM start-up logs ("Graph capturing finished ... took X GiB") on A100, B200, GB200, H100,
- * H200 and L40S whose graph mode is `FULL_AND_PIECEWISE` (the default), interquartile range 0.69 to 1.83 GiB
- * (blis-substrate, registry/coefficients/cost-model-memory.yaml, `cudagraph_capture_bytes_full_and_piecewise`).
- * It is a median over uncontrolled deployments, not a measurement of any one model; a visitor's model on a
- * real cluster may differ by half a gigabyte either way. It is a parameter of the teaching model, not tuned.
+ * Bytes that one row of vocabulary-wide sampler state takes per vocabulary entry: the 16-bit logits the
+ * language-model head returns (2), their 32-bit copy (`logits.to(torch.float32)` in vllm/v1/sample/sampler.py, 4)
+ * and the 32-bit probabilities (`logits.softmax(dim=-1, dtype=torch.float32)` in
+ * vllm/v1/sample/ops/topk_topp_sampler.py, 4). These three exist on every sampling path; a path that sorts
+ * (top-k/top-p in PyTorch) keeps 12 more bytes per entry (values and 64-bit indices), the Triton and FlashInfer
+ * paths none, so the figure is the part that does not depend on the backend.
  */
-export const CUDA_GRAPH_BYTES = 1_159_725_056;
+export const SAMPLER_BYTES_PER_LOGIT = 2 + 4 + 4;
+
+/** Bytes one captured CUDA graph costs beyond the pool that all graphs share: vLLM counts at least 1 MiB per graph (`profile_cudagraph_memory`, gpu_model_runner.py: `max(mem_samples[1], 1 << 20)`). */
+export const GRAPH_BYTES_FLOOR = 1 << 20;
 
 /** A replica whose KV pool holds fewer blocks than this cannot serve a single short request. */
 export const MIN_USABLE_POOL_BLOCKS = 8;
@@ -62,23 +48,73 @@ export function kvBytesPerToken(m: ModelSpec): number {
   return 2 * m.nL * m.nKv * m.dH * KV_BYTES_PER_ELEMENT;
 }
 
+/** Hidden-state working space of a forward pass over `tokens` tokens, bytes per GPU. */
+function forwardBytes(m: ModelSpec, tp: number, tokens: number): number {
+  return tokens * (2 * m.d + (2 * m.dFf) / tp) * BYTES_PER_ACTIVATION;
+}
+
 /**
- * Activations and workspace for one full step on one GPU: residual stream and feed-forward buffers for
- * every token in the step, plus logits for the sequences being sampled.
+ * Peak activation memory of the start-up profiling pass, bytes per GPU.
  *
- * Tensor parallelism keeps the residual stream whole on every GPU but gives each GPU only `d_ff / tp` of the
- * feed-forward width (the up and gate projections are split by column; Shoeybi et al., 2019). The logits
- * are gathered over the whole vocabulary for sampling, so they are not split.
+ * vLLM sizes the KV pool after one dummy step, `profile_run` (vllm/v1/worker/gpu_model_runner.py): a forward
+ * pass over `max_num_batched_tokens` tokens (`_dummy_run(self.max_num_tokens, ...)`), whose hidden states stay
+ * alive while the sampler runs over `min(max_num_batched_tokens, max_num_seqs)` rows (`num_reqs = min(num_tokens,
+ * max_num_reqs)` in `_dummy_run`, then `_dummy_sampler_run`). The peak is the larger of the two moments:
  *
- * Example: Llama 3.1 8B, one GPU: 8192 · (2·4096 + 2·14336) · 2 + 256 · 128256 · 4 = 735.3 MB. Llama 3.1 70B on
- * four GPUs: 8192 · (2·8192 + 2·28672/4) · 2 + 256 · 128256 · 4 = 634.7 MB, where it would be 1.34 GB unsplit.
+ *     forward = T · (2 d + 2 d_ff / tp) · 2 bytes                       (residual stream and feed-forward buffers)
+ *     sampler = T · d · 2  +  min(T, max_num_seqs) · vocab · 10 bytes   (hidden states kept, vocabulary-wide rows)
+ *     activations = max(forward, sampler)
  *
- * BLIS prices the same pass as 11 (one GPU) or 5 (four GPUs) bf16 hidden-state rows per token of the step,
- * from NVIDIA's memory model: 738.2 MB and 671.1 MB for those two examples.
+ * with T = `max_num_batched_tokens`. Tensor parallelism keeps the residual stream whole on every GPU but gives
+ * each GPU `d_ff / tp` of the feed-forward width (Shoeybi et al., 2019); the sampler rows are gathered over the
+ * whole vocabulary, so they are not split. Both terms are sums of the buffers a pass must hold at once, not a
+ * measurement: the real peak also holds allocator rounding and the scratch space of fused kernels.
+ *
+ * Example: Llama 3.1 8B, one GPU, T = 2,048 and 256 sequences (the settings of the RTX 4090 run): forward
+ * 151.0 MB, sampler 16.8 + 328.4 = 345.2 MB, so 345.2 MB. At T = 8,192 and 256 sequences the forward pass is
+ * 604.0 MB and decides.
  */
-export function activationBytes(m: ModelSpec, tp = 1): number {
-  const a = ACTIVATION_SIZING;
-  return a.stepTokens * (2 * m.d + (2 * m.dFf) / tp) * a.bytesPerActivation + a.samplingSequences * m.vocab * a.bytesPerLogit;
+export function activationBytes(m: ModelSpec, tp = 1, maxNumBatchedTokens = 8192, maxNumSeqs = 256): number {
+  const forward = forwardBytes(m, tp, maxNumBatchedTokens);
+  const sampler = maxNumBatchedTokens * m.d * BYTES_PER_ACTIVATION + Math.min(maxNumBatchedTokens, maxNumSeqs) * m.vocab * SAMPLER_BYTES_PER_LOGIT;
+  return Math.max(forward, sampler);
+}
+
+/**
+ * Batch sizes vLLM captures CUDA graphs for, from `max_num_seqs` (`_set_cudagraph_sizes`, vllm/config/vllm.py):
+ * 1, 2, 4, multiples of 8 below 256, then multiples of 16, up to `min(2 · max_num_seqs, 512)` and never more
+ * than `max_num_batched_tokens`. Example: 256 sequences give 51 sizes (the 4090 run's list), 128 give 35.
+ */
+export function graphCaptureSizes(maxNumSeqs: number, maxNumBatchedTokens: number): number[] {
+  const top = Math.min(2 * maxNumSeqs, 512, maxNumBatchedTokens);
+  const all = [1, 2, 4];
+  for (let s = 8; s < 256; s += 8) all.push(s);
+  for (let s = 256; s <= 512; s += 16) all.push(s);
+  return all.filter((s) => s <= top);
+}
+
+/**
+ * Memory the captured CUDA graphs take, bytes per GPU.
+ *
+ * Since v0.21 vLLM measures this before it sizes the KV pool and subtracts it (`profile_cudagraph_memory` and
+ * `determine_available_memory`, gpu_worker.py). Its own estimate is: the graphs of one mode share a pool, and the two
+ * modes (piecewise for every size, full for the decode sizes) overlay each other, so the shared part is that of the
+ * largest capture; every further graph adds at least 1 MiB. The model takes exactly that, with the shared pool sized
+ * as the forward pass over the largest captured batch:
+ *
+ *     graphs = forward(largest size) + (piecewise sizes + full sizes − 2) · 1 MiB
+ *
+ * It is a lower bound: the 1 MiB is vLLM's own floor, and a real graph of a deep model is larger. Releases before
+ * v0.21 (the RTX 4090 run's v0.19.0) did not subtract it at all. The earlier flat figure of 1.08 GiB was the median
+ * of start-up logs across models and GPUs and did not depend on any setting.
+ *
+ * Example: Llama 3.1 8B, 128 sequences: 35 piecewise and 19 full sizes, forward(256 tokens) 18.9 MB + 52 MiB = 73.4 MB.
+ */
+export function graphBytes(m: ModelSpec, tp = 1, maxNumSeqs = 256, maxNumBatchedTokens = 8192): number {
+  const sizes = graphCaptureSizes(maxNumSeqs, maxNumBatchedTokens);
+  const full = sizes.filter((s) => s <= maxNumSeqs).length;
+  const largest = sizes[sizes.length - 1] ?? 0;
+  return forwardBytes(m, tp, largest) + Math.max(0, sizes.length + full - 2) * GRAPH_BYTES_FLOOR;
 }
 
 export interface MemoryBudget {
@@ -121,8 +157,8 @@ export interface MemoryBudget {
  */
 export function memoryBudget(r: ReplicaSpec): MemoryBudget {
   const weights = weightBytes(r.model, r.precision) / r.tp;
-  const activations = activationBytes(r.model, r.tp);
-  const graphs = CUDA_GRAPH_BYTES;
+  const activations = activationBytes(r.model, r.tp, r.maxNumBatchedTokens, r.maxNumSeqs);
+  const graphs = graphBytes(r.model, r.tp, r.maxNumSeqs, r.maxNumBatchedTokens);
   const requested = Math.ceil(r.gpu.memory * r.gpuMemUtil);
   const kv = requested - weights - activations - graphs;
   const blockBytes = BLOCK_TOKENS * kvBytesPerToken(r.model);

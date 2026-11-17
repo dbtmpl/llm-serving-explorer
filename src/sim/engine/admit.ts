@@ -71,7 +71,7 @@ export function admit(w: World, pod: Pod, r: Req): boolean {
     return true;
   }
   let e = pod.entries.get(r.sid);
-  const recomputeSeconds = (tokens: number) => computeSeconds(pod.spec, seqLoad(pod.spec.model, 0, tokens).flops, p.mfu);
+  const recomputeSeconds = (tokens: number) => computeSeconds(pod.spec, seqLoad(pod.spec.model, 0, tokens).flops, p, tokens);
 
   // A copy in the shared pool can be loaded by any pod.
   const far = !e && p.prefixCaching ? w.remote.get(r.sid) : undefined;

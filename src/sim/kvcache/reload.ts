@@ -45,6 +45,6 @@ export const adaptiveReload: ReloadPolicy = {
  */
 export function reloadTimes(params: Params, spec: ReplicaSpec, tier: "dram" | "ssd" | "remote", bytes: number, tokens: number): { loadSeconds: number; recomputeSeconds: number; loads: boolean } {
   const loadSeconds = bytes / tierBw(params)[tier];
-  const recomputeSeconds = computeSeconds(spec, seqLoad(spec.model, 0, tokens).flops, params.mfu);
+  const recomputeSeconds = computeSeconds(spec, seqLoad(spec.model, 0, tokens).flops, params, tokens);
   return { loadSeconds, recomputeSeconds, loads: adaptiveReload.shouldLoad(loadSeconds, recomputeSeconds) };
 }

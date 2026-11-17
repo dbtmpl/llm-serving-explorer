@@ -20,7 +20,8 @@ const only = refFlag >= 0 ? process.argv[refFlag + 1] : undefined;
 for (const [ref, fit] of Object.entries(fitted.references)) for (const [k, p] of Object.entries(fit.pairs) as [string, FittedPair][]) {
   if (only && ref !== only) continue;
   const t = p.timing;
-  console.log(`${ref} / ${k}: mbu ${t.mbu} (default ${p.defaults.mbu}), mfu ${t.mfu} (${p.defaults.mfu}), hostMsBase ${t.hostMsBase} (${p.defaults.hostMsBase}), hostMsPerSeq ${t.hostMsPerSeq} (${p.defaults.hostMsPerSeq}); loss ${p.lossAtDefaults} -> ${p.lossAtFit}`);
+  console.log(`${ref} / ${k}: mbu ${t.mbu} (default ${p.defaults.mbu}), mfu ${t.mfu} (${p.defaults.mfu}), hostMsBase ${t.hostMsBase} (${p.defaults.hostMsBase}), hostMsPerSeq ${t.hostMsPerSeq} (${p.defaults.hostMsPerSeq})${t.commEff === undefined ? "" : `, commEff ${t.commEff}, commLatencyUs ${t.commLatencyUs}`}; loss ${p.lossAtDefaults} -> ${p.lossAtFit}; group ${p.group} over tp ${p.groupTps.join(",")}${p.atBound.length ? `; AT BOUND: ${p.atBound.join(", ")}` : ""}`);
+  for (const i of p.identifiability) console.log(`  ${i.parameter}: ${i.held.map((h) => `${h.value} -> ${h.loss}`).join(", ")}; fitted ${i.fitted.value} -> ${i.fitted.loss}; spread ${i.spread}${i.flat ? " (FLAT: not identified)" : ""}`);
   for (const r of p.residuals) console.log(`  ${r.scenario}: ttft ${pct(r.ttftMean)}, tpot ${pct(r.tpotMean)}`);
   if (p.specCost) console.log(`  specCost ${p.specCost.value} (default ${p.specCost.defaultValue}), tpot residual ${pct(p.specCost.residualTpot)}`);
   if (p.linkGbps) console.log(`  linkGbps ${p.linkGbps.value} (default ${p.linkGbps.defaultValue}), kv transfer residual ${pct(p.linkGbps.residualKvTransfer)}`);

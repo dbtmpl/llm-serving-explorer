@@ -21,13 +21,15 @@
 - **Eviction:** Dropping a cached KV block, or moving it to a lower memory tier, to make room.
 - **Preemption:** Taking a running request out of the batch and freeing its KV blocks when memory runs out. The request is recomputed later.
 - **HBM:** High-bandwidth memory, the GPU's own memory. Holds the weights, working space, captured CUDA graphs and the KV cache. A GPU's name rounds its size ("80 GB"); the driver reports a little more (85.0 GB for an H100), and the engine budgets from that figure.
-- **Headroom:** The part of a GPU's memory above `gpu_memory_utilization`, which the engine leaves unused. The KV pool is what remains of the share it may use after weights, activations and CUDA graphs.
+- **Headroom:** The part of a GPU's memory above `gpu_memory_utilization`, which the engine leaves unused. The KV pool is what remains of the share it may use after weights, activations (sized by the token budget and `max_num_seqs`) and CUDA graphs.
 - **Load shedding:** Rejecting excess work early (here with HTTP 429 once a request has waited past its deadline) so the work that is accepted still meets its deadline.
 - **Memory tiers:** The places KV can live below HBM: host DRAM, local SSD and a remote pool shared by all pods.
 - **P/D disaggregation:** Running prefill and decode on separate pools of pods and transferring the KV cache between them.
-- **Tensor parallelism (TP):** Splitting one model's weights and KV cache across several GPUs in a pod.
+- **Tensor parallelism (TP):** Splitting one model's weights and KV cache across several GPUs in a pod. Each layer ends in two all-reduces that add to the step time.
+- **All-reduce:** The exchange after each attention and feed-forward block by which the GPUs of a tensor-parallel pod sum their partial results. Costs a fixed time plus the hidden state through the link, so it grows with the tokens in a step.
+- **MBU / MFU:** The share of the datasheet memory bandwidth (MBU) or arithmetic rate (MFU) that real kernels reach. The defaults (0.85 and 0.6) come from two measured vLLM runs.
 - **Arithmetic intensity:** FLOPs per byte moved in a step. Compared with the GPU's ridge point, it says whether the step is compute-bound or memory-bound.
-- **Roofline:** The model that bounds step time by the slower of compute (FLOPs ÷ peak FLOP/s) and memory traffic (bytes ÷ bandwidth).
+- **Roofline:** The model that bounds step time by the slower of compute (FLOPs ÷ peak FLOP/s) and memory traffic (bytes ÷ bandwidth). The model adds to it the tensor-parallel all-reduces and the per-layer kernel launches, which it does not cover.
 - **Speculative decoding:** A small draft model proposes several tokens and the target model verifies them in one pass.
 - **TTFT:** Time to first token, from arrival to the first output token.
 - **TPOT:** Time per output token after the first. Also called inter-token latency (ITL).
