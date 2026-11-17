@@ -278,14 +278,6 @@ export function LiveView() {
   const leftRef = useRef<HTMLDivElement>(null);
   const rightRef = useRef<HTMLDivElement>(null);
   const [panels, setPanels] = useState(() => window.innerWidth >= NARROW_PX);
-  // the menus button draws attention until it has been used once
-  const [menusSeen, setMenusSeen] = useState(() => {
-    try {
-      return localStorage.getItem("lv-menus-seen") === "1";
-    } catch {
-      return false;
-    }
-  });
   const [log, setLog] = useState<LogEntry[]>([]);
   const [logOpen, setLogOpen] = useState(false);
   const [logUnread, setLogUnread] = useState(false);
@@ -1448,24 +1440,14 @@ export function LiveView() {
           <span>{replay?.finished ? "replay finished" : calibrated ? "BLIS clock" : "simulated"}</span>
         </div>
         <button
-          className={`lv-menus-btn ${panels ? "on" : ""} ${menusSeen ? "" : "invite"}`}
+          className={`lv-menus-btn ${panels ? "on" : ""}`}
           data-testid="toggle-panels"
           aria-pressed={panels}
           title={panels ? "Hide the menus" : "Open the menus: architectures, scenarios, models, GPUs and every engine setting"}
-          onClick={() => {
-            setPanels(!panels);
-            if (!menusSeen) {
-              setMenusSeen(true);
-              try {
-                localStorage.setItem("lv-menus-seen", "1");
-              } catch {
-                /* private mode: the button keeps inviting */
-              }
-            }
-          }}
+          onClick={() => setPanels(!panels)}
         >
           <span aria-hidden="true">{panels ? "✕" : "☰"}</span>
-          {panels ? "Hide menus" : "Menus"}
+          {panels && !narrow ? "Hide menus" : "Menus"}
         </button>
         <div className="lv-speed">
           <span>slow motion</span>
