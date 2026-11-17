@@ -113,7 +113,7 @@ export class ReplayRun implements Run {
         stateSince: 0,
         loadProgress: 1,
         spec,
-        budget: { ...budget, kv, poolBlocks: p.kvBlocksPerReplica, headroom: Math.max(0, budget.hbm - budget.weights - budget.activations - budget.graphs - kv) },
+        budget: { ...budget, kv, poolBlocks: p.kvBlocksPerReplica, headroom: Math.max(0, budget.hbm - budget.weights - budget.activations - budget.graphs - budget.runtime - kv) },
         waiting: [],
         running: [],
         inbound: 0,

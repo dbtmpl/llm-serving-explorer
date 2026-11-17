@@ -28,6 +28,8 @@ export interface KvEntry {
   lastUsed: number;
   /** Display cells this entry occupies in the pod's block grid. */
   cells: number[];
+  /** Left behind by a preempted request: its blocks are given up from the tail, one block at a time (kvcache/pool.ts). */
+  preempted?: boolean;
 }
 
 export interface Req {

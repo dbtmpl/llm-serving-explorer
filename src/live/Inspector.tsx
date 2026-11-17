@@ -271,7 +271,7 @@ function PodView({ w, pod, part }: { w: RunWorld; pod: Pod; part: string }) {
         <Stack
           parts={[
             { label: `weights ÷ ${pod.spec.tp} GPU`, value: b.weights, color: C.weights, text: fmtGB(b.weights) },
-            { label: "activations, CUDA graphs", value: b.activations + b.graphs, color: "#94a3b8", text: fmtGB(b.activations + b.graphs, 2) },
+            { label: "activations, CUDA graphs", value: b.activations + b.graphs + b.runtime, color: "#94a3b8", text: fmtGB(b.activations + b.graphs + b.runtime, 2) },
             { label: "KV cache pool", value: b.kv, color: C.decode, text: fmtGB(b.kv) },
             { label: `headroom ${((1 - pod.spec.gpuMemUtil) * 100).toFixed(0)}%`, value: b.headroom, color: "#dbe2ea", text: fmtGB(b.headroom) }
           ]}

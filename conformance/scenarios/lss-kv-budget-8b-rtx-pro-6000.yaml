@@ -30,8 +30,10 @@ checks:
       reference: llmservingsim
       cause: "LLMServingSim sets nothing aside for activations or CUDA graphs"
       reason: >-
-        LLMServingSim sizes the pool as (memory x utilisation - weights) / bytes per block, with 94.97 GiB x 0.92 and 16.06 GB of weights, and gets 37,090 blocks; it states that it does not model vLLM's activation peak or CUDA
-        context. The TypeScript model sets aside 735,313,920 bytes of activations (the peak of an 8,192-token step) and 1,159,725,056 bytes for CUDA graphs on top of the weights and gets 36,174 blocks, 916 (2.5 percent) fewer, which is
-        1.895 GB at 2,097,152 bytes per block. The real engine set aside about 0.900 GB for the same things (measured-8b-rtx-pro-6000), so the real figure lies between the two, nearer LLMServingSim's. This is arithmetic on both sides' inputs, not evidence about vLLM's start-up sizing.
+        LLMServingSim sizes the pool as (memory x utilisation - weights) / bytes per block, with 94.97 GiB x 0.92 and 16.06 GB of weights, and gets 37,090 blocks: it sets nothing aside for
+        activations, CUDA graphs or memory outside PyTorch, and its own documentation calls the figure an upper bound. The model, for this scenario's 8,192-token budget and 64 sequences, sets aside
+        604.0 MB of activations, 38.7 MB of graphs and the empirical 0.7 GB outside PyTorch, and gets 36,437 blocks, 653 fewer (-1.8 percent). The real engine, at 2,048 tokens and 128 sequences, set
+        aside 0.90 GB (measured-8b-rtx-pro-6000), where the model's derivation for those settings gives 0.95 GB, so the real figure for this configuration is expected near the model's, not
+        LLMServingSim's.
       differences:
-        value: { typescript: 36174, llmservingsim: 37090 }
+        value: { typescript: 36437, llmservingsim: 37090 }

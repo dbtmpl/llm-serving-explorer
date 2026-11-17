@@ -76,9 +76,9 @@ checks:
       reference: llmservingsim
       cause: "The model's fixed front-end tokenisation and slower host copy dominate a short reload"
       reason: >-
-        With the tier a follow-up's first token takes 0.0824 s in the model and 0.0221 s in LLMServingSim; without it 0.175 s and 0.134 s, so the effects are x0.471 and x0.164. Isolated by re-running the model: its host copy runs at
+        With the tier a follow-up's first token takes 0.0838 s in the model and 0.0221 s in LLMServingSim; without it 0.180 s and 0.134 s, so the effects are x0.467 and x0.164. Isolated by re-running the model: its host copy runs at
         20 GB/s (a default) where LLMServingSim's example configuration says 256 GB/s, and a copy of the 3,050-token history (400 MB) is 20 ms against 1.6 ms; at 256 GB/s the model's tier arm is 0.0624 s (x0.357). The remaining 40 ms is the
         model's front end, which assembles and tokenises every prompt (30 ms plus 4 microseconds per token, 42 ms for 3,050 tokens) and LLMServingSim does not model: 0.0624 - 0.042 is 0.020 s, which is LLMServingSim's 0.022 s. So
         the reload behaves alike (the hit rates agree); the ratio differs because the quantity is a short time dominated by fixed terms on one side only.
       differences:
-        effect: { typescript: 0.4709, llmservingsim: 0.1644 }
+        effect: { typescript: 0.4668, llmservingsim: 0.1644 }

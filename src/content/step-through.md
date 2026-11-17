@@ -204,7 +204,7 @@ On the new pod, in GPU memory
 GPU memory is split in four; the KV pool is what remains
 
 ### body
-Each GPU's memory has four parts, left to right in the box: the weights ({weights}); activations and CUDA graphs ({work}), the working space of the start-up profiling pass (set by the token budget and `max_num_seqs`) and the captured graphs that launch it; the headroom ({headroom}), the part above `gpu_memory_utilization` that the engine leaves unused; and the KV pool, which is what remains of the share the engine may use: {kv} per GPU, {blocks} blocks of 16 tokens for the pod. The KV cache holds the keys and values the model computed for every token it has read, so it never recomputes them.
+Each GPU's memory has four parts, left to right in the box: the weights ({weights}); activations, CUDA graphs and runtime ({work}), the working space of the start-up profiling pass (set by the token budget and `max_num_seqs`), the captured graphs that launch it and the memory the process holds outside PyTorch; the headroom ({headroom}), the part above `gpu_memory_utilization` that the engine leaves unused; and the KV pool, which is what remains of the share the engine may use: {kv} per GPU, {blocks} blocks of 16 tokens for the pod. The KV cache holds the keys and values the model computed for every token it has read, so it never recomputes them.
 
 ### detail
 The grid of empty cells is that pool; each cell takes the colour of the session whose tokens it holds. The engine may use `gpu_memory_utilization` times the memory the driver reports [@vllmEngineArgs], [@vllmMemoryProfiling]; from that share it takes the weights, the activations and the CUDA graphs it captures, and the rest becomes the pool, cut into blocks so no memory is wasted [@kwon2023]. The headroom is not taken from the pool: it is the memory outside the share. The pool caps how many requests fit at once.
@@ -901,10 +901,10 @@ On the pod, in the engine
 Preempted
 
 ### body
-The KV pool is full and nothing idle is left to evict. Session {sid} gives its blocks back. It waits until all {lost} tokens of its context fit again, then re-prefills them.
+The KV pool is full and nothing idle is left to evict. Session {sid} gives its blocks back. With prefix caching on, its full blocks stay findable until another sequence needs them, so when it is let in again it re-prefills only what is gone by then: at most {lost} tokens.
 
 ### detail
-All of a sequence's blocks go, newest admission first. A waiting request, preempted or new, is let in only when blocks for its whole prompt (every token it still has to prefill) are free, and none is let in during a step that preempted, so a preempted one does not come straight back to be preempted again [@vllmScheduler]. The tokens already streamed are kept as text, so the user sees a stall, not a restart [@vllmOptimization].
+All of a sequence's blocks go back to the pool, newest admission first. Their contents stay in the prefix cache until the pool hands the blocks out again, last block first, so a request that is let back in soon finds most of its context still cached. A waiting request, preempted or new, is let in only when blocks for its whole prompt (every token it still has to prefill) are free, and none is let in during a step that preempted, so a preempted one does not come straight back to be preempted again [@vllmScheduler]. The tokens already streamed are kept as text, so the user sees a stall, not a restart [@vllmOptimization].
 
 ### dive
 preempt, kvbytes

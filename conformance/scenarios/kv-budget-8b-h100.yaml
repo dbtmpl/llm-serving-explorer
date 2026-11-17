@@ -41,15 +41,15 @@ checks:
     tolerance: "0.1 percent (decision of 2026-11-16): the terms that remain are estimates on both sides (the activation peak, the rounding of the weights); a difference below one part in a thousand changes no admission decision in any scenario."
     known_difference:
       reference: blis
-      cause: "The graph estimate: a flat median in BLIS, derived from the capture list in the model"
+      cause: "BLIS's flat graph median is above what measured engines set aside; the model follows the measurements"
       reason: &r_kv8 >-
-        Both size the pool as vLLM does: ceil(driver-reported memory x utilisation) less weights, an activation peak and a CUDA-graph estimate; they agree on the memory (85,029,158,912 bytes),
-        the weights (16.06 GB) and the block (2,097,152 bytes), and differ in the last two terms, by 1.284 GB (613 blocks, +2.2 percent). BLIS charges 11 bf16 hidden-state rows per token of a full
-        8,192-token step (738.2 MB, from NVIDIA's memory model through its registry) and a flat 1.160 GB for graphs (the median of 22 vLLM start-up logs). The TypeScript model derives both from the
-        engine's settings the way vLLM's profiling does (src/sim/cost/memory.ts): the larger of a forward pass over 8,192 tokens (604.0 MB) and the sampler's 12 rows (small here), and, for graphs, a pool the size of a pass
-        over the largest captured batch plus vLLM's floor of 1 MiB per further graph, 10.2 MB for the 6 captured sizes of a 12-sequence engine. The difference is almost all graphs: a flat median
-        that does not depend on the settings against a figure that follows the capture list. Two measured vLLM runs (RTX PRO 6000, RTX 4090) set aside 0.90 and 1.24 GB for everything but weights and
-        KV, against 0.25 and 0.47 GB for the model's derivation and 1.9 GB for BLIS's, so neither is exact; the model's is closer on both. This check was within 0.007 percent (27,928 against 27,926)
-        before the derivation was changed; that agreement was between two estimates that both overshoot the real overhead. Not tuned.
+        Both size the pool as vLLM does: ceil(driver-reported memory x utilisation) less weights, an activation peak and a CUDA-graph estimate, and the model also less an allowance for memory
+        outside PyTorch. They agree on the device memory (85,029,158,912 bytes), the weights (16.06 GB) and the block (2,097,152 bytes). BLIS charges 11 bf16 hidden-state rows per token of a full
+        8,192-token step (738.2 MB, from NVIDIA's memory model through its registry) and a flat 1.160 GB for graphs (the median of 22 vLLM start-up logs), 1.898 GB in all. The model charges the
+        larger of a forward pass over 8,192 tokens and the sampler's rows (604.0 MB), 10.2 MB for the 6 captured sizes of a 12-sequence engine and the empirical 0.7 GB outside PyTorch
+        (RUNTIME_OVERHEAD_BYTES, src/sim/cost/memory.ts), 1.314 GB in all: 0.585 GB less, 279 blocks more (+1.0 percent). The 0.7 GB is fitted to the two measured vLLM runs, which set aside 0.90 GB
+        (RTX PRO 6000) and 1.24 GB (RTX 4090) for these terms against the model's 0.95 and 1.17 GB. BLIS's 1.9 GB is above both measurements, so the model follows the measurements. Before the
+        allowance (2026-11-16 to 2026-11-17) the model was 613 blocks (+2.2 percent) over; before the derivation was changed, within 0.007 percent, an agreement between two estimates that both
+        overshot the real overhead. Not tuned to BLIS.
       differences:
-        value: { typescript: 28539, blis: 27926 }
+        value: { typescript: 28205, blis: 27926 }

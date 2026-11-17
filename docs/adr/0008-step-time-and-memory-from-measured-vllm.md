@@ -64,3 +64,11 @@ Fits to BLIS and to the measured runs, before and after:
 - Visitors see, for a burst of 12 requests at the defaults, time per token on the default H100 and 8B fall from 15.5 to 12.6 ms (time to first token 2.88 to 2.66 s) and the KV pool of one H100 grow from 27,928 to 28,539 blocks; for the 70B on four H200s time per token goes from 22.6 to 21.7 ms and the pool from 74,790 to 75,768 blocks because the activation and graph terms are smaller (the default 12-sequence engine keeps 0.61 GB for them instead of 1.90); the preemption preset needed a smaller pool (0.28 instead of 0.3) to preempt.
 - The activation term now depends on `max_num_batched_tokens`: the "static batching" architecture, with a budget of 65,536, keeps 4.8 GB for the pass, as vLLM would.
 - Any later change to a cost term re-runs `pnpm conformance:calibrate` (minutes) and the known differences of the measured scenarios, which are recorded with the numbers at the time.
+
+## Update, 2026-11-17
+
+Two of the inexact points above were acted on.
+
+- **Memory outside the derived terms.** `RUNTIME_OVERHEAD_BYTES` (src/sim/cost/memory.ts) subtracts 0.7 GB per GPU, the rounded midpoint of the 0.64 and 0.77 GB the two measured runs left unexplained. It is empirical and stated as such. The KV pool is now -0.07 percent on the RTX PRO 6000 and +1.2 percent on the RTX 4090; against BLIS, +1.0 percent (8B, H100) and +0.6 percent (70B, four H200s), because BLIS charges an assumed 1.16 GB median for graphs. The preemption-overflow decision agrees with BLIS again (one preemption). On one H100, 70B in FP8 now holds 3.9 average requests and is flagged as a very small pool.
+- **Recompute after a preemption.** With prefix caching on, a preempted request's full blocks stay as an idle cached entry that the pool trims from the tail before evicting anything whole, as vLLM's free queue does (src/sim/kvcache/pool.ts). On the RTX 4090 the default time per token went from +22 to +10.6 percent and holds; the median end-to-end time is +16.4 percent against 15. The fit to that run still reaches its MBU bound, so what remains is not identified.
+
