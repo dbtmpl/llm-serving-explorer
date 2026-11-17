@@ -905,7 +905,10 @@ body,
     left: 8px;
     right: 8px;
     width: auto;
-    max-height: 32vh;
+    /* one sheet holds every menu on a phone, infrastructure second, so it gets room to scroll */
+    max-height: 58vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
   .lv-empty {
     top: 30%;
