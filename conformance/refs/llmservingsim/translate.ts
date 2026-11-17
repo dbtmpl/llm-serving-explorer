@@ -114,6 +114,7 @@ export function toLss(s: Scenario, arm: string): LssInput {
   let cluster: Record<string, unknown>;
   if (replay) {
     if (d.replicas !== 1 || d.disagg || d.offload || d.speculative) throw new Error(`${s.id}: a replay of the example's workload is one plain replica`);
+    if (d.engine.asyncScheduling !== true) throw new Error(`${s.id}: LLMServingSim's example runs with asynchronous scheduling (its default); the scenario says it does not`);
     cluster = replay.cluster;
   } else {
     const instance = (pdType: string | null): Record<string, unknown> => ({ ...structuredClone(exampleInstance), model_name: model, hardware, pd_type: pdType, tp_size: 1, num_npus: 1, npu_mem: { ...exampleInstance.npu_mem, mem_util: d.engine.gpuMemoryUtilisation } });
@@ -128,6 +129,8 @@ export function toLss(s: Scenario, arm: string): LssInput {
   args.push("--num-reqs", String(rows.length), "--max-num-seqs", String(d.engine.maxNumSeqs), "--max-num-batched-tokens", String(d.engine.maxNumBatchedTokens), "--block-size", String(BLOCK_TOKENS));
   args.push(d.engine.prefixCaching ? "--enable-prefix-caching" : "--no-enable-prefix-caching");
   args.push("--request-routing-policy", d.routing === "least-loaded" ? "LOAD" : "RR");
+  // vLLM's default since 0.11 and the simulator's: host work overlaps the GPU step. The scenario states it; the simulator is told the same.
+  args.push(d.engine.asyncScheduling ? "--async-scheduling" : "--no-async-scheduling");
   if (d.offload) args.push("--prefix-storage", "CPU");
   if (d.speculative) args.push("--num-speculative-tokens", String(d.speculative.k), "--spec-acceptance-rate", String((d.speculative.acceptanceLength - 1) / d.speculative.k));
   args.push("--log-interval", String(LOG_INTERVAL_S), "--log-level", "WARNING", "--network-backend", "analytical");

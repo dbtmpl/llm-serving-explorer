@@ -11,6 +11,7 @@ engine:
   max_num_batched_tokens: 8192
   block_size: 16
   prefix_caching: true
+  async_scheduling: true
 replicas: 2
 routing: round-robin
 requests:

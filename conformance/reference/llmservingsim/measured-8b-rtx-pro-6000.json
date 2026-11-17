@@ -1,7 +1,7 @@
 {
   "scenario": "measured-8b-rtx-pro-6000",
   "reference": "llmservingsim",
-  "inputHash": "8258526517be431fdec1c00f92239cff30e970f76d7bf5fc4b3886030e9a4b8a",
+  "inputHash": "0cd3d280ec81b9b72742b6591e941a6654c2c33b575af4ab31aaea6a2084c6c4",
   "provenance": {
     "lock": "49df63f2af61230da63dd2136044a2dbf9bd4161",
     "replay": "rtx-pro-6000-llama-3.1-8b"

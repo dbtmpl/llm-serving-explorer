@@ -1,7 +1,7 @@
 {
   "scenario": "measured-8b-rtx-4090",
   "reference": "llmservingsim",
-  "inputHash": "3ca678a8948a8b51330b418c2be4b4e67ee36c78d9c631c130fdd97aec50d671",
+  "inputHash": "824936b503dd7e3b397a788e7741b05a8f32b04af99632eae8241064de94c286",
   "provenance": {
     "lock": "49df63f2af61230da63dd2136044a2dbf9bd4161",
     "replay": "rtx-4090-llama-3.1-8b"

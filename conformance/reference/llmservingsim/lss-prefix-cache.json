@@ -1,7 +1,7 @@
 {
   "scenario": "lss-prefix-cache",
   "reference": "llmservingsim",
-  "inputHash": "b5540d12c029c03bc6244e57e97317117d5992caa2bdd22ee0c8cce795c20217",
+  "inputHash": "0d43291f6f08068a17cd8404a1cc78110a502db6d1b2c7bf012c3c21113e0e0d",
   "provenance": {
     "lock": "49df63f2af61230da63dd2136044a2dbf9bd4161",
     "replay": "no"
