@@ -520,8 +520,18 @@ export class Scene {
     return true;
   }
 
+  /** World-space box around everything drawn, as of the last frame that framed the graph; null before the first. */
+  content: { x0: number; y0: number; x1: number; y1: number } | null = null;
+
+  /** The graph's box on screen, for placing explanation boxes beside it. */
+  contentOnScreen(): { l: number; t: number; r: number; b: number } | null {
+    if (!this.content) return null;
+    const a = this.toScreen({ x: this.content.x0, y: this.content.y0 });
+    const b = this.toScreen({ x: this.content.x1, y: this.content.y1 });
+    return { l: a.x, t: a.y, r: b.x, b: b.y };
+  }
+
   private fit(w: RunWorld, k: number): void {
-    if (!this.auto) return;
     let x0 = Infinity;
     let y0 = Infinity;
     let x1 = -Infinity;
@@ -542,6 +552,8 @@ export class Scene {
       if (r) add(r.x, r.y - 64, r.w, r.h + 64);
     }
     if (x0 === Infinity) add(-120, -80, 400, 160);
+    this.content = { x0, y0, x1, y1 };
+    if (!this.auto) return;
     // two ways to avoid the corner panels: sit between them, or sit below them; take the larger
     const pn = this.panels;
     const rs = this.reserve;

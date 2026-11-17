@@ -39,7 +39,12 @@ interface Calibrated {
   file: ReplayFile | null;
   error: string;
 }
-const CALLOUT_TTL = 9;
+/** Seconds of animation every explanation box stays before it flies into the history; the same for all. */
+const CALLOUT_TTL = 5;
+/** Most explanation boxes on screen at once, on a phone and on a wide screen. */
+const MAX_CALLOUTS = { narrow: 3, wide: 4 };
+/** Space between stacked boxes and between a stack and the graph, px. */
+const STACK_GAP = 8;
 /** Seconds the restart note keeps the router's node to itself before other notes may take it. */
 const RESTART_HOLD_S = 6;
 
@@ -52,10 +57,8 @@ interface Shown extends Callout {
 
 /** Below this width the screen is a phone: menus start closed, explanation boxes dock under the metrics. */
 const NARROW_PX = 900;
-/** Height kept free under the metrics on a phone for the docked explanation box. */
-const CALLOUT_BAND_PX = 92;
 /** In the step-through a pod's cold start (container, then weights) plays at least this fast, so the visitor does not wait on it. */
-const COLD_START_SPEED = 0.6;
+const COLD_START_SPEED = 1.2;
 
 /** The speed picker on a phone: one row tall; scroll it, or tap a neighbour, to change the speed. */
 function SpeedWheel({ speeds, value, onChange }: { speeds: number[]; value: number; onChange: (s: number) => void }) {
@@ -275,6 +278,14 @@ export function LiveView() {
   const leftRef = useRef<HTMLDivElement>(null);
   const rightRef = useRef<HTMLDivElement>(null);
   const [panels, setPanels] = useState(() => window.innerWidth >= NARROW_PX);
+  // the menus button draws attention until it has been used once
+  const [menusSeen, setMenusSeen] = useState(() => {
+    try {
+      return localStorage.getItem("lv-menus-seen") === "1";
+    } catch {
+      return false;
+    }
+  });
   const [log, setLog] = useState<LogEntry[]>([]);
   const [logOpen, setLogOpen] = useState(false);
   const [logUnread, setLogUnread] = useState(false);
@@ -314,9 +325,7 @@ export function LiveView() {
       const tourStep = st.tour !== null ? TOUR[st.tour]! : null;
       const dock = tourStep ? tourEl.current : st.held ? heldEl.current : null;
       if (!dock) {
-        // on a phone the explanation boxes dock in a band under the metrics; the graph keeps out of it
-        const band = cw < NARROW_PX && st.explain && !st.stepMode && st.tour === null && runRef.current.kind !== "calibrated" ? CALLOUT_BAND_PX : 0;
-        scene.reserve = { l: 0, t: bannerH + band, r: 0, b: 0 };
+        scene.reserve = { l: 0, t: bannerH, r: 0, b: 0 };
         scene.setGuide(null);
         scene.highlight = null;
         return;
@@ -376,6 +385,76 @@ export function LiveView() {
       ring.style.width = `${r.r - r.l + 12}px`;
       ring.style.height = `${r.b - r.t + 12}px`;
       ring.style.transform = `translate(${Math.round(r.l - 6)}px, ${Math.round(r.t - 6)}px)`;
+    };
+
+    /** Where each explanation box is drawn now; boxes glide to their places instead of jumping when pushed. */
+    const placed = new Map<number, { x: number; y: number }>();
+    /**
+     * Lay out the explanation boxes. Newest first, each box sits nearest to what it explains and pushes the older
+     * ones away from it. On a phone they form one stack just above the graph, or just below it when there is no
+     * room above; on a wide screen each node has its own stack, above the node (below for the tokenizer and the
+     * stream), kept clear of the metrics strip and the corner menus.
+     */
+    const placeCallouts = (list: Shown[], world: World, cw: number, ch: number, bannerH: number) => {
+      const scene = sceneRef.current;
+      const want = new Map<number, { x: number; y: number }>();
+      const items = [...list].reverse().flatMap((c) => {
+        const el = calloutEls.current.get(c.id);
+        return el ? [{ c, el, h: el.offsetHeight, w: el.offsetWidth }] : [];
+      });
+      if (cw < NARROW_PX) {
+        const top = (hudRef.current?.getBoundingClientRect().bottom ?? 70) + STACK_GAP + bannerH;
+        const bottom = ch - (scene.panels.bottom || 96);
+        const g = scene.contentOnScreen() ?? { l: 0, t: ch / 2, r: cw, b: ch / 2 };
+        const total = items.reduce((n, it) => n + it.h + STACK_GAP, 0);
+        const roomAbove = g.t - STACK_GAP - top;
+        const roomBelow = bottom - (g.b + STACK_GAP);
+        const above = roomAbove >= total || roomAbove >= roomBelow;
+        let y = above ? Math.max(g.t - STACK_GAP, top + total) : Math.min(g.b + STACK_GAP, bottom - total);
+        for (const it of items) {
+          if (above) {
+            y -= it.h;
+            want.set(it.c.id, { x: cw / 2, y });
+            y -= STACK_GAP;
+          } else {
+            want.set(it.c.id, { x: cw / 2, y });
+            y += it.h + STACK_GAP;
+          }
+        }
+      } else {
+        const stacks = new Map<string, number>();
+        for (const it of items) {
+          const a = scene.anchor(world, it.c.target);
+          if (!a) continue;
+          const s = scene.toScreen(a);
+          const below = it.c.target.type === "tokenizer" || it.c.target.type === "stream";
+          const slot = `${it.c.target.type}:${"id" in it.c.target ? it.c.target.id : ""}`;
+          const used = stacks.get(slot) ?? 0;
+          stacks.set(slot, used + it.h + STACK_GAP);
+          // the top edge of this box: newest next to the node, older ones further out
+          let y = below ? s.y + 12 + used : s.y - 12 - used - it.h;
+          if (!below) y = Math.max(y, 84);
+          // never under the transport bar
+          y = Math.min(y, ch - (scene.panels.bottom || 96) - it.h);
+          const hw = it.w / 2 + 8;
+          const minX = y < scene.panels.lh ? scene.panels.lw + hw : hw;
+          const maxX = y < scene.panels.rh ? cw - scene.panels.rw - hw : cw - hw;
+          want.set(it.c.id, { x: Math.max(minX, Math.min(maxX, s.x)), y });
+        }
+      }
+      for (const it of items) {
+        const t = want.get(it.c.id);
+        if (!t) {
+          it.el.style.opacity = "0";
+          continue;
+        }
+        const cur = placed.get(it.c.id) ?? t;
+        const p = { x: cur.x + (t.x - cur.x) * 0.25, y: cur.y + (t.y - cur.y) * 0.25 };
+        placed.set(it.c.id, p);
+        it.el.style.opacity = String(Math.min(1, (scene.vt - it.c.born) * 3));
+        it.el.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px) translate(-50%, 0)`;
+      }
+      for (const id of placed.keys()) if (!list.some((c) => c.id === id)) placed.delete(id);
     };
 
     const frame = (now: number) => {
@@ -486,13 +565,13 @@ export function LiveView() {
           if (!c.once && scene.vt - (st.lastShown.get(family) ?? -99) < (c.every ?? 2.5)) continue;
           st.seen.add(c.key);
           st.lastShown.set(family, scene.vt);
-          const slotOf = (t: Target) => (t.type === "pod" ? `pod${t.id}` : t.type === "session" ? "session" : t.type);
-          next = (next ?? st.callouts).filter((x) => slotOf(x.target) !== slotOf(c.target));
+          // a new box joins the stack and pushes the older ones away; only a newer version of the same note replaces it
+          next = (next ?? [...st.callouts]).filter((x) => x.key !== c.key);
           next.push({ ...c, id: st.nextId++, born: scene.vt, simT: elapsed(world) });
         }
         if (next) {
-          // a phone has room for one box, docked under the metrics; a wide screen keeps three next to their nodes
-          const kept = next.slice(cw < NARROW_PX ? -1 : -3);
+          // past the most the screen holds, the oldest leaves early
+          const kept = next.slice(-(cw < NARROW_PX ? MAX_CALLOUTS.narrow : MAX_CALLOUTS.wide));
           for (const c of st.callouts) if (!kept.includes(c)) st.toLog(c, "callout", true);
           st.callouts = kept;
           setCallouts(st.callouts);
@@ -503,34 +582,7 @@ export function LiveView() {
         st.callouts = st.callouts.filter((c) => scene.vt - c.born <= CALLOUT_TTL);
         setCallouts(st.callouts);
       }
-      for (const c of st.callouts) {
-        const el = calloutEls.current.get(c.id);
-        const a = scene.anchor(world, c.target);
-        if (!el) continue;
-        if (!a) {
-          el.style.opacity = "0";
-          continue;
-        }
-        const age = scene.vt - c.born;
-        // it stays fully visible until it flies into the history
-        el.style.opacity = String(Math.min(1, age * 3));
-        if (cw < NARROW_PX) {
-          const top = (hudRef.current?.getBoundingClientRect().bottom ?? 70) + 6 + bannerH;
-          el.style.transform = `translate(${Math.round(cw / 2)}px, ${Math.round(top)}px) translate(-50%, 0)`;
-          continue;
-        }
-        const s = scene.toScreen(a);
-        const below = c.target.type === "tokenizer" || c.target.type === "stream";
-        // keep the box on screen and clear of the metrics strip
-        const hw = el.offsetWidth / 2 + 8;
-        const y = below ? s.y + 12 : Math.max(s.y - 12, el.offsetHeight + 84);
-        // stay out from under the corner panels
-        const top = below ? y : y - el.offsetHeight;
-        const minX = top < scene.panels.lh ? scene.panels.lw + hw : hw;
-        const maxX = top < scene.panels.rh ? cw - scene.panels.rw - hw : cw - hw;
-        const x = Math.max(minX, Math.min(maxX, s.x));
-        el.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px) translate(-50%, ${below ? "0" : "-100%"})`;
-      }
+      placeCallouts(st.callouts, world, cw, ch, bannerH);
       if (st.tour !== null) placeRing(ringEl.current, TOUR[st.tour]!.target);
       if (now - lastRefresh > 200) {
         lastRefresh = now;
@@ -1358,6 +1410,26 @@ export function LiveView() {
           <b>{elapsed(w).toFixed(2)} s</b>
           <span>{replay?.finished ? "replay finished" : calibrated ? "BLIS clock" : "simulated"}</span>
         </div>
+        <button
+          className={`lv-menus-btn ${panels ? "on" : ""} ${menusSeen ? "" : "invite"}`}
+          data-testid="toggle-panels"
+          aria-pressed={panels}
+          title={panels ? "Hide the menus" : "Open the menus: architectures, scenarios, models, GPUs and every engine setting"}
+          onClick={() => {
+            setPanels(!panels);
+            if (!menusSeen) {
+              setMenusSeen(true);
+              try {
+                localStorage.setItem("lv-menus-seen", "1");
+              } catch {
+                /* private mode: the button keeps inviting */
+              }
+            }
+          }}
+        >
+          <span aria-hidden="true">{panels ? "✕" : "☰"}</span>
+          {panels ? "Hide menus" : "Menus"}
+        </button>
         <div className="lv-speed">
           <span>slow motion</span>
           {narrow ? (
@@ -1385,10 +1457,7 @@ export function LiveView() {
         )}
           </>
         )}
-        {!calibrated && <LogButton count={log.length} open={logOpen} unread={logUnread} buttonRef={logBtn} onToggle={() => toggleLog(!logOpen)} />}
-        <button className={`lv-ghost ${panels ? "on" : ""}`} data-testid="toggle-panels" onClick={() => setPanels(!panels)}>
-          menus
-        </button>
+        {!calibrated && <LogButton count={log.length} open={logOpen} unread={logUnread} buttonRef={logBtn} compact={narrow} onToggle={() => toggleLog(!logOpen)} />}
         {!narrow && (
           <button className="lv-ghost" data-testid="reset" onClick={() => (calibrated ? startReplay(cal.id) : reset())}>
             reset
