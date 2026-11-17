@@ -10,7 +10,8 @@ import { C, Scene, TONE, type Free, type GpuPart, type Target } from "./render.j
 import { ReplayRun } from "../replay/adapter.js";
 import { blankRun } from "../replay/blank.js";
 import { loadReplay } from "../replay/load.js";
-import { BlisBadge, ModeToggle, ReadOnlySettings, ScenarioPanel, type Mode } from "../replay/ReplayPanels.js";
+import { BlisBadge, ReadOnlySettings, ScenarioPanel, type Mode } from "../replay/ReplayPanels.js";
+import { LogButton, LogPanel, flyToLog, logAppend, type LogEntry } from "./Log.js";
 import { ReplayInspector } from "../replay/ReplayInspector.js";
 import { DEFAULT_REPLAY, type ReplayId } from "../replay/scenarios.js";
 import type { ReplayFile } from "../replay/schema.js";
@@ -45,6 +46,47 @@ const RESTART_HOLD_S = 6;
 interface Shown extends Callout {
   id: number;
   born: number;
+  /** simulated seconds when it was shown, for the history log */
+  simT?: number;
+}
+
+/** Below this width the screen is a phone: menus start closed, explanation boxes dock under the metrics. */
+const NARROW_PX = 900;
+/** Height kept free under the metrics on a phone for the docked explanation box. */
+const CALLOUT_BAND_PX = 92;
+/** In the step-through a pod's cold start (container, then weights) plays at least this fast, so the visitor does not wait on it. */
+const COLD_START_SPEED = 0.6;
+
+/** The speed picker on a phone: one row tall; scroll it, or tap a neighbour, to change the speed. */
+function SpeedWheel({ speeds, value, onChange }: { speeds: number[]; value: number; onChange: (s: number) => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const timer = useRef(0);
+  const ROW = 14;
+  useEffect(() => {
+    const el = ref.current;
+    const i = speeds.indexOf(value);
+    if (el && i >= 0 && Math.abs(el.scrollTop - i * ROW) > 1) el.scrollTo({ top: i * ROW });
+  }, [value, speeds]);
+  const onScroll = () => {
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => {
+      const el = ref.current;
+      if (!el) return;
+      const s = speeds[Math.max(0, Math.min(speeds.length - 1, Math.round(el.scrollTop / ROW)))]!;
+      if (s !== value) onChange(s);
+    }, 120);
+  };
+  return (
+    <div className="lv-wheel" ref={ref} onScroll={onScroll} role="listbox" aria-label="Playback speed" data-testid="speed-wheel">
+      <i />
+      {speeds.map((s) => (
+        <button key={s} role="option" aria-selected={s === value} className={s === value ? "on" : ""} data-testid={`speed-${s}`} onClick={() => onChange(s)}>
+          {s}×
+        </button>
+      ))}
+      <i />
+    </div>
+  );
 }
 
 /** Everything needed to show a step again: the world, the picture and the step-through bookkeeping. */
@@ -219,7 +261,7 @@ export function LiveView() {
   const [arch, setArch] = useState(DEFAULT_ARCH);
   const [histPos, setHistPos] = useState<[number, number, boolean]>([0, 0, false]);
   const [, refresh] = useReducer((x: number) => x + 1, 0);
-  const live = useRef({ playing, speed, explain, callouts, seen: new Set<string>(), lastShown: new Map<string, number>(), nextId: 1, stepMode: false, held: null as Shown | null, focus: null as number | null, focusDone: false, script: newScript(), freeze: false, queue: [] as Callout[], tour: null as number | null, hist: [] as StepRec[], hi: -1, dirty: false, replay: null as Replay | null, finish: () => {} });
+  const live = useRef({ playing, speed, explain, callouts, seen: new Set<string>(), lastShown: new Map<string, number>(), nextId: 1, stepMode: false, held: null as Shown | null, focus: null as number | null, focusDone: false, script: newScript(), freeze: false, queue: [] as Callout[], tour: null as number | null, hist: [] as StepRec[], hi: -1, dirty: false, replay: null as Replay | null, finish: () => {}, toLog: (() => {}) as (c: Shown, kind: LogEntry["kind"], fly: boolean) => void });
   live.current.tour = tour;
   const heldEl = useRef<HTMLDivElement>(null);
   const tourEl = useRef<HTMLDivElement>(null);
@@ -232,7 +274,24 @@ export function LiveView() {
   const calloutEls = useRef(new Map<number, HTMLDivElement>());
   const leftRef = useRef<HTMLDivElement>(null);
   const rightRef = useRef<HTMLDivElement>(null);
-  const [panels, setPanels] = useState(true);
+  const [panels, setPanels] = useState(() => window.innerWidth >= NARROW_PX);
+  const [log, setLog] = useState<LogEntry[]>([]);
+  const [logOpen, setLogOpen] = useState(false);
+  const [logUnread, setLogUnread] = useState(false);
+  const logOpenRef = useRef(false);
+  logOpenRef.current = logOpen;
+  const logBtn = useRef<HTMLButtonElement>(null);
+  const hudRef = useRef<HTMLDivElement>(null);
+  const [more, setMore] = useState<{ left: number; bottom: number } | null>(null);
+  const moreBtn = useRef<HTMLButtonElement>(null);
+  /** Put an explanation in the history; `fly` animates its box into the history button first. */
+  const toLog = useCallback((c: Shown, kind: LogEntry["kind"], fly: boolean) => {
+    const el = kind === "callout" ? calloutEls.current.get(c.id) : null;
+    if (fly && el) flyToLog(el, logBtn.current);
+    setLog((l) => logAppend(l, { id: c.id, kind, t: c.simT ?? c.born, tone: c.tone, title: c.title, body: c.body, target: c.focus ?? c.target }));
+    if (!logOpenRef.current) setLogUnread(true);
+  }, []);
+  live.current.toLog = toLog;
   const calibrated = mode === "calibrated";
   const w: RunWorld = runRef.current.world;
   const p = w.params;
@@ -255,7 +314,9 @@ export function LiveView() {
       const tourStep = st.tour !== null ? TOUR[st.tour]! : null;
       const dock = tourStep ? tourEl.current : st.held ? heldEl.current : null;
       if (!dock) {
-        scene.reserve = { l: 0, t: bannerH, r: 0, b: 0 };
+        // on a phone the explanation boxes dock in a band under the metrics; the graph keeps out of it
+        const band = cw < NARROW_PX && st.explain && !st.stepMode && st.tour === null && runRef.current.kind !== "calibrated" ? CALLOUT_BAND_PX : 0;
+        scene.reserve = { l: 0, t: bannerH + band, r: 0, b: 0 };
         scene.setGuide(null);
         scene.highlight = null;
         return;
@@ -355,7 +416,11 @@ export function LiveView() {
       const animating = st.playing && (!st.held || !!st.held.animate || !!replay);
       if (calibrated) {
         if (st.playing) run.advance(dt * st.speed);
-      } else if (running) advance(world, dt * st.speed);
+      } else if (running) {
+        // a cold start in the step-through is waited for, not studied: it plays at least at COLD_START_SPEED
+        const cold = st.stepMode && world.pods.some((p) => p.state === "creating" || p.state === "loading");
+        advance(world, dt * (cold ? Math.max(st.speed, COLD_START_SPEED) : st.speed));
+      }
       else if (replay && st.playing && world.t < replay.t) advance(world, Math.min(dt * replay.rate, replay.t - world.t));
       const events = shown.events.splice(0);
       scene.focusSid = st.stepMode ? st.focus : null;
@@ -423,14 +488,18 @@ export function LiveView() {
           st.lastShown.set(family, scene.vt);
           const slotOf = (t: Target) => (t.type === "pod" ? `pod${t.id}` : t.type === "session" ? "session" : t.type);
           next = (next ?? st.callouts).filter((x) => slotOf(x.target) !== slotOf(c.target));
-          next.push({ ...c, id: st.nextId++, born: scene.vt });
+          next.push({ ...c, id: st.nextId++, born: scene.vt, simT: elapsed(world) });
         }
         if (next) {
-          st.callouts = next.slice(-3);
+          // a phone has room for one box, docked under the metrics; a wide screen keeps three next to their nodes
+          const kept = next.slice(cw < NARROW_PX ? -1 : -3);
+          for (const c of st.callouts) if (!kept.includes(c)) st.toLog(c, "callout", true);
+          st.callouts = kept;
           setCallouts(st.callouts);
         }
       }
       if (st.callouts.some((c) => scene.vt - c.born > CALLOUT_TTL)) {
+        for (const c of st.callouts) if (scene.vt - c.born > CALLOUT_TTL) st.toLog(c, "callout", true);
         st.callouts = st.callouts.filter((c) => scene.vt - c.born <= CALLOUT_TTL);
         setCallouts(st.callouts);
       }
@@ -442,10 +511,16 @@ export function LiveView() {
           el.style.opacity = "0";
           continue;
         }
+        const age = scene.vt - c.born;
+        // it stays fully visible until it flies into the history
+        el.style.opacity = String(Math.min(1, age * 3));
+        if (cw < NARROW_PX) {
+          const top = (hudRef.current?.getBoundingClientRect().bottom ?? 70) + 6 + bannerH;
+          el.style.transform = `translate(${Math.round(cw / 2)}px, ${Math.round(top)}px) translate(-50%, 0)`;
+          continue;
+        }
         const s = scene.toScreen(a);
         const below = c.target.type === "tokenizer" || c.target.type === "stream";
-        const age = scene.vt - c.born;
-        el.style.opacity = String(Math.min(1, age * 3, (CALLOUT_TTL - age) * 2));
         // keep the box on screen and clear of the metrics strip
         const hw = el.offsetWidth / 2 + 8;
         const y = below ? s.y + 12 : Math.max(s.y - 12, el.offsetHeight + 84);
@@ -471,12 +546,44 @@ export function LiveView() {
     const canvas = canvasRef.current!;
     const scene = sceneRef.current;
     let drag: { x: number; y: number; moved: boolean } | null = null;
+    // two fingers on a touch screen: pinch to zoom around their midpoint, move them together to pan
+    const touches = new Map<number, { x: number; y: number }>();
+    let pinch: { d0: number; s0: number; anchor: { x: number; y: number } } | null = null;
+    const local = (x: number, y: number) => {
+      const r = canvas.getBoundingClientRect();
+      return { x: x - r.left, y: y - r.top };
+    };
+    const pinchState = () => {
+      const [a, b] = [...touches.values()] as [{ x: number; y: number }, { x: number; y: number }];
+      return { d: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), mid: local((a.x + b.x) / 2, (a.y + b.y) / 2) };
+    };
     const down = (e: PointerEvent) => {
-      drag = { x: e.clientX, y: e.clientY, moved: false };
       canvas.setPointerCapture(e.pointerId);
+      if (e.pointerType === "touch") {
+        touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (touches.size === 2) {
+          const { d, mid } = pinchState();
+          scene.takeOver();
+          pinch = { d0: d, s0: scene.cam.s, anchor: scene.toWorld(mid.x, mid.y) };
+          drag = null;
+          return;
+        }
+        if (touches.size > 2) return;
+      }
+      drag = { x: e.clientX, y: e.clientY, moved: false };
     };
     const move = (e: PointerEvent) => {
+      if (e.pointerType === "touch" && touches.has(e.pointerId)) touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pinch && touches.size >= 2) {
+        const { d, mid } = pinchState();
+        scene.cam.s = Math.max(0.1, Math.min(3, (pinch.s0 * d) / pinch.d0));
+        const now = scene.toWorld(mid.x, mid.y);
+        scene.cam.x += pinch.anchor.x - now.x;
+        scene.cam.y += pinch.anchor.y - now.y;
+        return;
+      }
       if (!drag) {
+        if (e.pointerType === "touch") return;
         const seg = scene.segmentAt(runRef.current.world, e.offsetX, e.offsetY);
         setTip((cur) => (seg ? { x: e.offsetX, y: e.offsetY, part: seg.part, bytes: seg.bytes } : cur ? null : cur));
         canvas.style.cursor = scene.hit(runRef.current.world, e.offsetX, e.offsetY) ? "pointer" : "grab";
@@ -493,6 +600,13 @@ export function LiveView() {
       drag.y = e.clientY;
     };
     const up = (e: PointerEvent) => {
+      touches.delete(e.pointerId);
+      if (pinch) {
+        // the gesture ends when a finger lifts; the other finger does not start a drag or a click
+        if (touches.size < 2) pinch = null;
+        drag = null;
+        return;
+      }
       if (drag && !drag.moved) {
         const t = scene.hit(runRef.current.world, e.offsetX, e.offsetY);
         scene.selected = t;
@@ -514,12 +628,14 @@ export function LiveView() {
     canvas.addEventListener("pointerdown", down);
     canvas.addEventListener("pointermove", move);
     canvas.addEventListener("pointerup", up);
+    canvas.addEventListener("pointercancel", up);
     canvas.addEventListener("wheel", wheel, { passive: false });
     return () => {
       canvas.removeEventListener("pointerleave", leave);
       canvas.removeEventListener("pointerdown", down);
       canvas.removeEventListener("pointermove", move);
       canvas.removeEventListener("pointerup", up);
+      canvas.removeEventListener("pointercancel", up);
       canvas.removeEventListener("wheel", wheel);
     };
   }, []);
@@ -799,6 +915,35 @@ export function LiveView() {
     setPlaying(true);
   };
 
+  const toggleLog = (open: boolean) => {
+    setLogOpen(open);
+    if (open) setLogUnread(false);
+  };
+  const openMore = () => {
+    if (more) return setMore(null);
+    const r = moreBtn.current!.getBoundingClientRect();
+    setMore({ left: Math.max(8, Math.min(window.innerWidth - 248, r.right - 240)), bottom: window.innerHeight - r.top + 8 });
+  };
+  /** Run a menu item and close the menu. */
+  const pick = (f: () => void) => {
+    setMore(null);
+    f();
+  };
+  // a click outside the menu closes it
+  useEffect(() => {
+    if (!more) return;
+    const close = (e: PointerEvent) => {
+      const t = e.target as Element | null;
+      if (!t?.closest(".lv-more-menu") && !moreBtn.current?.contains(t)) setMore(null);
+    };
+    window.addEventListener("pointerdown", close);
+    return () => window.removeEventListener("pointerdown", close);
+  }, [more]);
+  // each step of the step-through goes into the history when it is first shown
+  useEffect(() => {
+    if (held) toLog(held, "step", false);
+  }, [held, toLog]);
+
   const select = (t: Target | null) => {
     sceneRef.current.selected = t;
     setSelected(t);
@@ -807,7 +952,7 @@ export function LiveView() {
   // The tutorial hides the menus except on the step that is about them; on a narrow screen the
   // step-through box takes the place of the left menu, which is a sheet at the bottom there.
   const tourTarget = tour !== null ? TOUR[tour]!.target : undefined;
-  const narrow = window.innerWidth < 900;
+  const narrow = window.innerWidth < NARROW_PX;
   const showLeft = panels && tour === null && !(stepMode && narrow);
   const showRight = tour !== null ? !!tourTarget && "el" in tourTarget && tourTarget.el === "right" : panels;
 
@@ -999,7 +1144,7 @@ export function LiveView() {
 
       {calibrated && cal.file && <BlisBadge commit={cal.file.blis.commit} />}
 
-      <div className="lv-hud" data-testid="hud">
+      <div className="lv-hud" data-testid="hud" ref={hudRef}>
         {tiles.map(([k, v, sub]) => (
           <div key={k}>
             <span>{k}</span>
@@ -1011,8 +1156,14 @@ export function LiveView() {
 
       <div className="lv-col lv-left" ref={leftRef} hidden={!showLeft}>
         <section className="lv-panel">
-          <ModeToggle mode={mode} onChange={switchMode} />
-          <Rich text={calibrated ? replayText("mode.calibrated") : replayText("mode.explore")} className="lv-note" />
+          {calibrated && (
+            <>
+              <button className="lv-back" data-testid="mode-explore" onClick={() => switchMode("explore")}>
+                ◂ Back to the approximate model
+              </button>
+              <Rich text={replayText("mode.calibrated")} className="lv-note" />
+            </>
+          )}
           <header>
             <h2>{calibrated ? "BLIS scenario" : "Serving architecture"}</h2>
           </header>
@@ -1029,7 +1180,7 @@ export function LiveView() {
           {(() => {
             const a = architectureText(arch);
             return (
-              <details className="lv-arch" open>
+              <details className="lv-arch">
                 <summary>What this step adds</summary>
                 <p className="lv-note">
                   <b>
@@ -1209,40 +1360,94 @@ export function LiveView() {
         </div>
         <div className="lv-speed">
           <span>slow motion</span>
-          <div className="lv-seg">
-            {(calibrated ? REPLAY_SPEEDS : SPEEDS).map((s) => (
-              <button key={s} className={s === speed ? "on" : ""} data-testid={`speed-${s}`} onClick={() => setSpeed(s)}>
-                {s}×
-              </button>
-            ))}
-          </div>
+          {narrow ? (
+            <SpeedWheel speeds={calibrated ? REPLAY_SPEEDS : SPEEDS} value={speed} onChange={setSpeed} />
+          ) : (
+            <div className="lv-seg">
+              {(calibrated ? REPLAY_SPEEDS : SPEEDS).map((s) => (
+                <button key={s} className={s === speed ? "on" : ""} data-testid={`speed-${s}`} onClick={() => setSpeed(s)}>
+                  {s}×
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         {!calibrated && (
           <>
         <button className={`lv-ghost ${stepMode ? "on" : ""}`} data-testid="step-toggle" onClick={toggleStep} title="Follow one session and stop at each thing that happens to it">
-          step-through{stepMode ? (focus !== null ? ` · session ${focus}` : " · waiting for a request") : ""}
+          {narrow ? "steps" : "step-through"}
+          {stepMode && !narrow ? (focus !== null ? ` · session ${focus}` : " · waiting for a request") : ""}
         </button>
-        <button className={`lv-ghost ${explain ? "on" : ""}`} onClick={() => setExplain(!explain)}>
-          explain
-        </button>
-        <button className="lv-ghost" data-testid="tour-start" onClick={startTour}>
-          tutorial
-        </button>
+        {!narrow && (
+          <button className={`lv-ghost ${explain ? "on" : ""}`} onClick={() => setExplain(!explain)}>
+            explain
+          </button>
+        )}
           </>
         )}
+        {!calibrated && <LogButton count={log.length} open={logOpen} unread={logUnread} buttonRef={logBtn} onToggle={() => toggleLog(!logOpen)} />}
         <button className={`lv-ghost ${panels ? "on" : ""}`} data-testid="toggle-panels" onClick={() => setPanels(!panels)}>
           menus
         </button>
-        <button
-          className="lv-ghost"
-          onClick={() => sceneRef.current.fitNow()}
-        >
-          fit
-        </button>
-        <button className="lv-ghost" data-testid="reset" onClick={() => (calibrated ? startReplay(cal.id) : reset())}>
-          reset
+        {!narrow && (
+          <button className="lv-ghost" data-testid="reset" onClick={() => (calibrated ? startReplay(cal.id) : reset())}>
+            reset
+          </button>
+        )}
+        <button ref={moreBtn} className={`lv-ghost ${more ? "on" : ""}`} data-testid="more" aria-haspopup="menu" aria-expanded={!!more} aria-label="More" onClick={openMore}>
+          ⋯
         </button>
       </div>
+
+      {more && (
+        <div className="lv-more-menu" role="menu" data-testid="more-menu" style={{ left: more.left, bottom: more.bottom }}>
+          {!calibrated && (
+            <button role="menuitem" data-testid="tour-start" onClick={() => pick(startTour)}>
+              Tutorial
+              <small>a guided tour of the graph</small>
+            </button>
+          )}
+          {narrow && !calibrated && (
+            <button role="menuitem" aria-checked={explain} onClick={() => pick(() => setExplain(!explain))}>
+              {explain ? "Explain events: on" : "Explain events: off"}
+              <small>short notes next to what just happened</small>
+            </button>
+          )}
+          <button role="menuitem" onClick={() => pick(() => sceneRef.current.fitNow())}>
+            Fit the graph to the screen
+          </button>
+          {narrow && (
+            <button role="menuitem" data-testid="reset" onClick={() => pick(() => (calibrated ? startReplay(cal.id) : reset()))}>
+              Reset
+              <small>{calibrated ? "replay the scenario from the start" : "an empty graph with the default settings"}</small>
+            </button>
+          )}
+          <hr />
+          {calibrated ? (
+            <button role="menuitem" data-testid="menu-explore" onClick={() => pick(() => switchMode("explore"))}>
+              Back to the approximate model
+              <small>change any setting while requests run</small>
+            </button>
+          ) : (
+            <button role="menuitem" data-testid="mode-calibrated" onClick={() => pick(() => switchMode("calibrated"))}>
+              Calibrated replay (BLIS)
+              <small>recorded BLIS runs of fixed scenarios, read-only</small>
+            </button>
+          )}
+        </div>
+      )}
+
+      {logOpen && !calibrated && (
+        <LogPanel
+          entries={log}
+          onPick={(e) => e.target && select(e.target)}
+          onClose={() => toggleLog(false)}
+          onClear={() => {
+            setLog([]);
+            setLogUnread(false);
+          }}
+        />
+      )}
     </div>
   );
 }

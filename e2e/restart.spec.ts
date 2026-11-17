@@ -115,10 +115,11 @@ test.describe("restarting the fleet", () => {
     await page.getByTestId("speed-1").click();
     await openGroups(page);
     await pick(page, "model", "Llama 3.1 70B");
-    await page.getByRole("button", { name: /^Calibrated/ }).click();
+    await page.getByTestId("more").click();
+    await page.getByTestId("mode-calibrated").click();
     await page.waitForTimeout(1500);
     await expect(page.getByTestId("fit-banner")).toHaveCount(0);
-    await page.getByRole("button", { name: /^Explore/ }).click();
+    await page.getByTestId("mode-explore").click();
     await page.getByTestId("send-10").click();
     await page.getByTestId("speed-1").click();
     await expect.poll(() => page.evaluate(() => (window as unknown as Win).__live.world().pods.some((p) => p.state === "ready")), { timeout: 15_000 }).toBe(true);

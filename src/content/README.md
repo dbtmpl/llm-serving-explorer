@@ -9,7 +9,7 @@ Every piece of explanatory text on the website lives in a markdown file here, so
 | [`tutorial.md`](tutorial.md) | The guided tour cards | `src/live/Tutorial.tsx` |
 | [`inspector.md`](inspector.md) | The notes in the "dive in" panel | `src/live/Inspector.tsx` |
 | [`panels.md`](panels.md) | Empty-state card, scenario hints, notes in the menus, legend note | `src/live/LiveView.tsx` |
-| [`replay.md`](replay.md) | The Calibrated (BLIS replay) mode: what it is and is not evidence for, the BLIS badge, one description per scenario, the notes in its inspector | `src/replay/`, `src/live/LiveView.tsx` |
+| [`replay.md`](replay.md) | The calibrated replay of BLIS runs: what it is and is not evidence for, the BLIS badge, one description per scenario, the notes in its inspector | `src/replay/`, `src/live/LiveView.tsx` |
 | [`architectures.md`](architectures.md) | Name, what it adds and sources of each serving architecture | `src/live/LiveView.tsx`, by architecture id |
 
 ## Entry format

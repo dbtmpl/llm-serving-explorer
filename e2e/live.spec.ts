@@ -211,7 +211,7 @@ test.describe("live graph view", () => {
     await page.waitForTimeout(1500);
     const expected: [string, RegExp][] = [
       ["weights", /Weights/],
-      ["work", /Activations and CUDA graphs/],
+      ["work", /Activations, CUDA graphs and runtime/],
       ["kv", /KV pool/],
       ["headroom", /Headroom/]
     ];
@@ -431,6 +431,7 @@ test.describe("live graph view", () => {
     await page.getByTestId("send-20").click();
     await page.getByTestId("speed-1").click();
     await page.getByTestId("arch").selectOption("static");
+    await page.getByText("What this step adds").click();
     await expect(page.getByText("The baseline.")).toBeVisible();
     expect(await world(page, (w) => (w.params as unknown as { batching: string }).batching)).toBe("static");
     await page.getByTestId("arch").selectOption("disagg");
@@ -444,6 +445,7 @@ test.describe("live graph view", () => {
   test("sources named in the architecture panel are links that open in a new tab", async ({ page }) => {
     await page.goto("/");
     await page.getByTestId("arch").selectOption("orca");
+    await page.getByText("What this step adds").click();
     const link = page.getByRole("link", { name: "Orca (Yu et al., OSDI 2022)" });
     await expect(link).toHaveAttribute("href", /usenix\.org/);
     await expect(link).toHaveAttribute("target", "_blank");
@@ -483,6 +485,7 @@ test("first visit starts the tutorial, which can be stepped and dismissed", asyn
   await page.reload();
   await expect(page.getByTestId("live-canvas")).toBeVisible();
   await expect(page.getByTestId("tour")).toHaveCount(0);
+  await page.getByTestId("more").click();
   await page.getByTestId("tour-start").click();
   await expect(page.getByTestId("tour")).toBeVisible();
 });

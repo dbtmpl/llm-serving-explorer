@@ -78,12 +78,20 @@ test.describe("fuzz: changing settings in every state", () => {
         ["disagg", () => choose("prefill / decode", pickOf(["one pool", "disaggregated"]))],
         ["routing", () => choose("routing policy", pickOf(["prefix-aware", "least-loaded", "round-robin"]))],
         ["arch", () => page.getByTestId("arch").selectOption({ index: Math.floor(rand() * 8) }, { timeout: 800 })],
-        ["mode", () => page.getByRole("button", { name: /Calibrated|Explore/ }).first().click({ timeout: 800 })],
+        ["mode", async () => {
+          const back = page.getByTestId("mode-explore");
+          if (await back.isVisible()) return back.click({ timeout: 800 });
+          await page.getByTestId("more").click({ timeout: 800 });
+          await page.getByTestId("mode-calibrated").click({ timeout: 800 });
+        }],
         ["explain", () => page.getByRole("button", { name: "explain", exact: true }).click({ timeout: 800 })],
         ["step-through", () => page.getByTestId("step-toggle").click({ timeout: 800 })],
         ["step-next", () => page.getByTestId("step-next").click({ timeout: 800 })],
         ["step-back", () => page.getByTestId("step-back").click({ timeout: 800 })],
-        ["tour", () => page.getByTestId("tour-start").click({ timeout: 800 })],
+        ["tour", async () => {
+          await page.getByTestId("more").click({ timeout: 800 });
+          await page.getByTestId("tour-start").click({ timeout: 800 });
+        }],
         ["tour-skip", () => page.getByTestId("tour-skip").click({ timeout: 800 })],
         ["pause", () => page.getByTestId("play-toggle").click({ timeout: 800 })],
         ["speed", () => page.getByTestId(pickOf(["speed-0.1", "speed-0.5", "speed-1"])).click({ timeout: 800 })],
@@ -114,7 +122,7 @@ test.describe("fuzz: changing settings in every state", () => {
         const q = (sel: string) => document.querySelector<HTMLElement>(sel);
         const btn = (re: RegExp) => [...document.querySelectorAll<HTMLElement>("button")].find((b) => re.test(b.textContent ?? ""));
         if (q('[data-testid="tour-skip"]')) q('[data-testid="tour-skip"]')!.click();
-        btn(/^Explore/)?.click();
+        q('[data-testid="mode-explore"]')?.click();
       });
       await page.waitForTimeout(300);
       await page.evaluate(() => {
