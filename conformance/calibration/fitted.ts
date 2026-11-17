@@ -15,7 +15,33 @@ export interface TimingParams {
   mfu: number;
   hostMsBase: number;
   hostMsPerSeq: number;
+  /** Tensor-parallel all-reduce link efficiency and fixed time: fitted only for a (model, GPU) with more than one tensor-parallel degree in its calibration data. */
+  commEff?: number;
+  commLatencyUs?: number;
 }
+
+/** One point of a loss profile: the best loss reachable with one parameter held at `value` and the others refitted. */
+export interface ProfilePoint {
+  value: number;
+  loss: number;
+}
+
+/**
+ * How well the calibration data pins a shared parameter down. A parameter whose loss barely moves while it is held at
+ * values across its whole range is a label for something else, not a measurement of the quantity it names.
+ */
+export interface Identifiability {
+  parameter: keyof TimingParams;
+  /** The fitted value and its loss, then the losses with the parameter held at fixed values. */
+  fitted: ProfilePoint;
+  held: ProfilePoint[];
+  /** (largest − smallest loss over `held` and `fitted`) / smallest: below `FLAT_BELOW` the data does not identify the parameter. */
+  spread: number;
+  flat: boolean;
+}
+
+/** The spread of a loss profile under which a parameter is called unidentified. */
+export const FLAT_BELOW = 0.25;
 
 /** Residuals of one calibration scenario: the TypeScript value against BLIS's, signed (TypeScript - BLIS) / BLIS. */
 export interface ScenarioResidual {
@@ -29,6 +55,18 @@ export interface FittedPair {
   gpu: string;
   tp: number;
   timing: TimingParams;
+  /**
+   * The pair's group: the (model, GPU) whose tensor-parallel degrees were fitted together with shared values, since
+   * the roofline's rates do not depend on the degree and a fit to one degree cannot tell MBU from a constant. Equal to
+   * `model/gpu` for every pair; a group of one degree is fitted alone.
+   */
+  group: string;
+  /** The degrees fitted together in the group. */
+  groupTps: number[];
+  /** Parameters that ended on a bound of their range (a fit at a bound is a sign that the structure, not the value, is off). */
+  atBound: string[];
+  /** Loss profile of MBU and MFU over the group's calibration data. */
+  identifiability: Identifiability[];
   /** Where the fit started from: the site's defaults. Reported, never changed by the fit. */
   defaults: TimingParams;
   /** Loss at the defaults and at the fitted values (mean squared log ratio over the scenarios' TTFT and TPOT). */

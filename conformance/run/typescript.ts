@@ -6,7 +6,7 @@ import { FRONTEND_HOPS } from "../../src/sim/workload/frontend.js";
 import { fittedFor, loadFitted, type FittedFile } from "../calibration/fitted.js";
 import { fitReferenceOf } from "../refs/index.js";
 import { NO_AGGREGATES, microseconds, sortRows, type Aggregates, type Fate, type Reduced, type RequestRow } from "../record.js";
-import { AUTOSCALE_LOAD_S, MAIN_ARM, usesCalibration, type Scenario } from "../scenario.js";
+import { AUTOSCALE_LOAD_S, FITTED_ON, MAIN_ARM, usesCalibration, type ParamsMode, type Scenario } from "../scenario.js";
 import { TS_COLD_START_S, toTypescript, type TimingOverride } from "../translate/toTypescript.js";
 
 /** Clock step of the headless loop, seconds. The engine ticks finer inside it; this only bounds how late the loop notices it is done. */
@@ -20,10 +20,11 @@ const MAX_SIMULATED_S = 3600;
  * calibrated or directional check, otherwise the site's defaults (an empty override). The reference
  * is the one the scenario names (`fit_reference`) or the only one that covers it.
  */
-export function timingFor(s: Scenario, arm: string, fitted?: FittedFile, reference?: string, mode: "defaults" | "fitted" = usesCalibration(s) ? "fitted" : "defaults"): TimingOverride {
+export function timingFor(s: Scenario, arm: string, fitted?: FittedFile, reference?: string, mode: ParamsMode = usesCalibration(s) ? "fitted" : "defaults"): TimingOverride {
   if (mode === "defaults") return {};
   const d = s.arms[arm]!;
-  const f = fittedFor(fitted ?? loadFitted(), reference ?? fitReferenceOf(s), d.model, d.gpu, d.engine.tp);
+  const gpu = mode.startsWith(FITTED_ON) ? mode.slice(FITTED_ON.length) : d.gpu;
+  const f = fittedFor(fitted ?? loadFitted(), reference ?? fitReferenceOf(s), d.model, gpu, d.engine.tp);
   return {
     ...f.timing,
     ...(d.speculative && f.specCost ? { specCost: f.specCost.value } : {}),
@@ -157,7 +158,7 @@ export function reduceTypescript(s: Scenario, w: World, arm: string = MAIN_ARM):
 }
 
 /** Run every arm of a scenario; a scenario with a timing check uses the fitted values. */
-export function runTypescriptArms(s: Scenario, fitted?: FittedFile, reference?: string, mode?: "defaults" | "fitted"): Record<string, Reduced> {
+export function runTypescriptArms(s: Scenario, fitted?: FittedFile, reference?: string, mode?: ParamsMode): Record<string, Reduced> {
   const out: Record<string, Reduced> = {};
   for (const arm of Object.keys(s.arms)) out[arm] = runTypescript(s, arm, timingFor(s, arm, fitted, reference, mode)).reduced;
   return out;

@@ -24,7 +24,7 @@ _Where:_ Left menu, Requests panel, group "Scenarios", under the buttons once th
 _Where:_ Left menu, group "Scenarios", under the buttons once the "Outputs outgrow the pool → preemption" scenario is selected.
 
 ### text
-12 prompts fit in a small KV pool (gpu_memory_utilization 0.3), but their long outputs keep growing. With nothing idle to evict, the newest sequence gives its blocks back and recomputes; it waits until its whole context fits again.
+12 prompts fit in a small KV pool (gpu_memory_utilization 0.28), but their long outputs keep growing. With nothing idle to evict, the newest sequence gives its blocks back and recomputes; it waits until its whole context fits again.
 
 ## `scenario.70b` 70B on 4 x H100
 _Where:_ Left menu, group "Scenarios", under the buttons once the "70B on 4 × H100" scenario is selected.
@@ -108,7 +108,7 @@ _Where:_ Hover tooltip over the thin strip after the weights in a GPU's memory b
 Activations and CUDA graphs
 
 ### text
-Working space for one forward pass (the intermediate results between layers) plus the captured CUDA graphs that launch a step cheaply. It is reserved once, before the KV pool is sized.
+Working space of the start-up profiling pass plus the captured CUDA graphs that launch a step cheaply. The pass is one step of `max_num_batched_tokens` tokens (the intermediate results between layers) and the sampler's rows over the whole vocabulary, so a larger token budget or `max_num_seqs` makes this strip wider and the KV pool smaller; the graphs are one per batch size on the capture list. It is reserved once, before the KV pool is sized.
 
 ## `gpu.kv` KV pool segment
 _Where:_ Hover tooltip over the grid of cells in a GPU's memory box; the size is per GPU.

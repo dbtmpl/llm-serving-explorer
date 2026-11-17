@@ -43,6 +43,14 @@ export interface Params {
   hostMsBase: number;
   /** Host milliseconds per step, per sequence in the batch. */
   hostMsPerSeq: number;
+  /** Share of the link bandwidth a tensor-parallel all-reduce reaches, in (0, 1]. */
+  commEff: number;
+  /** Fixed time of one all-reduce, microseconds. */
+  commLatencyUs: number;
+  /** Kernel launch time per layer of a step replayed from a CUDA graph, microseconds. */
+  launchUs: number;
+  /** Kernel launch time per layer of a step run eagerly (larger than the capture list), microseconds. */
+  launchEagerUs: number;
 
   /* ---- decoding (see decoding/) ---- */
   specDecode: boolean;
@@ -116,10 +124,14 @@ export const DEFAULT_PARAMS: Params = {
   tokenBudget: 8192,
   prefixCaching: true,
   overlap: false,
-  mbu: 0.6,
-  mfu: 0.5,
+  mbu: 0.85,
+  mfu: 0.7,
   hostMsBase: 1.5,
   hostMsPerSeq: 0.05,
+  commEff: 0.65,
+  commLatencyUs: 6,
+  launchUs: 32,
+  launchEagerUs: 102,
   routing: "prefix-aware",
   minPods: 0,
   maxPods: 16,

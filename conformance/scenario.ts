@@ -131,6 +131,14 @@ export interface ReferenceGap {
   differences: Differences;
 }
 
+/**
+ * Which timing parameters a check runs with: the site's `defaults`; the ones `fitted` to the reference for this model
+ * and GPU; or `fitted-on:<gpu>`, the ones fitted to the same reference for the same model on another GPU, which the
+ * run being checked has had no part in (a held-out reading that needs no split of the requests).
+ */
+export type ParamsMode = "defaults" | "fitted" | `fitted-on:${string}`;
+export const FITTED_ON = "fitted-on:";
+
 interface CheckBase {
   id: string;
   /** What the check shows, in one sentence. */
@@ -142,7 +150,7 @@ interface CheckBase {
    * ones `fitted` to the reference. Unstated: `fitted` where the scenario has a calibrated or
    * directional check, `defaults` otherwise (the BLIS scenarios, where every timing check is held out).
    */
-  params?: "defaults" | "fitted";
+  params?: ParamsMode;
   /**
    * Which requests the check's metrics are computed over: `all`, the `calibration` requests (the
    * first `split.calibrationRequests` by arrival) or the `held-out` rest. A check on the held-out
@@ -245,6 +253,8 @@ export interface Deployment {
     maxNumSeqs: number;
     maxNumBatchedTokens: number;
     prefixCaching: boolean;
+    /** vLLM's `async_scheduling`: the engine schedules the next step while the GPU runs this one, so host time overlaps GPU time. BLIS prices host work as an additive term and has no such mode. */
+    asyncScheduling?: boolean;
     /** Longest context the engine accepts. Only BLIS asks for it (it refuses a pool that cannot hold one such sequence); the TypeScript model has no limit. */
     maxModelLen?: number;
   };
@@ -358,6 +368,7 @@ function deployment(file: string, raw: Record<string, unknown>): Deployment {
       maxNumSeqs: num(file, engine, "max_num_seqs"),
       maxNumBatchedTokens: num(file, engine, "max_num_batched_tokens"),
       prefixCaching: engine.prefix_caching !== false,
+      asyncScheduling: engine.async_scheduling === true,
       ...(engine.max_model_len === undefined ? {} : { maxModelLen: num(file, engine, "max_model_len") })
     },
     replicas: num(file, raw, "replicas"),
@@ -393,8 +404,9 @@ function check(file: string, c: unknown, arms: string[]): Check {
   const o = obj(file, c, "a check");
   const base: CheckBase = { id: str(file, o, "id"), claim: str(file, o, "claim"), tolerance: str(file, o, "tolerance"), knownDifferences: [] };
   if (o.params !== undefined) {
-    if (o.params !== "defaults" && o.params !== "fitted") fail(file, `check ${base.id}: params must be "defaults" or "fitted"`);
-    base.params = o.params as "defaults" | "fitted";
+    if (o.params !== "defaults" && o.params !== "fitted" && !(typeof o.params === "string" && o.params.startsWith(FITTED_ON) && o.params.length > FITTED_ON.length))
+      fail(file, `check ${base.id}: params must be "defaults", "fitted" or "fitted-on:<gpu>"`);
+    base.params = o.params as ParamsMode;
   }
   if (o.subset !== undefined) {
     if (o.subset !== "all" && o.subset !== "calibration" && o.subset !== "held-out") fail(file, `check ${base.id}: subset must be "all", "calibration" or "held-out"`);
@@ -515,10 +527,10 @@ export const mainArm = (s: Scenario): Deployment => s.arms[MAIN_ARM] ?? fail(s.i
 export const usesCalibration = (s: Scenario): boolean => s.checks.some((c) => c.kind === "calibrated" || c.kind === "directional");
 
 /** The timing parameters a check runs with. */
-export const paramsOf = (s: Scenario, c: Check): "defaults" | "fitted" => c.params ?? (usesCalibration(s) ? "fitted" : "defaults");
+export const paramsOf = (s: Scenario, c: Check): ParamsMode => c.params ?? (usesCalibration(s) ? "fitted" : "defaults");
 
 /** True when any check of the scenario runs with fitted parameters, so a fit to a reference must exist. */
-export const needsFit = (s: Scenario): boolean => s.checks.some((c) => paramsOf(s, c) === "fitted");
+export const needsFit = (s: Scenario): boolean => s.checks.some((c) => paramsOf(s, c) !== "defaults");
 
 /**
  * The (session, round) keys of the requests of a subset, by arrival order of the main arm. A subset

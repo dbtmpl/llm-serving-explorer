@@ -6,16 +6,16 @@ import { compare, type Comparison, type Records } from "./compare.js";
 import { restrict, type ReferenceFile } from "./record.js";
 import { checkReferences, fitReferenceOf, requireReferenceFile } from "./refs/index.js";
 import { runTypescriptArms } from "./run/typescript.js";
-import { needsFit, paramsOf, subsetKeys, type Scenario } from "./scenario.js";
+import { needsFit, paramsOf, subsetKeys, type ParamsMode, type Scenario } from "./scenario.js";
 
-type Mode = "defaults" | "fitted";
+type Mode = ParamsMode;
 
 /** The model's runs of a scenario, one per set of timing parameters its checks use, each made once and when first asked for. */
 export class ModelRuns {
   private runs: Partial<Record<Mode, Records>> = {};
   constructor(readonly scenario: Scenario) {}
   get(mode: Mode): Records {
-    return (this.runs[mode] ??= runTypescriptArms(this.scenario, undefined, mode === "fitted" ? fitReferenceOf(this.scenario) : undefined, mode));
+    return (this.runs[mode] ??= runTypescriptArms(this.scenario, undefined, mode !== "defaults" ? fitReferenceOf(this.scenario) : undefined, mode));
   }
 }
 

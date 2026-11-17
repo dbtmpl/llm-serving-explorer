@@ -27,6 +27,18 @@ checks:
     kind: exact
     quantity: preemptions
     tolerance: A count of discrete engine events in a case built to produce exactly one.
+    known_difference:
+      reference: blis
+      cause: "The model's pool is 17 percent larger, so both sequences fit and nothing is preempted"
+      reason: >-
+        This scenario is built so that two growing sequences outgrow the pool: each needs 32,000 tokens, 2,000 blocks, so together 4,000 blocks, and the pool was made smaller than that
+        (30 percent memory utilisation). BLIS's pool is 3,601 blocks (57,616 tokens), so the second sequence is preempted once. The TypeScript model's pool is now 4,212 blocks (67,392 tokens), 611 blocks
+        more (+17 percent; the same memory terms as kv-budget-8b-h100, a pool 2.2 percent larger at full size, but here the pool is a quarter of the memory, so the same 1.3 GB weighs 17 percent), which is
+        more than the 4,000 the two need, so both finish without a preemption. The mechanism is unchanged: the model's preemption, recompute and re-admission are exercised by the on-demand overload
+        preset and by the unit tests in src/sim/admission, whose sequences are drawn from a distribution and do overflow the pool, and the decisions of this scenario that do not depend on the pool (both complete) still agree. The scenario was written to the
+        pools of 2026-11-16 ("the two pools agree to a few blocks") and is left as it was: moving its memory utilisation to restore the preemption would be choosing a parameter after seeing the result. Not tuned.
+      differences:
+        value: { typescript: 0, blis: 1 }
   - id: both-complete
     claim: Both requests complete.
     kind: exact
