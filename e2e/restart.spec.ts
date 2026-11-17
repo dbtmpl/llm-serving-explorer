@@ -13,9 +13,11 @@ const guard = (page: Page) => {
 const openGroups = (page: Page) => page.evaluate(() => document.querySelectorAll("details.lv-group").forEach((d) => ((d as HTMLDetailsElement).open = true)));
 const pick = (page: Page, label: string, option: string) => page.locator(".lv-choice", { hasText: label }).getByRole("button", { name: option }).first().click();
 const vt = (page: Page) => page.evaluate(() => (window as unknown as Win).__live.scene.vt);
+/** The animation still runs, or a step-through box holds it on purpose (a held step stops the clock until Next). */
 const alive = async (page: Page) => {
   const a = await vt(page);
   await page.waitForTimeout(400);
+  if (await page.getByTestId("step-box").isVisible()) return;
   expect(await vt(page)).toBeGreaterThan(a);
 };
 const podPoint = (page: Page) =>
