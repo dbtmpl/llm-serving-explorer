@@ -149,15 +149,20 @@ test.describe("fuzz: changing settings in every state", () => {
           const w = (window as unknown as Win).__live.world();
           return { inflight: w.reqs.size, tokens: w.m.tokensOut, done: w.m.completed, failed: w.m.failed, pods: w.pods.map((p) => p.state), queued: w.gatewayQueue.length };
         });
+      // up to 20 s: while first explanations wait their turn the clock runs slowed, on purpose
       const a = await state();
-      await page.waitForTimeout(6000);
-      const b = await state();
+      let b = a;
+      for (let i = 0; i < 20; i++) {
+        await page.waitForTimeout(1000);
+        b = await state();
+        if (b.tokens > a.tokens || b.done > a.done || b.failed > a.failed || b.inflight === 0) break;
+      }
       const fits = (await page.evaluate(() => document.querySelector('[data-testid="fit-banner"]')?.getAttribute("data-state") ?? null)) !== "blocked";
       if (b.inflight > 0 && fits) {
         const alive = b.pods.some((s) => s === "creating" || s === "loading" || s === "ready");
         expect(alive, `requests in flight, the configuration fits, and no pod is coming up: ${JSON.stringify(b)} after ${log.join(" > ")}`).toBe(true);
         const progressed = b.tokens > a.tokens || b.done > a.done || b.failed > a.failed || b.pods.some((s) => s === "loading" || s === "creating");
-        expect(progressed, `no progress in 6 s: ${JSON.stringify({ a, b })} after ${log.join(" > ")}`).toBe(true);
+        expect(progressed, `no progress in 20 s: ${JSON.stringify({ a, b })} after ${log.join(" > ")}`).toBe(true);
       }
       if (!fits) {
         await expect(page.getByTestId("fit-banner")).toContainText("cannot serve");
