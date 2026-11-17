@@ -1034,6 +1034,207 @@ export function LiveView() {
     calibrated ? ["shed", String(w.m.failed), "at the router"] : ["cost", w.m.tokensOut ? `$${costPerMTok(w).toFixed(2)}/M` : "–", "output tokens"]
   ];
 
+  // the menus, composed differently on a phone (one sheet) and a wide screen (two columns)
+  const workloadGroups = (
+ <>
+          <Group title="Scenarios">
+            {PRESETS.map((ps) => (
+              <button key={ps.id} className={`lv-preset ${preset === ps.id ? "on" : ""}`} data-testid={`preset-${ps.id}`} onClick={() => runPreset(ps)}>
+                {ps.label}
+              </button>
+            ))}
+            {activePreset && <Rich text={activePreset.hint} className="lv-note" />}
+          </Group>
+          <Group title="Session behaviour">
+            <Slider id="prompt-tokens" label="first prompt, mean length" value={p.promptTokens} min={200} max={64000} step={200} fmt={(v) => `${fmtInt(v)} tok`} onChange={(v) => set("promptTokens", v)} />
+            <Slider label="follow-up prompt, mean length" value={p.followTokens} min={10} max={8000} step={10} fmt={(v) => `${fmtInt(v)} tok`} onChange={(v) => set("followTokens", v)} />
+            <Slider label="answer, mean length" value={p.outputTokens} min={10} max={2000} step={10} fmt={(v) => `${fmtInt(v)} tok`} onChange={(v) => set("outputTokens", v)} />
+            <Slider label="time between follow-ups" value={p.thinkTimeS} min={0.5} max={60} step={0.5} fmt={(v) => `${v} s`} onChange={(v) => set("thinkTimeS", v)} />
+            <Slider label="sessions that reply again after a turn" value={p.returnProb} min={0} max={1} step={0.05} fmt={(v) => `${(v * 100).toFixed(0)}%`} onChange={(v) => set("returnProb", v)} />
+            <Slider label="turns before a session ends" value={p.maxTurns} min={1} max={40} step={1} onChange={(v) => set("maxTurns", v)} />
+            <Slider label="new sessions per second" value={p.arrivalRate} min={0} max={50} step={0.5} onChange={(v) => set("arrivalRate", v)} />
+            <Rich text={panelText("sessions.note", { returnPct: (p.returnProb * 100).toFixed(0), thinkTime: p.thinkTimeS, leavePct: ((1 - p.returnProb) * 100).toFixed(0) })} className="lv-note" />
+          </Group>
+  </>
+  );
+  const archPanel = (
+        <section className="lv-panel">
+          {calibrated && (
+            <>
+              <button className="lv-back" data-testid="mode-explore" onClick={() => switchMode("explore")}>
+                ◂ Back to the approximate model
+              </button>
+              <Rich text={replayText("mode.calibrated")} className="lv-note" />
+            </>
+          )}
+          <header>
+            <h2>{calibrated ? "BLIS scenario" : "Serving architecture"}</h2>
+          </header>
+          {calibrated && <ScenarioPanel id={cal.id} file={cal.file} status={cal.status} error={cal.error} onPick={startReplay} />}
+          {!calibrated && (
+            <>
+          <select className="lv-select" data-testid="arch" value={arch} onChange={(e) => applyArch(e.target.value)} aria-label="Serving architecture">
+            {ARCHITECTURES.map((a, i) => (
+              <option key={a.id} value={a.id}>
+                {i + 1}. {a.year} · {a.short}
+              </option>
+            ))}
+          </select>
+          {(() => {
+            const a = architectureText(arch);
+            return (
+              <details className="lv-arch">
+                <summary>What this step adds</summary>
+                <p className="lv-note">
+                  <b>
+                    <Rich inline text={a.name} />.
+                  </b>{" "}
+                  <Rich inline text={a.adds} />
+                </p>
+                <Rich text={a.source} className="lv-note lv-src" />
+              </details>
+            );
+          })()}
+            </>
+          )}
+        </section>
+  );
+  const requestsPanel = (
+    <>
+        {!calibrated && (
+        <section className="lv-panel">
+          <header>
+            <h2>Requests</h2>
+          </header>
+          <div className="lv-burst">
+            {[1, 10, 20, 100, 1000, 10000].map((n) => (
+              <button key={n} data-testid={`send-${n}`} onClick={() => send(n)}>
+                <b>{n >= 1000 ? `${n / 1000}k` : n}</b>
+                <span>{n === 1 ? "session" : "at once"}</span>
+              </button>
+            ))}
+          </div>
+          {!narrow && workloadGroups}
+        </section>
+        )}
+    </>
+  );
+  const infraPanel = (
+    <>
+        {calibrated && (
+          <section className="lv-panel">
+            <header>
+              <h2>Scenario settings</h2>
+              <span className="lv-fixed">read-only</span>
+            </header>
+            {cal.file && <ReadOnlySettings file={cal.file} />}
+          </section>
+        )}
+        {!calibrated && (
+        <section className="lv-panel">
+          <header>
+            <h2>Infrastructure</h2>
+            <span className="lv-live">changes apply live</span>
+          </header>
+          <Group title="Model and GPU">
+            <Choice label="model" value={p.model} options={Object.values(MODELS).map((m) => [m.id, m.label])} nofit={(v) => nofit({ model: v })} onChange={(v) => set("model", v)} />
+            <Choice label="precision" value={p.precision} options={[["bf16", "BF16"], ["fp8", "FP8"]]} nofit={(v) => nofit({ precision: v })} onChange={(v) => set("precision", v)} />
+            <Choice label="GPU" value={p.gpu} options={Object.values(GPUS).map((g) => [g.id, g.label.replace(" SXM", "")])} nofit={(v) => nofit({ gpu: v })} onChange={(v) => set("gpu", v)} />
+            <Choice label="GPUs per pod (tensor parallel)" value={p.tp} options={[[1, "1"], [2, "2"], [4, "4"], [8, "8"]]} nofit={(v) => nofit({ tp: v })} onChange={(v) => set("tp", v)} />
+            <Slider label="gpu_memory_utilization" value={p.gpuMemUtil} min={0.3} max={0.98} step={0.01} fmt={(v) => v.toFixed(2)} onChange={(v) => set("gpuMemUtil", v)} />
+            {anyNoFit && <Rich text={FIT_OPTION.note} className="lv-note" />}
+            <Rich text={panelText("model.note")} className="lv-note" />
+          </Group>
+          <Group title="Engine">
+            <Slider id="max-num-seqs" label="max_num_seqs (batch slots)" value={p.maxNumSeqs} min={1} max={64} step={1} onChange={(v) => set("maxNumSeqs", v)} />
+            <Slider label="token budget per step" value={p.tokenBudget} min={256} max={32768} step={256} fmt={fmtInt} onChange={(v) => set("tokenBudget", v)} />
+            <Choice label="batching" value={p.batching} options={[["static", "static"], ["continuous", "continuous"]]} onChange={(v) => set("batching", v)} />
+            <Choice label="KV needed to admit a request" value={p.admission} options={[["on-demand", "next chunk"], ["prompt", "whole prompt"], ["reserve", "prompt + max_tokens"]]} onChange={(v) => set("admission", v)} />
+            {p.admission === "reserve" && <Slider label="max_tokens clients send" value={p.maxTokensCap} min={256} max={16384} step={256} fmt={fmtInt} onChange={(v) => set("maxTokensCap", v)} />}
+            <Choice label="speculative decoding" value={p.specDecode} options={[[false, "off"], [true, `draft ${p.specK} tokens`]]} onChange={(v) => set("specDecode", v)} />
+            {p.specDecode && <Slider label="draft length γ" value={p.specK} min={1} max={10} step={1} onChange={(v) => set("specK", v)} />}
+            {p.specDecode && <Slider label="acceptance rate α" value={p.specAccept} min={0.3} max={0.95} step={0.01} fmt={(v) => v.toFixed(2)} onChange={(v) => set("specAccept", v)} />}
+            {p.specDecode && <Slider label="draft cost c (draft run ÷ target run)" value={p.specCost} min={0.01} max={0.3} step={0.01} fmt={(v) => v.toFixed(2)} onChange={(v) => set("specCost", v)} />}
+            {p.specDecode && (
+              <Rich
+                text={panelText("spec.note", {
+                  tokensPerStep: ((1 - p.specAccept ** (p.specK + 1)) / (1 - p.specAccept)).toFixed(2),
+                  speedup: ((1 - p.specAccept ** (p.specK + 1)) / ((1 - p.specAccept) * (p.specK * p.specCost + 1))).toFixed(2)
+                })}
+                className="lv-note"
+              />
+            )}
+            <Choice label="prefix caching" value={p.prefixCaching} options={[[true, "on"], [false, "off"]]} onChange={(v) => set("prefixCaching", v)} />
+            <Choice label="CPU / GPU overlap" value={p.overlap} options={[[false, "host + GPU"], [true, "max(host, GPU)"]]} onChange={(v) => set("overlap", v)} />
+            <Slider label="host time per step" value={p.hostMsBase} min={0} max={20} step={0.5} fmt={(v) => `${v} ms`} onChange={(v) => set("hostMsBase", v)} />
+          </Group>
+          <Group title="Routing and autoscaling">
+            <Choice label="routing policy" value={p.routing} options={[["prefix-aware", "prefix-aware"], ["least-loaded", "least-loaded"], ["round-robin", "round-robin"]]} onChange={(v) => set("routing", v)} />
+            <Choice label="prefill / decode pools" value={p.disagg} options={[[false, "one pool"], [true, "disaggregated"]]} onChange={(v) => set("disagg", v)} />
+            {p.disagg && <Slider label="skip prefill pool below (uncached tokens)" value={p.pdThreshold} min={0} max={8192} step={64} fmt={fmtInt} onChange={(v) => set("pdThreshold", v)} />}
+            {p.disagg && <Slider label="KV transfer link" value={p.linkGbps} min={10} max={400} step={10} fmt={(v) => `${v} Gbps`} onChange={(v) => set("linkGbps", v)} />}
+            <Slider label="shed requests waiting longer than" value={p.shedAfterS} min={0} max={120} step={1} fmt={(v) => (v ? `${v} s` : "never")} onChange={(v) => set("shedAfterS", v)} />
+            <Slider label="min pods" value={p.minPods} min={0} max={8} step={1} onChange={(v) => set("minPods", v)} />
+            <Slider label="max pods" value={p.maxPods} min={1} max={100} step={1} onChange={(v) => set("maxPods", v)} />
+            <Slider label="cold start" value={p.coldStartS} min={0.5} max={60} step={0.5} fmt={(v) => `${v} s`} onChange={(v) => set("coldStartS", v)} />
+            <Slider label="scale down after idle" value={p.scaleDownIdleS} min={2} max={120} step={1} fmt={(v) => `${v} s`} onChange={(v) => set("scaleDownIdleS", v)} />
+            <Rich text={panelText("scaling.note")} className="lv-note" />
+          </Group>
+          <Group title="Memory tiers">
+            <Slider label="host DRAM for KV" value={p.dramGB} min={0} max={256} step={4} fmt={(v) => (v ? `${v} GB` : "off")} onChange={(v) => set("dramGB", v)} />
+            <Slider label="local SSD for KV" value={p.ssdGB} min={0} max={1024} step={8} fmt={(v) => (v ? `${v} GB` : "off")} onChange={(v) => set("ssdGB", v)} />
+            <Slider label="remote pool, shared by all pods" value={p.remoteGB} min={0} max={4096} step={32} fmt={(v) => (v ? `${v} GB` : "off")} onChange={(v) => set("remoteGB", v)} />
+            <Slider label="DRAM ↔ HBM copy rate" value={p.dramGBs} min={5} max={64} step={1} fmt={(v) => `${v} GB/s`} onChange={(v) => set("dramGBs", v)} />
+            <Slider label="SSD read rate" value={p.ssdGBs} min={0.5} max={14} step={0.5} fmt={(v) => `${v} GB/s`} onChange={(v) => set("ssdGBs", v)} />
+            <Slider label="remote pool link" value={p.remoteGbps} min={10} max={400} step={2} fmt={(v) => `${v} Gbps`} onChange={(v) => set("remoteGbps", v)} />
+            <Rich text={panelText("tiers.measured")} className="lv-note" />
+            <Rich text={panelText("tiers.flow")} className="lv-note" />
+          </Group>
+          <Group title="Efficiency and price">
+            <Slider label="MBU (bandwidth achieved)" value={p.mbu} min={0.1} max={1} step={0.01} fmt={(v) => v.toFixed(2)} onChange={(v) => set("mbu", v)} />
+            <Slider label="MFU (FLOPs achieved)" value={p.mfu} min={0.1} max={1} step={0.01} fmt={(v) => v.toFixed(2)} onChange={(v) => set("mfu", v)} />
+            <Slider label="price per GPU-hour" value={p.pricePerGpuHour} min={0.5} max={10} step={0.1} fmt={(v) => `$${v.toFixed(2)}`} onChange={(v) => set("pricePerGpuHour", v)} />
+          </Group>
+        </section>
+        )}
+    </>
+  );
+  const legendPanel = (
+        <section className="lv-panel">
+          <Group title="Legend">
+            <div className="lv-legend">
+              {(calibrated
+                ? ([
+                    [C.prefill, "prefill"],
+                    [C.decode, "decode, output tokens"],
+                    [C.weights, "weights in HBM"],
+                    ["hsl(205 62% 60%)", "share of the KV pool in use"],
+                    [C.evict, "preemption"]
+                  ] as const)
+                : ([
+                    [C.prefill, "prefill (compute-bound)"],
+                    [C.decode, "decode, output tokens (memory-bound)"],
+                    [C.weights, "weights in HBM"],
+                    ["hsl(200 66% 60%)", "KV blocks of a running sequence"],
+                    ["hsl(200 38% 84%)", "KV blocks cached, session idle"],
+                    [C.dram, "KV in host DRAM"],
+                    [C.ssd, "KV on SSD"],
+                    [C.remote, "KV in the shared remote pool"],
+                    [C.sub, "conversation text read or saved"],
+                    [C.evict, "dropped or preempted"]
+                  ] as const)
+              ).map(([c, l]) => (
+                <div key={l}>
+                  <i className="lv-sw" style={{ background: c }} />
+                  {l}
+                </div>
+              ))}
+              <Rich text={calibrated ? replayText("legend") : panelText("legend.note")} className="lv-note" />
+            </div>
+          </Group>
+        </section>
+  );
+
   return (
     <div className="lv-root">
       <canvas ref={canvasRef} className="lv-canvas" data-testid="live-canvas" />
@@ -1207,79 +1408,22 @@ export function LiveView() {
       </div>
 
       <div className="lv-col lv-left" ref={leftRef} hidden={!showLeft}>
-        <section className="lv-panel">
-          {calibrated && (
-            <>
-              <button className="lv-back" data-testid="mode-explore" onClick={() => switchMode("explore")}>
-                ◂ Back to the approximate model
-              </button>
-              <Rich text={replayText("mode.calibrated")} className="lv-note" />
-            </>
-          )}
-          <header>
-            <h2>{calibrated ? "BLIS scenario" : "Serving architecture"}</h2>
-          </header>
-          {calibrated && <ScenarioPanel id={cal.id} file={cal.file} status={cal.status} error={cal.error} onPick={startReplay} />}
-          {!calibrated && (
-            <>
-          <select className="lv-select" data-testid="arch" value={arch} onChange={(e) => applyArch(e.target.value)} aria-label="Serving architecture">
-            {ARCHITECTURES.map((a, i) => (
-              <option key={a.id} value={a.id}>
-                {i + 1}. {a.year} · {a.short}
-              </option>
-            ))}
-          </select>
-          {(() => {
-            const a = architectureText(arch);
-            return (
-              <details className="lv-arch">
-                <summary>What this step adds</summary>
-                <p className="lv-note">
-                  <b>
-                    <Rich inline text={a.name} />.
-                  </b>{" "}
-                  <Rich inline text={a.adds} />
-                </p>
-                <Rich text={a.source} className="lv-note lv-src" />
-              </details>
-            );
-          })()}
-            </>
-          )}
-        </section>
-        {!calibrated && (
-        <section className="lv-panel">
-          <header>
-            <h2>Requests</h2>
-          </header>
-          <div className="lv-burst">
-            {[1, 10, 20, 100, 1000, 10000].map((n) => (
-              <button key={n} data-testid={`send-${n}`} onClick={() => send(n)}>
-                <b>{n >= 1000 ? `${n / 1000}k` : n}</b>
-                <span>{n === 1 ? "session" : "at once"}</span>
-              </button>
-            ))}
-          </div>
-          <Group title="Scenarios">
-            {PRESETS.map((ps) => (
-              <button key={ps.id} className={`lv-preset ${preset === ps.id ? "on" : ""}`} data-testid={`preset-${ps.id}`} onClick={() => runPreset(ps)}>
-                {ps.label}
-              </button>
-            ))}
-            {activePreset && <Rich text={activePreset.hint} className="lv-note" />}
-          </Group>
-          <Group title="Session behaviour">
-            <Slider id="prompt-tokens" label="first prompt, mean length" value={p.promptTokens} min={200} max={64000} step={200} fmt={(v) => `${fmtInt(v)} tok`} onChange={(v) => set("promptTokens", v)} />
-            <Slider label="follow-up prompt, mean length" value={p.followTokens} min={10} max={8000} step={10} fmt={(v) => `${fmtInt(v)} tok`} onChange={(v) => set("followTokens", v)} />
-            <Slider label="answer, mean length" value={p.outputTokens} min={10} max={2000} step={10} fmt={(v) => `${fmtInt(v)} tok`} onChange={(v) => set("outputTokens", v)} />
-            <Slider label="time between follow-ups" value={p.thinkTimeS} min={0.5} max={60} step={0.5} fmt={(v) => `${v} s`} onChange={(v) => set("thinkTimeS", v)} />
-            <Slider label="sessions that reply again after a turn" value={p.returnProb} min={0} max={1} step={0.05} fmt={(v) => `${(v * 100).toFixed(0)}%`} onChange={(v) => set("returnProb", v)} />
-            <Slider label="turns before a session ends" value={p.maxTurns} min={1} max={40} step={1} onChange={(v) => set("maxTurns", v)} />
-            <Slider label="new sessions per second" value={p.arrivalRate} min={0} max={50} step={0.5} onChange={(v) => set("arrivalRate", v)} />
-            <Rich text={panelText("sessions.note", { returnPct: (p.returnProb * 100).toFixed(0), thinkTime: p.thinkTimeS, leavePct: ((1 - p.returnProb) * 100).toFixed(0) })} className="lv-note" />
-          </Group>
-        </section>
+        {narrow ? (
+          // a phone has one sheet: what to run, then what it runs on, then requests; scenarios, sessions and the legend last
+          <>
+            {archPanel}
+            {infraPanel}
+            {requestsPanel}
+            {!calibrated && <section className="lv-panel">{workloadGroups}</section>}
+            {legendPanel}
+          </>
+        ) : (
+          <>
+            {archPanel}
+            {requestsPanel}
+          </>
         )}
+
         {selected && !calibrated && (
           <Inspector
             w={w}
@@ -1291,115 +1435,8 @@ export function LiveView() {
       </div>
 
       <div className="lv-col lv-right" ref={rightRef} hidden={!showRight} data-tour="right">
-        {calibrated && (
-          <section className="lv-panel">
-            <header>
-              <h2>Scenario settings</h2>
-              <span className="lv-fixed">read-only</span>
-            </header>
-            {cal.file && <ReadOnlySettings file={cal.file} />}
-          </section>
-        )}
-        {!calibrated && (
-        <section className="lv-panel">
-          <header>
-            <h2>Infrastructure</h2>
-            <span className="lv-live">changes apply live</span>
-          </header>
-          <Group title="Model and GPU">
-            <Choice label="model" value={p.model} options={Object.values(MODELS).map((m) => [m.id, m.label])} nofit={(v) => nofit({ model: v })} onChange={(v) => set("model", v)} />
-            <Choice label="precision" value={p.precision} options={[["bf16", "BF16"], ["fp8", "FP8"]]} nofit={(v) => nofit({ precision: v })} onChange={(v) => set("precision", v)} />
-            <Choice label="GPU" value={p.gpu} options={Object.values(GPUS).map((g) => [g.id, g.label.replace(" SXM", "")])} nofit={(v) => nofit({ gpu: v })} onChange={(v) => set("gpu", v)} />
-            <Choice label="GPUs per pod (tensor parallel)" value={p.tp} options={[[1, "1"], [2, "2"], [4, "4"], [8, "8"]]} nofit={(v) => nofit({ tp: v })} onChange={(v) => set("tp", v)} />
-            <Slider label="gpu_memory_utilization" value={p.gpuMemUtil} min={0.3} max={0.98} step={0.01} fmt={(v) => v.toFixed(2)} onChange={(v) => set("gpuMemUtil", v)} />
-            {anyNoFit && <Rich text={FIT_OPTION.note} className="lv-note" />}
-            <Rich text={panelText("model.note")} className="lv-note" />
-          </Group>
-          <Group title="Engine">
-            <Slider id="max-num-seqs" label="max_num_seqs (batch slots)" value={p.maxNumSeqs} min={1} max={64} step={1} onChange={(v) => set("maxNumSeqs", v)} />
-            <Slider label="token budget per step" value={p.tokenBudget} min={256} max={32768} step={256} fmt={fmtInt} onChange={(v) => set("tokenBudget", v)} />
-            <Choice label="batching" value={p.batching} options={[["static", "static"], ["continuous", "continuous"]]} onChange={(v) => set("batching", v)} />
-            <Choice label="KV needed to admit a request" value={p.admission} options={[["on-demand", "next chunk"], ["prompt", "whole prompt"], ["reserve", "prompt + max_tokens"]]} onChange={(v) => set("admission", v)} />
-            {p.admission === "reserve" && <Slider label="max_tokens clients send" value={p.maxTokensCap} min={256} max={16384} step={256} fmt={fmtInt} onChange={(v) => set("maxTokensCap", v)} />}
-            <Choice label="speculative decoding" value={p.specDecode} options={[[false, "off"], [true, `draft ${p.specK} tokens`]]} onChange={(v) => set("specDecode", v)} />
-            {p.specDecode && <Slider label="draft length γ" value={p.specK} min={1} max={10} step={1} onChange={(v) => set("specK", v)} />}
-            {p.specDecode && <Slider label="acceptance rate α" value={p.specAccept} min={0.3} max={0.95} step={0.01} fmt={(v) => v.toFixed(2)} onChange={(v) => set("specAccept", v)} />}
-            {p.specDecode && <Slider label="draft cost c (draft run ÷ target run)" value={p.specCost} min={0.01} max={0.3} step={0.01} fmt={(v) => v.toFixed(2)} onChange={(v) => set("specCost", v)} />}
-            {p.specDecode && (
-              <Rich
-                text={panelText("spec.note", {
-                  tokensPerStep: ((1 - p.specAccept ** (p.specK + 1)) / (1 - p.specAccept)).toFixed(2),
-                  speedup: ((1 - p.specAccept ** (p.specK + 1)) / ((1 - p.specAccept) * (p.specK * p.specCost + 1))).toFixed(2)
-                })}
-                className="lv-note"
-              />
-            )}
-            <Choice label="prefix caching" value={p.prefixCaching} options={[[true, "on"], [false, "off"]]} onChange={(v) => set("prefixCaching", v)} />
-            <Choice label="CPU / GPU overlap" value={p.overlap} options={[[false, "host + GPU"], [true, "max(host, GPU)"]]} onChange={(v) => set("overlap", v)} />
-            <Slider label="host time per step" value={p.hostMsBase} min={0} max={20} step={0.5} fmt={(v) => `${v} ms`} onChange={(v) => set("hostMsBase", v)} />
-          </Group>
-          <Group title="Routing and autoscaling">
-            <Choice label="routing policy" value={p.routing} options={[["prefix-aware", "prefix-aware"], ["least-loaded", "least-loaded"], ["round-robin", "round-robin"]]} onChange={(v) => set("routing", v)} />
-            <Choice label="prefill / decode pools" value={p.disagg} options={[[false, "one pool"], [true, "disaggregated"]]} onChange={(v) => set("disagg", v)} />
-            {p.disagg && <Slider label="skip prefill pool below (uncached tokens)" value={p.pdThreshold} min={0} max={8192} step={64} fmt={fmtInt} onChange={(v) => set("pdThreshold", v)} />}
-            {p.disagg && <Slider label="KV transfer link" value={p.linkGbps} min={10} max={400} step={10} fmt={(v) => `${v} Gbps`} onChange={(v) => set("linkGbps", v)} />}
-            <Slider label="shed requests waiting longer than" value={p.shedAfterS} min={0} max={120} step={1} fmt={(v) => (v ? `${v} s` : "never")} onChange={(v) => set("shedAfterS", v)} />
-            <Slider label="min pods" value={p.minPods} min={0} max={8} step={1} onChange={(v) => set("minPods", v)} />
-            <Slider label="max pods" value={p.maxPods} min={1} max={100} step={1} onChange={(v) => set("maxPods", v)} />
-            <Slider label="cold start" value={p.coldStartS} min={0.5} max={60} step={0.5} fmt={(v) => `${v} s`} onChange={(v) => set("coldStartS", v)} />
-            <Slider label="scale down after idle" value={p.scaleDownIdleS} min={2} max={120} step={1} fmt={(v) => `${v} s`} onChange={(v) => set("scaleDownIdleS", v)} />
-            <Rich text={panelText("scaling.note")} className="lv-note" />
-          </Group>
-          <Group title="Memory tiers">
-            <Slider label="host DRAM for KV" value={p.dramGB} min={0} max={256} step={4} fmt={(v) => (v ? `${v} GB` : "off")} onChange={(v) => set("dramGB", v)} />
-            <Slider label="local SSD for KV" value={p.ssdGB} min={0} max={1024} step={8} fmt={(v) => (v ? `${v} GB` : "off")} onChange={(v) => set("ssdGB", v)} />
-            <Slider label="remote pool, shared by all pods" value={p.remoteGB} min={0} max={4096} step={32} fmt={(v) => (v ? `${v} GB` : "off")} onChange={(v) => set("remoteGB", v)} />
-            <Slider label="DRAM ↔ HBM copy rate" value={p.dramGBs} min={5} max={64} step={1} fmt={(v) => `${v} GB/s`} onChange={(v) => set("dramGBs", v)} />
-            <Slider label="SSD read rate" value={p.ssdGBs} min={0.5} max={14} step={0.5} fmt={(v) => `${v} GB/s`} onChange={(v) => set("ssdGBs", v)} />
-            <Slider label="remote pool link" value={p.remoteGbps} min={10} max={400} step={2} fmt={(v) => `${v} Gbps`} onChange={(v) => set("remoteGbps", v)} />
-            <Rich text={panelText("tiers.measured")} className="lv-note" />
-            <Rich text={panelText("tiers.flow")} className="lv-note" />
-          </Group>
-          <Group title="Efficiency and price">
-            <Slider label="MBU (bandwidth achieved)" value={p.mbu} min={0.1} max={1} step={0.01} fmt={(v) => v.toFixed(2)} onChange={(v) => set("mbu", v)} />
-            <Slider label="MFU (FLOPs achieved)" value={p.mfu} min={0.1} max={1} step={0.01} fmt={(v) => v.toFixed(2)} onChange={(v) => set("mfu", v)} />
-            <Slider label="price per GPU-hour" value={p.pricePerGpuHour} min={0.5} max={10} step={0.1} fmt={(v) => `$${v.toFixed(2)}`} onChange={(v) => set("pricePerGpuHour", v)} />
-          </Group>
-        </section>
-        )}
-        <section className="lv-panel">
-          <Group title="Legend">
-            <div className="lv-legend">
-              {(calibrated
-                ? ([
-                    [C.prefill, "prefill"],
-                    [C.decode, "decode, output tokens"],
-                    [C.weights, "weights in HBM"],
-                    ["hsl(205 62% 60%)", "share of the KV pool in use"],
-                    [C.evict, "preemption"]
-                  ] as const)
-                : ([
-                    [C.prefill, "prefill (compute-bound)"],
-                    [C.decode, "decode, output tokens (memory-bound)"],
-                    [C.weights, "weights in HBM"],
-                    ["hsl(200 66% 60%)", "KV blocks of a running sequence"],
-                    ["hsl(200 38% 84%)", "KV blocks cached, session idle"],
-                    [C.dram, "KV in host DRAM"],
-                    [C.ssd, "KV on SSD"],
-                    [C.remote, "KV in the shared remote pool"],
-                    [C.sub, "conversation text read or saved"],
-                    [C.evict, "dropped or preempted"]
-                  ] as const)
-              ).map(([c, l]) => (
-                <div key={l}>
-                  <i className="lv-sw" style={{ background: c }} />
-                  {l}
-                </div>
-              ))}
-              <Rich text={calibrated ? replayText("legend") : panelText("legend.note")} className="lv-note" />
-            </div>
-          </Group>
-        </section>
+        {!narrow && infraPanel}
+        {!narrow && legendPanel}
       </div>
 
       <div className="lv-transport" data-tour="transport">
