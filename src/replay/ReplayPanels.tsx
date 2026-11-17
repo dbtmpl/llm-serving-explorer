@@ -1,4 +1,4 @@
-/** The menus of the Calibrated mode: the mode toggle, the scenario picker, the BLIS badge and the read-only settings. */
+/** The menus of the calibrated replay: the scenario picker, the BLIS badge and the read-only settings. */
 import type { ReactNode } from "react";
 import { replayFields, replayText } from "../content/index.js";
 import { fmtInt } from "../live/format.js";
@@ -17,22 +17,6 @@ export const shortCommit = (commit: string): string => commit.slice(0, 7);
 /** The names BLIS and the replay files use, as people write them. */
 const MODEL_LABELS: Record<string, string> = { "llama-3.1-8b": "Llama 3.1 8B", "llama-70b": "Llama 3.1 70B" };
 const GPU_LABELS: Record<string, string> = { h100: "H100", h200: "H200" };
-
-export function ModeToggle({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => void }) {
-  const options: [Mode, string][] = [
-    ["explore", "Explore (TypeScript model)"],
-    ["calibrated", "Calibrated (BLIS replay)"]
-  ];
-  return (
-    <div className="lv-mode" role="group" aria-label="Mode">
-      {options.map(([m, label]) => (
-        <button key={m} className={m === mode ? "on" : ""} aria-pressed={m === mode} data-testid={`mode-${m}`} onClick={() => m !== mode && onChange(m)}>
-          {label}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 /** The badge that says a BLIS replay is on screen and names the commit it was produced by. */
 export function BlisBadge({ commit }: { commit: string }) {

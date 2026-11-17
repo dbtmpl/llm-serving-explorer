@@ -473,6 +473,9 @@ body,
   flex-direction: column;
   gap: 1px;
 }
+.lv-speed .lv-seg {
+  flex-wrap: nowrap;
+}
 .lv-speed .lv-seg button {
   padding: 2px 7px;
   font-size: 11px;
@@ -932,8 +935,31 @@ body,
   .lv-transport a {
     display: none;
   }
+  /* on a phone the explanation box sits in a band under the metrics, not over the graph */
   .lv-callout {
-    width: 180px;
+    width: calc(100vw - 16px);
+    box-sizing: border-box;
+    padding: 6px 10px;
+  }
+  .lv-callout b {
+    font-size: 11.5px;
+  }
+  .lv-callout span {
+    font-size: 11px;
+    line-height: 1.4;
+  }
+  .lv-transport {
+    padding: 4px 10px 4px 4px;
+  }
+  .lv-play {
+    width: 34px;
+    height: 34px;
+  }
+  .lv-clock {
+    min-width: 50px;
+  }
+  .lv-log {
+    bottom: 62px;
   }
   .lv-step,
   .lv-tour {
@@ -983,10 +1009,20 @@ body,
   margin: 4px 0;
 }
 .lv-formula .katex {
-  font-size: 1.3em;
+  font-size: 1.18em;
 }
 .lv-tex .katex {
   font-size: 1em;
+}
+/* KaTeX sets sub- and superscripts at 70% of the base; word subscripts such as "decode" or "weights"
+   still read too large next to small body text, so they are set smaller and a little tighter. */
+.lv-formula .katex .msupsub,
+.lv-tex .katex .msupsub {
+  font-size: 0.82em;
+}
+.lv-formula .katex .msupsub .mord.text,
+.lv-tex .katex .msupsub .mord.text {
+  letter-spacing: -0.01em;
 }
 .lv-table-wrap {
   overflow-x: auto;
@@ -1121,30 +1157,235 @@ body,
   margin: 0;
 }
 
-/* Calibrated mode: the mode toggle, the BLIS badge and the read-only settings */
-.lv-mode {
-  display: flex;
-  gap: 2px;
-  padding: 2px;
-  margin-bottom: 8px;
+/* Calibrated mode: the way back, the BLIS badge and the read-only settings */
+.lv-back {
+  display: block;
+  width: 100%;
+  margin-bottom: 10px;
+  border: 1px solid var(--line);
   background: var(--soft);
   border-radius: 9px;
+  padding: 7px 10px;
+  font-size: 12px !important;
+  font-weight: 600;
+  color: var(--ink) !important;
+  text-align: left;
+  cursor: pointer;
 }
-.lv-mode button {
-  flex: 1;
+.lv-back:hover {
+  border-color: var(--ink);
+}
+
+/* the "more" menu in the transport bar */
+.lv-more {
+  position: relative;
+}
+.lv-more-menu {
+  position: fixed;
+  z-index: 12;
+  min-width: 230px;
+  display: flex;
+  flex-direction: column;
+  padding: 5px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.18);
+}
+.lv-more-menu button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
   border: 0;
   background: none;
-  border-radius: 7px;
-  padding: 5px 4px;
-  font-size: 11px;
-  line-height: 1.25;
+  border-radius: 8px;
+  padding: 7px 10px;
+  text-align: left;
+  font-size: 12.5px !important;
+  font-weight: 600;
+  color: var(--ink) !important;
+  cursor: pointer;
+}
+.lv-more-menu button:hover,
+.lv-more-menu button:focus-visible {
+  background: var(--soft);
+}
+.lv-more-menu button small {
+  font-size: 10.5px;
+  font-weight: 400;
+  color: var(--mute);
+}
+.lv-more-menu hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 4px 6px;
+}
+
+/* compact speed picker on narrow screens: one row tall, scroll or tap to choose */
+.lv-wheel {
+  position: relative;
+  height: 42px;
+  width: 52px;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+  overscroll-behavior: contain;
+  border-radius: 8px;
+  background: var(--soft);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 35%, #000 65%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 35%, #000 65%, transparent 100%);
+}
+.lv-wheel::-webkit-scrollbar {
+  display: none;
+}
+.lv-wheel > i {
+  display: block;
+  height: 14px;
+}
+.lv-wheel button {
+  display: block;
+  width: 100%;
+  height: 14px;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: 500 10.5px/14px ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--mute);
+  scroll-snap-align: center;
+}
+.lv-wheel button.on {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+/* history of explanations */
+.lv-log-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.lv-log-count {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 99px;
+  background: var(--soft);
+  font: 600 10.5px/16px ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--sub);
+  text-align: center;
+  transition: background 0.3s, color 0.3s;
+}
+.lv-log-count.new {
+  background: var(--ink);
+  color: #fff;
+}
+.lv-log {
+  position: absolute;
+  z-index: 9;
+  left: 50%;
+  bottom: 74px;
+  transform: translateX(-50%);
+  width: min(460px, calc(100vw - 16px));
+  max-height: min(56vh, 520px);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.2);
+  animation: lv-log-in 0.18s ease-out;
+}
+@keyframes lv-log-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+}
+.lv-log header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 10px 10px 6px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.lv-log h2 {
+  margin: 0;
+  font-size: 13px;
+}
+.lv-log header > span {
+  margin-right: auto;
+  font-size: 10.5px;
+  color: var(--mute);
+}
+.lv-log > .lv-note {
+  margin: 12px 14px;
+}
+.lv-log ol {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.lv-log li button {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  text-align: left;
+  border: 0;
+  border-left: 3px solid var(--ink);
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 6px 9px;
+  cursor: pointer;
+}
+.lv-log li button:disabled {
+  cursor: default;
+}
+.lv-log li button:not(:disabled):hover {
+  background: var(--soft);
+}
+.lv-log li.tone-prefill button {
+  border-left-color: var(--prefill);
+}
+.lv-log li.tone-decode button {
+  border-left-color: var(--accent);
+}
+.lv-log li.tone-dram button {
+  border-left-color: var(--dram);
+}
+.lv-log li.tone-ssd button {
+  border-left-color: var(--ssd);
+}
+.lv-log li.tone-evict button {
+  border-left-color: var(--evict);
+}
+.lv-log li.tone-remote button {
+  border-left-color: var(--remote);
+}
+.lv-log-meta {
+  font: 500 10px ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--mute);
+}
+.lv-log li b {
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--ink);
+}
+.lv-log-body {
+  font-size: 11.5px;
+  line-height: 1.45;
   color: var(--sub);
 }
-.lv-mode button.on {
-  background: #fff;
-  color: var(--ink);
-  font-weight: 650;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+.lv-fly {
+  will-change: transform, opacity;
 }
 .lv-badge {
   position: absolute;

@@ -1,15 +1,9 @@
 # Calibrated mode
 
-The explanatory text of the "Calibrated (BLIS replay)" mode: what the mode is, which scenarios it offers and what each shows, the badge that names the BLIS commit, the note on what a replay cannot show, and the notes in the inspector for a replay. Control labels stay in the code. Values in braces are filled in by the code from the replay file, so the text cannot disagree with the data.
-
-## `mode.explore` Explore mode
-_Where:_ Left menu, under the mode toggle, while Explore is selected.
-
-### text
-The TypeScript model in `src/sim/`: change any setting while requests are in flight and watch every block, step and routing decision.
+The explanatory text of the calibrated replay, reached from the transport bar's "more" menu (Calibrated replay (BLIS)): what the mode is, which scenarios it offers and what each shows, the badge that names the BLIS commit, the note on what a replay cannot show, and the notes in the inspector for a replay. Control labels stay in the code. Values in braces are filled in by the code from the replay file, so the text cannot disagree with the data.
 
 ## `mode.calibrated` Calibrated mode
-_Where:_ Left menu, under the mode toggle, while Calibrated is selected.
+_Where:_ Left menu, under the "Back to the approximate model" button, while a replay is shown.
 
 ### text
 A recorded run of BLIS on a fixed scenario. The settings are the run's and cannot be changed; you can pause, change the speed and click any part to see what BLIS recorded.
@@ -21,7 +15,7 @@ _Where:_ A badge at the top of the graph and in the left menu for as long as a B
 BLIS replay
 
 ### text
-Every time, route and number in this picture was produced by [BLIS](https://github.com/inference-sim/inference-sim) at commit {commit}. It is a recording, not the TypeScript model.
+Every time, route and number in this picture was produced by [BLIS](https://github.com/inference-sim/inference-sim) at commit {commit}. It is a recording, not the approximate model the site otherwise runs.
 
 ## `shows` What a replay is evidence for
 _Where:_ Left menu, drop-down "What this shows" under the badge.
@@ -36,7 +30,7 @@ _Where:_ Left menu, drop-down "What this does not show" under the badge.
 BLIS reports no events inside an engine step. A replay therefore draws no per-block KV map, no forward-pass sweep, no roofline dot and no memory tiers: a pod shows how full its KV pool is and how many requests run and wait. Output tokens are spaced evenly between the first and the last token BLIS reports. BLIS starts a request's clock when it reaches the router, so the short trip from the session to the router is drawn for the picture, just before that time.
 
 ## `pod.aggregate` Pod interior note
-_Where:_ On each pod in the graph, where Explore draws the forward pass, the roofline and the memory tiers.
+_Where:_ On each pod in the graph, where the approximate model draws the forward pass, the roofline and the memory tiers.
 
 ### line-1
 Not in BLIS's output
@@ -78,13 +72,13 @@ One pod with a deliberately small KV pool ({pool} tokens) receives four requests
 _Where:_ Right menu, under the list of the scenario's settings.
 
 ### text
-These are the settings BLIS ran this scenario with. They are fixed because the run is recorded; switch to Explore to change settings and see the TypeScript model respond.
+These are the settings BLIS ran this scenario with. They are fixed because the run is recorded; go back to the approximate model to change settings and watch it respond.
 
-## `explore-only` Features that stay in Explore
+## `explore-only` Features of the approximate model only
 _Where:_ Left menu, under the scenario description, in Calibrated mode.
 
 ### text
-The step-through, the explain boxes and the guided tour narrate the TypeScript model, so they are available in Explore mode only.
+The step-through, the explain boxes, their history and the guided tour narrate the approximate model, so they are not available in a replay.
 
 ## `legend` Legend note
 _Where:_ Right menu, group "Legend", in Calibrated mode.
@@ -102,7 +96,7 @@ Loading the BLIS replay…
 _Where:_ Centre of the screen when a replay file could not be fetched or is not a valid replay file.
 
 ### text
-This replay could not be loaded: {reason}. Pick another scenario or switch back to Explore.
+This replay could not be loaded: {reason}. Pick another scenario or go back to the approximate model.
 
 ## `finished` Replay finished
 _Where:_ Under the clock when the replay has reached its last event.

@@ -59,17 +59,18 @@ test.describe("a configuration that does not fit", () => {
     await openGroup(page, "Model and GPU");
     await pick(page, "model", "Llama 3.1 70B");
     await pick(page, "precision", "FP8");
-    // FP8 on one H100 now leaves a pool of 14,512 tokens (4.6 average requests), so it takes a little less memory to make it very small
-    await page.locator("label.lv-slider", { hasText: "gpu_memory_utilization" }).locator("input").fill("0.89");
+    // FP8 on one H100 leaves a pool of 12,368 tokens (3.9 average requests) at the default utilisation: very small
     const banner = page.getByTestId("fit-banner");
     await expect(banner).toContainText("KV pool is very small");
-    await expect(banner).toContainText("11,900 tokens");
+    await expect(banner).toContainText("12,400 tokens");
   });
 
   test("at phone width the box and its buttons are reachable", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 800 });
     await page.goto("/");
-    await page.getByTestId("send-1").click().catch(() => {});
+    // on a phone the menus start closed
+    await page.getByTestId("toggle-panels").click();
+    await page.getByTestId("send-1").click();
     await page.evaluate(() => (window as any).__live.world().params && 0);
     await page.evaluate(() => {
       // the right menu is hidden on a phone, so change the model through the world as the menu would

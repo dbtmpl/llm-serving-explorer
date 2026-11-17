@@ -44,6 +44,7 @@ test.describe("calibrated mode", () => {
     await page.goto("/");
     await expect(page.getByTestId("blis-badge")).toHaveCount(0);
 
+    await page.getByTestId("more").click();
     await page.getByTestId("mode-calibrated").click();
     const badge = page.getByTestId("blis-badge");
     await expect(badge).toBeVisible();
@@ -101,6 +102,7 @@ test.describe("calibrated mode", () => {
   test("the step-through and the tour are not offered while replaying", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByTestId("step-toggle")).toBeVisible();
+    await page.getByTestId("more").click();
     await page.getByTestId("mode-calibrated").click();
     await expect(page.getByTestId("step-toggle")).toHaveCount(0);
     await expect(page.getByTestId("tour-start")).toHaveCount(0);
@@ -110,6 +112,7 @@ test.describe("calibrated mode", () => {
     test.setTimeout(60_000);
     const errors = guard(page);
     await page.goto("/");
+    await page.getByTestId("more").click();
     await page.getByTestId("mode-calibrated").click();
     await page.getByTestId("scenario").selectOption("kv-pressure");
     await page.getByTestId("speed-10").click();
@@ -120,6 +123,7 @@ test.describe("calibrated mode", () => {
   test("an unreachable replay file says so instead of hanging", async ({ page }) => {
     await page.route("**/replay/prefix-followups.json", (r) => r.fulfill({ status: 404, body: "no" }));
     await page.goto("/");
+    await page.getByTestId("more").click();
     await page.getByTestId("mode-calibrated").click();
     await expect(page.getByTestId("replay-failed")).toContainText("could not be loaded");
     await page.getByTestId("mode-explore").click();
@@ -131,6 +135,7 @@ test.describe("calibrated mode", () => {
     await page.goto("/");
     const overflow = () => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(await overflow()).toBeLessThanOrEqual(0);
+    await page.getByTestId("more").click();
     await page.getByTestId("mode-calibrated").click();
     await expect(page.getByTestId("blis-badge")).toBeVisible();
     await page.waitForTimeout(1500);
