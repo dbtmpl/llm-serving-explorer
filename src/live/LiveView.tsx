@@ -43,8 +43,17 @@ interface Calibrated {
 const CALLOUT_TTL = 5;
 /** Most explanation boxes on screen or waiting at once; past it the oldest leaves early. */
 const MAX_CALLOUTS = 12;
-/** While a box waits for room the clock runs at this share of the chosen speed, so the picture keeps pace with the text. */
-const CROWDED_SLOWDOWN = 0.25;
+/** Seconds between two boxes appearing: they come one at a time, so they also leave one at a time. */
+const PACE_S = 1.6;
+/**
+ * While a box waits for its turn the whole simulation runs at this share of the chosen speed, so the picture keeps
+ * pace with the text. It slows everything alike, so every duration keeps its proportion to the others.
+ */
+const READING_SHARE = 0.15;
+/** A repeated notice (not a first explanation) that has waited this long for its turn is not shown late; it goes straight to the history. */
+const STALE_S = 3;
+/** How fast the clock eases into and out of a slow-down or fast-forward, per second. */
+const WARP_EASE = 2.5;
 /** Space between stacked boxes and between a stack and the graph, px. */
 const STACK_GAP = 8;
 /** Seconds the restart note keeps the router's node to itself before other notes may take it. */
@@ -59,17 +68,25 @@ interface Shown extends Callout {
   waiting?: boolean;
   /** animation seconds when it was created */
   created?: number;
+  /** its number in the current run of boxes, given when it appears */
+  no?: number;
 }
 
 /** Below this width the screen is a phone: menus start closed, explanation boxes dock under the metrics. */
 const NARROW_PX = 900;
 /**
- * A pod's cold start (container, then weights) plays at least this fast while there is nothing else to watch:
- * in the step-through, and in the live view while no pod is ready yet.
+ * A pod's cold start (container, then weights) plays at least this fast while there is nothing else to watch: in
+ * the step-through, and in the live view while no pod is ready yet and no box is waiting. The model's cold start
+ * (`coldStartS`, 2 s) is already shortened from the minutes a real one takes; this only fast-forwards the wait.
  */
-const COLD_START_SPEED = 2.4;
-/** In the live view the cold start speeds up only once every explanation box on screen is this many seconds old. */
-const COLD_START_READ_S = 2;
+const COLD_START_SPEED = 1;
+
+/** What the clock is doing besides the chosen speed: slowed so a box can be read, or fast-forwarding a cold start. */
+function warpLabel(warp: number, narrow: boolean): string {
+  if (warp < 0.9) return narrow ? "slowed" : "slowed to read";
+  if (warp > 1.1) return narrow ? "⏩ start" : "⏩ cold start";
+  return "simulated";
+}
 
 /** The speed picker on a phone: one row tall; scroll it, or tap a neighbour, to change the speed. */
 function SpeedWheel({ speeds, value, onChange }: { speeds: number[]; value: number; onChange: (s: number) => void }) {
@@ -275,7 +292,7 @@ export function LiveView() {
   const [arch, setArch] = useState(DEFAULT_ARCH);
   const [histPos, setHistPos] = useState<[number, number, boolean]>([0, 0, false]);
   const [, refresh] = useReducer((x: number) => x + 1, 0);
-  const live = useRef({ playing, speed, explain, callouts, seen: new Set<string>(), lastShown: new Map<string, number>(), nextId: 1, stepMode: false, held: null as Shown | null, focus: null as number | null, focusDone: false, script: newScript(), freeze: false, queue: [] as Callout[], tour: null as number | null, hist: [] as StepRec[], hi: -1, dirty: false, replay: null as Replay | null, finish: () => {}, toLog: (() => {}) as (c: Shown, kind: LogEntry["kind"], fly: boolean) => void });
+  const live = useRef({ playing, speed, explain, callouts, seen: new Set<string>(), lastShown: new Map<string, number>(), nextId: 1, stepMode: false, held: null as Shown | null, focus: null as number | null, focusDone: false, script: newScript(), freeze: false, queue: [] as Callout[], tour: null as number | null, hist: [] as StepRec[], hi: -1, dirty: false, replay: null as Replay | null, warp: 1, finish: () => {}, toLog: (() => {}) as (c: Shown, kind: LogEntry["kind"], fly: boolean) => void });
   live.current.tour = tour;
   const heldEl = useRef<HTMLDivElement>(null);
   const tourEl = useRef<HTMLDivElement>(null);
@@ -286,6 +303,7 @@ export function LiveView() {
   live.current.explain = explain;
   live.current.callouts = callouts;
   const calloutEls = useRef(new Map<number, HTMLDivElement>());
+  const leaderSvg = useRef<SVGSVGElement>(null);
   const leftRef = useRef<HTMLDivElement>(null);
   const rightRef = useRef<HTMLDivElement>(null);
   const [panels, setPanels] = useState(() => window.innerWidth >= NARROW_PX);
@@ -394,6 +412,29 @@ export function LiveView() {
     const placed = new Map<number, { x: number; y: number }>();
     /** The side each box was given when it first appeared: above its node or the graph, or below the graph. It keeps it. */
     const sides = new Map<number, "above" | "below">();
+    /** When the last box appeared, and the number it got; numbers start again at 1 once the screen is empty. */
+    let lastReveal = -99;
+    let lastNo = 0;
+    /** The line from each box to the part of the graph it explains, with the box's number at that end. */
+    const leaders = new Map<number, SVGGElement>();
+    const SVG = "http://www.w3.org/2000/svg";
+    const leaderOf = (c: Shown): SVGGElement | null => {
+      const svg = leaderSvg.current;
+      if (!svg) return null;
+      let g = leaders.get(c.id);
+      if (!g) {
+        g = document.createElementNS(SVG, "g");
+        g.setAttribute("class", `lv-leader tone-${c.tone}`);
+        g.appendChild(document.createElementNS(SVG, "line"));
+        g.appendChild(document.createElementNS(SVG, "circle")).setAttribute("r", "8");
+        const t = g.appendChild(document.createElementNS(SVG, "text"));
+        t.setAttribute("text-anchor", "middle");
+        t.setAttribute("dominant-baseline", "central");
+        svg.appendChild(g);
+        leaders.set(c.id, g);
+      }
+      return g;
+    };
     /**
      * Lay out the explanation boxes. Newest first, each box sits nearest to what it explains and pushes the older
      * ones on its side away from it. A new box goes above when there is room there, else below the graph; with
@@ -441,6 +482,9 @@ export function LiveView() {
       const order = [...items].reverse();
       // a stack where a box is waiting takes no newer box before it: first come, first shown
       const blocked = new Set<string>();
+      // and one box at a time appears, PACE_S apart, so they leave one at a time too
+      let turn = scene.vt - lastReveal >= PACE_S;
+      if (!list.length) lastNo = 0;
       for (const it of [...order.filter((x) => !x.c.waiting), ...order.filter((x) => x.c.waiting)]) {
         const key = keyOf(it);
         if (key === null) continue;
@@ -449,8 +493,8 @@ export function LiveView() {
         let side = sides.get(it.c.id);
         if (!side) {
           const fits = blocked.has(key) ? null : st.used.above + h <= st.room.above ? "above" : st.used.below + h <= st.room.below ? "below" : null;
-          // no room on either side: wait, unless nothing else is there (then it overlaps rather than never shows)
-          if (!fits && (blocked.has(key) || st.boxes.above.length + st.boxes.below.length > 0)) {
+          // not its turn yet, or no room on either side: wait (with no room, unless nothing else is there; then it overlaps rather than never shows)
+          if (!turn || (!fits && (blocked.has(key) || st.boxes.above.length + st.boxes.below.length > 0))) {
             it.c.born = scene.vt;
             blocked.add(key);
             continue;
@@ -460,6 +504,11 @@ export function LiveView() {
           if (it.c.waiting) {
             it.c.waiting = false;
             it.c.born = scene.vt;
+            it.c.no = ++lastNo;
+            const badge = it.el.querySelector(".lv-callout-no");
+            if (badge) badge.textContent = String(it.c.no);
+            lastReveal = scene.vt;
+            turn = false;
           }
         }
         st.used[side] += h;
@@ -509,15 +558,50 @@ export function LiveView() {
       }
       for (const it of items) {
         const t = want.get(it.c.id);
+        const g = leaderOf(it.c);
         if (!t) {
           it.el.style.opacity = "0";
+          if (g) g.style.opacity = "0";
           continue;
         }
         const cur = placed.get(it.c.id) ?? t;
         const p = { x: cur.x + (t.x - cur.x) * 0.25, y: cur.y + (t.y - cur.y) * 0.25 };
         placed.set(it.c.id, p);
-        it.el.style.opacity = String(Math.min(1, (scene.vt - it.c.born) * 3));
+        const op = Math.min(1, (scene.vt - it.c.born) * 3);
+        it.el.style.opacity = String(op);
         it.el.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px) translate(-50%, 0)`;
+        // the leader: from the box's nearest edge to the part it explains
+        const a = scene.anchor(world, it.c.target);
+        if (!g) continue;
+        if (!a) {
+          g.style.opacity = "0";
+          continue;
+        }
+        const end = scene.toScreen(a);
+        const l = p.x - it.w / 2;
+        const r = p.x + it.w / 2;
+        const bx = Math.max(l + 10, Math.min(r - 10, end.x));
+        const by = end.y > p.y + it.h ? p.y + it.h : end.y < p.y ? p.y : NaN;
+        const inside = Number.isNaN(by) && end.x >= l && end.x <= r;
+        const from = Number.isNaN(by) ? { x: end.x < l ? l : r, y: Math.max(p.y + 10, Math.min(p.y + it.h - 10, end.y)) } : { x: bx, y: by };
+        g.style.opacity = inside ? "0" : String(op);
+        const [line, dot, label] = g.children as unknown as [SVGLineElement, SVGCircleElement, SVGTextElement];
+        line.setAttribute("x1", String(Math.round(from.x)));
+        line.setAttribute("y1", String(Math.round(from.y)));
+        line.setAttribute("x2", String(Math.round(end.x)));
+        line.setAttribute("y2", String(Math.round(end.y)));
+        dot.setAttribute("cx", String(Math.round(end.x)));
+        dot.setAttribute("cy", String(Math.round(end.y)));
+        label.setAttribute("x", String(Math.round(end.x)));
+        label.setAttribute("y", String(Math.round(end.y)));
+        label.textContent = it.c.no ? String(it.c.no) : "";
+      }
+      for (const [id, g] of leaders) {
+        if (list.some((c) => c.id === id && !c.waiting)) continue;
+        if (!list.some((c) => c.id === id)) {
+          g.remove();
+          leaders.delete(id);
+        } else g.style.opacity = "0";
       }
       for (const id of placed.keys()) if (!list.some((c) => c.id === id)) placed.delete(id);
       for (const id of sides.keys()) if (!list.some((c) => c.id === id)) sides.delete(id);
@@ -560,17 +644,20 @@ export function LiveView() {
       const replay = st.replay;
       const running = st.playing && !st.held && !frozen;
       const animating = st.playing && (!st.held || !!st.held.animate || !!replay);
-      // a box waiting for room slows the clock until it can be shown
-      const crowded = !st.stepMode && st.callouts.some((c) => c.waiting && scene.vt - (c.created ?? scene.vt) > 0.15);
+      // The clock's warp, a factor on the chosen speed that applies to the whole simulation at once, so every
+      // duration keeps its proportion to the others: slowed while a box waits for its turn, fast-forwarded through
+      // a cold start with nothing else to watch. It eases in and out instead of jumping.
+      // only a first explanation slows the clock; a busy run's repeated notices never hold it back
+      const reading = !st.stepMode && st.callouts.some((c) => c.waiting && c.once && scene.vt - (c.created ?? scene.vt) > 0.1);
+      const starting = world.pods.some((p) => p.state === "creating" || p.state === "loading");
+      const cold = starting && (st.stepMode || !world.pods.some((p) => p.state === "ready"));
+      const target = reading ? READING_SHARE : cold ? Math.max(1, COLD_START_SPEED / st.speed) : 1;
+      st.warp += (target - st.warp) * Math.min(1, dt * WARP_EASE);
+      if (Math.abs(st.warp - target) < 0.01) st.warp = target;
       if (calibrated) {
         if (st.playing) run.advance(dt * st.speed);
       } else if (running) {
-        // a cold start is waited for, not studied: with nothing else to watch it plays at least at COLD_START_SPEED
-        const starting = world.pods.some((p) => p.state === "creating" || p.state === "loading");
-        // in the live view it waits until the newest explanation box has been up for a while, so the boxes about the start are read first
-        const read = st.callouts.every((c) => scene.vt - c.born > COLD_START_READ_S);
-        const cold = starting && (st.stepMode || (read && !world.pods.some((p) => p.state === "ready")));
-        advance(world, dt * (cold ? Math.max(st.speed, COLD_START_SPEED) : crowded ? st.speed * CROWDED_SLOWDOWN : st.speed));
+        advance(world, dt * st.speed * st.warp);
       }
       else if (replay && st.playing && world.t < replay.t) advance(world, Math.min(dt * replay.rate, replay.t - world.t));
       const events = shown.events.splice(0);
@@ -652,6 +739,12 @@ export function LiveView() {
       if (st.callouts.some((c) => scene.vt - c.born > CALLOUT_TTL)) {
         for (const c of st.callouts) if (scene.vt - c.born > CALLOUT_TTL) st.toLog(c, "callout", true);
         st.callouts = st.callouts.filter((c) => scene.vt - c.born <= CALLOUT_TTL);
+        setCallouts(st.callouts);
+      }
+      const stale = st.callouts.filter((c) => c.waiting && !c.once && scene.vt - (c.created ?? scene.vt) > STALE_S);
+      if (stale.length) {
+        for (const c of stale) st.toLog(c, "callout", false);
+        st.callouts = st.callouts.filter((c) => !stale.includes(c));
         setCallouts(st.callouts);
       }
       const squeezed = placeCallouts(st.callouts, world, cw, ch, bannerH);
@@ -1361,6 +1454,7 @@ export function LiveView() {
         </div>
       )}
 
+      <svg className="lv-leaders" ref={leaderSvg} aria-hidden="true" />
       <div className="lv-callouts">
         {callouts.map((c) => (
           <div
@@ -1374,6 +1468,7 @@ export function LiveView() {
             onClick={() => select(c.target)}
           >
             <b>
+              <i className="lv-callout-no" aria-hidden="true" />
               <Rich inline text={c.title} />
             </b>
             <span>
@@ -1522,7 +1617,7 @@ export function LiveView() {
         </button>
         <div className="lv-clock" data-testid="clock" title={replay?.finished ? replayText("finished") : undefined}>
           <b>{elapsed(w).toFixed(2)} s</b>
-          <span>{replay?.finished ? "replay finished" : calibrated ? "BLIS clock" : "simulated"}</span>
+          <span data-testid="clock-mode" title="The clock slows while an explanation waits its turn, and fast-forwards a cold start with nothing else to watch. Both change the whole simulation alike.">{replay?.finished ? "replay finished" : calibrated ? "BLIS clock" : warpLabel(live.current.warp, narrow)}</span>
         </div>
         <button
           className={`lv-menus-btn ${panels ? "on" : ""}`}

@@ -466,6 +466,7 @@ body,
 }
 .lv-clock span,
 .lv-speed > span {
+  white-space: nowrap;
   font-size: 10px;
   color: var(--mute);
 }
@@ -500,6 +501,87 @@ body,
 }
 
 /* callouts next to nodes */
+/* the line from each box to the part it explains, numbered at that end */
+.lv-leaders {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+.lv-leader {
+  --c: var(--ink);
+  opacity: 0;
+}
+.lv-leader line {
+  stroke: var(--c);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+  opacity: 0.55;
+}
+.lv-leader circle {
+  fill: var(--c);
+  stroke: #fff;
+  stroke-width: 1.5;
+}
+.lv-leader text {
+  fill: #fff;
+  font: 700 10px ui-sans-serif, system-ui, sans-serif;
+}
+.lv-leader.tone-prefill {
+  --c: var(--prefill);
+}
+.lv-leader.tone-decode {
+  --c: var(--accent);
+}
+.lv-leader.tone-dram {
+  --c: var(--dram);
+}
+.lv-leader.tone-ssd {
+  --c: var(--ssd);
+}
+.lv-leader.tone-evict {
+  --c: var(--evict);
+}
+.lv-leader.tone-remote {
+  --c: var(--remote);
+}
+.lv-callout-no {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  border-radius: 99px;
+  background: var(--ink);
+  color: #fff;
+  font: 700 10px ui-sans-serif, system-ui, sans-serif;
+  font-style: normal;
+  vertical-align: 1px;
+}
+.lv-callout-no:empty {
+  display: none;
+}
+.lv-callout.tone-prefill .lv-callout-no {
+  background: var(--prefill);
+}
+.lv-callout.tone-decode .lv-callout-no {
+  background: var(--accent);
+}
+.lv-callout.tone-dram .lv-callout-no {
+  background: var(--dram);
+}
+.lv-callout.tone-ssd .lv-callout-no {
+  background: var(--ssd);
+}
+.lv-callout.tone-evict .lv-callout-no {
+  background: var(--evict);
+}
+.lv-callout.tone-remote .lv-callout-no {
+  background: var(--remote);
+}
 .lv-callouts {
   position: absolute;
   inset: 0;
