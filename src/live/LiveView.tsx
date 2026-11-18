@@ -39,12 +39,20 @@ interface Calibrated {
   file: ReplayFile | null;
   error: string;
 }
-/** Seconds of animation every explanation box stays before it flies into the history; the same for all. */
-const CALLOUT_TTL = 5;
+/**
+ * Seconds of animation every explanation box stays before it flies into the history, at the default speed. A
+ * slower speed stretches it (and the pace between boxes) in proportion, so slowing down slows the notes as well
+ * as the graph; a faster one shortens it, but only so far, so a note stays readable.
+ */
+const CALLOUT_TTL = 6;
 /** Most explanation boxes on screen or waiting at once; past it the oldest leaves early. */
 const MAX_CALLOUTS = 12;
-/** Seconds between two boxes appearing: they come one at a time, so they also leave one at a time. */
-const PACE_S = 1.6;
+/** Seconds between two boxes appearing, at the default speed: they come one at a time, so they also leave one at a time. */
+const PACE_S = 2.2;
+/** How much longer the notes stay, and the longer they wait for each other, at `speed` than at the default speed. */
+function noteStretch(speed: number): number {
+  return Math.max(0.5, Math.min(5, EXPLORE_SPEED / speed));
+}
 /**
  * While a box waits for its turn the whole simulation runs at this share of the chosen speed, so the picture keeps
  * pace with the text. It slows everything alike, so every duration keeps its proportion to the others.
@@ -72,20 +80,33 @@ interface Shown extends Callout {
   no?: number;
 }
 
+/** The floating notes button's size plus its gap, px: boxes keep clear of the corner it sits in. */
+const NOTES_BTN_PX = 56;
 /** Below this width the screen is a phone: menus start closed, explanation boxes dock under the metrics. */
 const NARROW_PX = 900;
 /**
- * A pod's cold start (container, then weights) plays at least this fast while there is nothing else to watch: in
- * the step-through, and in the live view while no pod is ready yet and no box is waiting. The model's cold start
+ * A pod's cold start (container, then weights) plays this many times faster than the chosen speed while there is
+ * nothing else to watch: in the step-through, and in the live view while no pod is ready yet and no box is
+ * waiting. A factor on the speed, so a slower speed slows the cold start too. The model's cold start
  * (`coldStartS`, 2 s) is already shortened from the minutes a real one takes; this only fast-forwards the wait.
  */
-const COLD_START_SPEED = 1;
+const COLD_START_WARP = 2.5;
 
 /** What the clock is doing besides the chosen speed: slowed so a box can be read, or fast-forwarding a cold start. */
 function warpLabel(warp: number, narrow: boolean): string {
   if (warp < 0.9) return narrow ? "slowed" : "slowed to read";
   if (warp > 1.1) return narrow ? "⏩ start" : "⏩ cold start";
   return "simulated";
+}
+
+/** A speech bubble with lines of text; struck through when the notes are off. */
+function NotesIcon({ off }: { off: boolean }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-9l-5 4v-4H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" />
+      {off ? <path d="M3 3l18 18" /> : <path d="M7.5 9.5h9M7.5 13h6" />}
+    </svg>
+  );
 }
 
 /** The speed picker on a phone: one row tall; scroll it, or tap a neighbour, to change the speed. */
@@ -320,7 +341,7 @@ export function LiveView() {
   const toLog = useCallback((c: Shown, kind: LogEntry["kind"], fly: boolean) => {
     const el = kind === "callout" ? calloutEls.current.get(c.id) : null;
     if (fly && el) flyToLog(el, logBtn.current);
-    setLog((l) => logAppend(l, { id: c.id, kind, t: c.simT ?? c.born, tone: c.tone, title: c.title, body: c.body, target: c.focus ?? c.target }));
+    setLog((l) => logAppend(l, { id: c.id, kind, t: c.simT ?? c.born, tone: c.tone, title: c.title, body: c.body, target: c.focus ?? c.target, ...(c.no ? { no: c.no } : {}) }));
     if (!logOpenRef.current) setLogUnread(true);
   }, []);
   live.current.toLog = toLog;
@@ -444,7 +465,7 @@ export function LiveView() {
      * strip, the corner menus and the transport bar. Returns the oldest box of a side that has run out of room,
      * which then leaves early, or null.
      */
-    const placeCallouts = (list: Shown[], world: World, cw: number, ch: number, bannerH: number): Shown | null => {
+    const placeCallouts = (list: Shown[], world: World, cw: number, ch: number, bannerH: number, stretch: number): Shown | null => {
       const scene = sceneRef.current;
       const want = new Map<number, { x: number; y: number }>();
       const items = [...list].reverse().flatMap((c) => {
@@ -452,7 +473,8 @@ export function LiveView() {
         return el ? [{ c, el, h: el.offsetHeight, w: el.offsetWidth }] : [];
       });
       const g = scene.contentOnScreen() ?? { l: 0, t: ch / 2, r: cw, b: ch / 2 };
-      const bottom = ch - (scene.panels.bottom || 96);
+      // on a phone the notes button floats in the corner above the transport bar; boxes stop above it
+      const bottom = ch - (scene.panels.bottom || 96) - (cw < NARROW_PX ? NOTES_BTN_PX : 0);
       // stacks: a key, the room each side has, and what is already in it; older boxes keep their side
       type Stack = { room: { above: number; below: number }; used: { above: number; below: number }; boxes: { above: typeof items; below: typeof items } };
       const stacks = new Map<string, Stack>();
@@ -483,7 +505,7 @@ export function LiveView() {
       // a stack where a box is waiting takes no newer box before it: first come, first shown
       const blocked = new Set<string>();
       // and one box at a time appears, PACE_S apart, so they leave one at a time too
-      let turn = scene.vt - lastReveal >= PACE_S;
+      let turn = scene.vt - lastReveal >= PACE_S * stretch;
       if (!list.length) lastNo = 0;
       for (const it of [...order.filter((x) => !x.c.waiting), ...order.filter((x) => x.c.waiting)]) {
         const key = keyOf(it);
@@ -551,7 +573,8 @@ export function LiveView() {
             y = Math.min(y, bottom - it.h);
             const hw = it.w / 2 + 8;
             const minX = y < scene.panels.lh ? scene.panels.lw + hw : hw;
-            const maxX = y < scene.panels.rh ? cw - scene.panels.rw - hw : cw - hw;
+            // clear of the menus at the top right and of the notes button at the bottom right
+            const maxX = y < scene.panels.rh ? cw - scene.panels.rw - hw : y + it.h > bottom - NOTES_BTN_PX ? cw - NOTES_BTN_PX - hw : cw - hw;
             want.set(it.c.id, { x: Math.max(minX, Math.min(maxX, s.x)), y });
           }
         }
@@ -651,7 +674,7 @@ export function LiveView() {
       const reading = !st.stepMode && st.callouts.some((c) => c.waiting && c.once && scene.vt - (c.created ?? scene.vt) > 0.1);
       const starting = world.pods.some((p) => p.state === "creating" || p.state === "loading");
       const cold = starting && (st.stepMode || !world.pods.some((p) => p.state === "ready"));
-      const target = reading ? READING_SHARE : cold ? Math.max(1, COLD_START_SPEED / st.speed) : 1;
+      const target = reading ? READING_SHARE : cold ? COLD_START_WARP : 1;
       st.warp += (target - st.warp) * Math.min(1, dt * WARP_EASE);
       if (Math.abs(st.warp - target) < 0.01) st.warp = target;
       if (calibrated) {
@@ -736,18 +759,20 @@ export function LiveView() {
           setCallouts(st.callouts);
         }
       }
-      if (st.callouts.some((c) => scene.vt - c.born > CALLOUT_TTL)) {
-        for (const c of st.callouts) if (scene.vt - c.born > CALLOUT_TTL) st.toLog(c, "callout", true);
-        st.callouts = st.callouts.filter((c) => scene.vt - c.born <= CALLOUT_TTL);
+      const stretch = noteStretch(st.speed);
+      const ttl = CALLOUT_TTL * stretch;
+      if (st.callouts.some((c) => scene.vt - c.born > ttl)) {
+        for (const c of st.callouts) if (scene.vt - c.born > ttl) st.toLog(c, "callout", true);
+        st.callouts = st.callouts.filter((c) => scene.vt - c.born <= ttl);
         setCallouts(st.callouts);
       }
-      const stale = st.callouts.filter((c) => c.waiting && !c.once && scene.vt - (c.created ?? scene.vt) > STALE_S);
+      const stale = st.callouts.filter((c) => c.waiting && !c.once && scene.vt - (c.created ?? scene.vt) > STALE_S * stretch);
       if (stale.length) {
         for (const c of stale) st.toLog(c, "callout", false);
         st.callouts = st.callouts.filter((c) => !stale.includes(c));
         setCallouts(st.callouts);
       }
-      const squeezed = placeCallouts(st.callouts, world, cw, ch, bannerH);
+      const squeezed = placeCallouts(st.callouts, world, cw, ch, bannerH, stretch);
       if (squeezed) {
         st.toLog(squeezed, "callout", true);
         st.callouts = st.callouts.filter((c) => c !== squeezed);
@@ -923,10 +948,9 @@ export function LiveView() {
     st.focusDone = false;
     st.script = newScript();
     st.freeze = false;
-    // follow the selected session, else the newest one still waiting on a model call, else the next to arrive
-    let f: number | null = selected?.type === "session" ? selected.id : null;
-    if (f === null) for (const s of worldRef.current.sessions.values()) if (s.reqId !== null) f = s.id;
-    st.focus = st.stepMode ? f : null;
+    // follow a request from its first step: the next one to arrive, never one already on its way, whose earlier
+    // steps the walkthrough would have missed
+    st.focus = null;
     st.callouts = [];
     st.hist = [];
     st.replay = null;
@@ -936,7 +960,15 @@ export function LiveView() {
     setHeld(null);
     setFocus(st.focus);
     setStepMode(st.stepMode);
-    if (st.stepMode) setPlaying(true);
+    if (st.stepMode) {
+      setPlaying(true);
+      sendIfNone();
+    }
+  };
+  /** The walkthrough waits for the next request; if none is on its way, it sends one. */
+  const sendIfNone = () => {
+    const w = worldRef.current;
+    if (!w.pending.length) spawnBurst(w, 1);
   };
 
   /** Put back the world, the picture and the bookkeeping stored with a step. */
@@ -1025,6 +1057,7 @@ export function LiveView() {
       st.focusDone = false;
       st.script = newScript();
       setFocus(null);
+      sendIfNone();
     }
     setHeld(st.held);
     setHistPos(posOf(st));
@@ -1038,8 +1071,8 @@ export function LiveView() {
   };
 
   const trace = () => {
-    if (!live.current.stepMode) toggleStep();
-    send(1);
+    if (live.current.stepMode) send(1);
+    else toggleStep();
   };
 
   const applyArch = (id: string) => {
@@ -1060,6 +1093,8 @@ export function LiveView() {
   };
   const endTour = () => {
     setTour(null);
+    // the tour runs faster to have something to show; the visitor's own exploring starts at the default speed
+    setSpeed(EXPLORE_SPEED);
     try {
       localStorage.setItem("lv-tour-seen", "1");
     } catch {
@@ -1163,8 +1198,8 @@ export function LiveView() {
   }, [more]);
   // each step of the step-through goes into the history when it is first shown
   useEffect(() => {
-    if (held) toLog(held, "step", false);
-  }, [held, toLog]);
+    if (held) toLog({ ...held, no: histPos[0] + 1 }, "step", false);
+  }, [held, histPos, toLog]);
 
   const select = (t: Target | null) => {
     sceneRef.current.selected = t;
@@ -1611,6 +1646,20 @@ export function LiveView() {
         {!narrow && legendPanel}
       </div>
 
+      {!calibrated && !stepMode && tour === null && !(narrow && showLeft) && (
+        <button
+          className={`lv-notes-btn ${explain ? "on" : ""}`}
+          data-testid="notes-toggle"
+          aria-pressed={explain}
+          aria-label={explain ? "Notes on: short notes next to what just happened. Turn off" : "Notes off. Turn on short notes next to what just happened"}
+          title={explain ? "Notes on: short notes next to what just happened. Click to turn them off" : "Notes off. Click to show short notes next to what just happened"}
+          onClick={() => setExplain(!explain)}
+        >
+          <NotesIcon off={!explain} />
+          {!narrow && <span>{explain ? "Notes on" : "Notes off"}</span>}
+        </button>
+      )}
+
       <div className="lv-transport" data-tour="transport">
         <button className="lv-play" data-testid="play-toggle" onClick={() => setPlaying(!playing)} aria-label={playing ? "Pause" : "Play"}>
           {playing ? "❚❚" : "▶"}
@@ -1645,15 +1694,10 @@ export function LiveView() {
         </div>
         {!calibrated && (
           <>
-        <button className={`lv-ghost ${stepMode ? "on" : ""}`} data-testid="step-toggle" onClick={toggleStep} title="Follow one session and stop at each thing that happens to it">
+        <button className={`lv-ghost ${stepMode ? "on" : ""}`} data-testid="step-toggle" onClick={toggleStep} title="Follow the next request from its first step and stop at each thing that happens to it; sends one if none is on its way">
           {narrow ? "steps" : "step-through"}
           {stepMode && !narrow ? (focus !== null ? ` · session ${focus}` : " · waiting for a request") : ""}
         </button>
-        {!narrow && (
-          <button className={`lv-ghost ${explain ? "on" : ""}`} onClick={() => setExplain(!explain)}>
-            explain
-          </button>
-        )}
           </>
         )}
         {!calibrated && <LogButton count={log.length} open={logOpen} unread={logUnread} buttonRef={logBtn} compact={narrow} onToggle={() => toggleLog(!logOpen)} />}
@@ -1673,12 +1717,6 @@ export function LiveView() {
             <button role="menuitem" data-testid="tour-start" onClick={() => pick(startTour)}>
               Tutorial
               <small>a guided tour of the graph</small>
-            </button>
-          )}
-          {narrow && !calibrated && (
-            <button role="menuitem" aria-checked={explain} onClick={() => pick(() => setExplain(!explain))}>
-              {explain ? "Explain events: on" : "Explain events: off"}
-              <small>short notes next to what just happened</small>
             </button>
           )}
           <button role="menuitem" onClick={() => pick(() => sceneRef.current.fitNow())}>

@@ -17,6 +17,8 @@ export interface LogEntry {
   title: string;
   body: string;
   target?: Target;
+  /** the number its box showed (a note), or its step number (a step) */
+  no?: number;
 }
 
 /** Entries kept; older ones are dropped. */
@@ -119,6 +121,11 @@ export function LogPanel({ entries, onPick, onClose, onClear }: { entries: LogEn
                   {e.kind === "step" ? "step" : "note"} · {e.t.toFixed(2)} s
                 </span>
                 <b>
+                  {e.no !== undefined && (
+                    <i className="lv-log-no" data-testid="log-no">
+                      {e.no}
+                    </i>
+                  )}
                   <Rich inline text={e.title} />
                 </b>
                 <span className="lv-log-body">

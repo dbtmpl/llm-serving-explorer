@@ -517,5 +517,5 @@ test("each tutorial step moves the camera so its target lies in the free area be
   // the menus step points at the menu instead and shows it; the camera is not framing anything
   await page.getByTestId("tour-next").click();
   await expect(page.locator(".lv-right")).toBeVisible();
-  expect(await page.evaluate(() => (window as unknown as LiveWin).__live.scene.guide)).toBeNull();
+  await expect.poll(() => page.evaluate(() => (window as unknown as LiveWin).__live.scene.guide?.key ?? null), { timeout: 5_000 }).toBeNull();
 });
