@@ -84,7 +84,7 @@ test.describe("fuzz: changing settings in every state", () => {
           await page.getByTestId("more").click({ timeout: 800 });
           await page.getByTestId("mode-calibrated").click({ timeout: 800 });
         }],
-        ["explain", () => page.getByRole("button", { name: "explain", exact: true }).click({ timeout: 800 })],
+        ["explain", () => page.getByTestId("notes-toggle").click({ timeout: 800 })],
         ["step-through", () => page.getByTestId("step-toggle").click({ timeout: 800 })],
         ["step-next", () => page.getByTestId("step-next").click({ timeout: 800 })],
         ["step-back", () => page.getByTestId("step-back").click({ timeout: 800 })],
