@@ -96,7 +96,7 @@ function failingTable(r: ReferenceSummary): string[] {
 
 export { failingTable };
 
-/** The README's parity section: one block per reference, led by the deviations, then the checks that do not hold. */
+/** The parity section of conformance/README.md: one block per reference, led by the deviations, then the checks that do not hold. */
 export function renderReadmeParity(s: Summary): string {
   const out: string[] = [];
   for (const r of Object.values(s.references)) {
@@ -108,7 +108,7 @@ export function renderReadmeParity(s: Summary): string {
       "",
       ...distributionTable(r),
       "",
-      `Counting checks instead: ${r.headline.agree} of ${r.headline.total} checks agree (${pct(r.headline.share)}), ${r.headline.knownDifferences} known differences; ${r.verified.length} of the ${s.approaches.total} approaches in the table above are covered by at least one of its scenarios.`,
+      `Counting checks instead: ${r.headline.agree} of ${r.headline.total} checks agree (${pct(r.headline.share)}), ${r.headline.knownDifferences} known differences; ${r.verified.length} of the ${s.approaches.total} approaches in the [approach table](../README.md#what-is-modelled-and-where-it-comes-from) are covered by at least one of its scenarios.`,
       "",
       "| Kind of check | What must hold | Checks | Agree | Known difference |",
       "|---|---|---|---|---|",
@@ -118,7 +118,7 @@ export function renderReadmeParity(s: Summary): string {
       row("Directional", "The same intervention moves the same metric the same way by a similar factor (memory tiers, eviction, routing policy, autoscaling)", k.directional, k.directional.directional_agree ?? 0),
       `| **All** | | **${r.checks.total}** | **${r.headline.agree}** | **${r.headline.knownDifferences}** |`,
       "",
-      `Every check that does not hold as written (the scenario files carry the full reasons, [the parity page](docs/parity.md) the numbers):`,
+      `Every check that does not hold as written (the scenario files carry the full reasons, [the parity page](../docs/parity.md) the numbers):`,
       "",
       ...failingTable(r),
       ""

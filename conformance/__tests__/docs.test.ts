@@ -1,5 +1,5 @@
 /**
- * The generated parts of docs/parity.md and of the root README's parity section are in step with the
+ * The generated parts of docs/parity.md and of conformance/README.md's parity section are in step with the
  * scenarios, the fits and the registry. `pnpm docs:sync` rewrites them.
  */
 import { readFileSync, writeFileSync } from "node:fs";
@@ -33,18 +33,20 @@ describe("docs/parity.md", () => {
     const page = readFileSync(PAGE, "utf8");
     for (const r of REFERENCES) expect(page, r.id).toContain(`## ${r.name}`);
   });
-  it("the root README quotes each reference's current figure and the table (run pnpm docs:sync for the table)", () => {
-    const readme = path.join(CONFORMANCE_DIR, "..", "README.md");
-    const summary = buildSummary();
+  it("conformance/README.md carries the parity tables (run pnpm docs:sync)", () => {
+    const readme = path.join(CONFORMANCE_DIR, "README.md");
     const current = readFileSync(readme, "utf8");
-    const expected = replaceGenerated(current, "parity-readme", renderReadmeParity(summary));
+    const expected = replaceGenerated(current, "parity-readme", renderReadmeParity(buildSummary()));
     if (process.env.UPDATE_DOCS) writeFileSync(readme, expected);
     else expect(current, "out of date: run `pnpm docs:sync`").toBe(expected);
-    // The figures in the opening paragraphs are prose, so they are checked, not rewritten.
+  }, 60_000);
+  it("the root README's introduction quotes each reference's current figures", () => {
+    // prose, so checked, not rewritten
+    const readme = readFileSync(path.join(CONFORMANCE_DIR, "..", "README.md"), "utf8");
+    const summary = buildSummary();
     for (const r of REFERENCES) {
       if (!summary.references[r.id]!.checks.total) continue;
-      for (const figure of [readmeFigure(summary, r.id), readmeHeadline(summary, r.id)])
-        expect(expected.split(figure).length - 1, `README must say "${figure}" in the introduction and in the parity section`).toBeGreaterThanOrEqual(2);
+      for (const figure of [readmeFigure(summary, r.id), readmeHeadline(summary, r.id)]) expect(readme, `README must say "${figure}"`).toContain(figure);
     }
   }, 60_000);
   it("links to the parity page from the conformance README", () => {

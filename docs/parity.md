@@ -8,7 +8,7 @@ The TypeScript model in `src/sim/` is compared, scenario by scenario, with exter
 | [Measured vLLM](https://github.com/casys-kaist/LLMServingSim) | `vllm-measured` | Real vLLM runs of 300 ShareGPT requests on one RTX PRO 6000 and on one RTX 4090 (data published with LLMServingSim, MIT licence) | Real timings and KV block counts on two workstation GPUs, one workload |
 | [LLMServingSim](https://github.com/casys-kaist/LLMServingSim) (MIT licence) | `llmservingsim` | A Python port of vLLM's V1 scheduler and block pool whose step times come from per-layer kernel tables profiled on real GPUs (here the RTX PRO 6000 and the RTX 4090) | A second, independent implementation of vLLM's scheduling and caching decisions, with profiled-kernel timings; its authors validated it against the measured runs above |
 
-This page says what agreement shows, what it does not, how it is produced, and where the model and each reference differ. The machinery is in [`conformance/`](../conformance/README.md); the plan it followed is [`blis-conformance-plan.md`](blis-conformance-plan.md).
+This page says what agreement shows, what it does not, how it is produced, and where the model and each reference differ. The machinery and a summary per reference are in [`conformance/README.md`](../conformance/README.md).
 
 ## How it is produced
 
@@ -20,7 +20,7 @@ This page says what agreement shows, what it does not, how it is produced, and w
 - **CI jobs.** `conformance` (every pull request) runs the model on every scenario and compares it with the references. `blis-references` (nightly, and when the pin, a scenario or a translator changes; it regenerates only BLIS's references) rebuilds the pinned BLIS, regenerates the references and the fit, and fails if they differ from the committed ones. `blis-upstream` (weekly, allowed to fail) does the same against BLIS's `main`, to see drift before the pin is bumped. `llmservingsim-references` (nightly, and when its adapter changes) builds the pinned LLMServingSim on Ubuntu, reproduces its own committed result for the measured example, regenerates its records and fails if they differ.
 - **The rule on differences.** A check holds as stated, or it carries a `known_difference` with a reason and the exact values that differ, and the test asserts the observed difference equals the recorded one: it fails if the difference disappears or changes. A failing check is fixed in the model only when the model is demonstrably wrong against the vLLM or llm-d source; otherwise it is recorded. A tolerance is never widened to make a test pass, and a scenario is never tuned until it agrees.
 
-Three kinds of check: **exact** (integers and decisions that must be equal), **calibrated** (a timing or rate within a relative tolerance after the fit) and **directional** (the same intervention moves the same metric in the same direction by a similar factor).
+Four kinds of check: **exact** (integers and decisions that must be equal), **capacity** (a size both sides derive from estimates, within a relative tolerance), **calibrated** (a timing or rate within a relative tolerance after the fit) and **directional** (the same intervention moves the same metric in the same direction by a similar factor).
 
 
 ## BLIS

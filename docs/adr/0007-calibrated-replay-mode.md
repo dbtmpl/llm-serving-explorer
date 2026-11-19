@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-11-15). Implements phase 5 of [the BLIS plan](../blis-conformance-plan.md). Builds on [ADR 0004](0004-live-graph-view.md), [ADR 0005](0005-remove-blis-replay.md) and [ADR 0006](0006-modular-simulation-with-citations.md).
+Accepted (2026-11-15). Builds on [ADR 0004](0004-live-graph-view.md), [ADR 0005](0005-remove-blis-replay.md) and [ADR 0006](0006-modular-simulation-with-citations.md).
 
 ## Context
 
