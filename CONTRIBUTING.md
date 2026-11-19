@@ -18,7 +18,7 @@ pnpm dev
 | `src/sim/` | The simulation, one module per concept. Start with [`src/sim/README.md`](src/sim/README.md). |
 | `src/sim/citations.ts` | Every source the model relies on. |
 | `src/content/` | Every piece of explanatory text on the site, as markdown. See [`src/content/README.md`](src/content/README.md). |
-| `conformance/` | Tests that compare the model with BLIS (llm-d router and vLLM scheduler in a simulator). A change to the model can make a recorded difference disappear or a new one appear; see [`conformance/README.md`](conformance/README.md). |
+| `conformance/` | Tests that compare the model with three references (BLIS, measured vLLM runs, LLMServingSim), and the parity results. A model change can make a recorded difference disappear or a new one appear; see [`conformance/README.md`](conformance/README.md). |
 | `src/live/` | The user interface: rendering, menus, inspector, tutorial, callouts. |
 | `e2e/` | Playwright tests. |
 
@@ -46,4 +46,4 @@ pnpm test:e2e     # first time: pnpm exec playwright install chromium
 pnpm build
 ```
 
-Keep pull requests small and focused on one change. Say in the description what you changed and how you checked it.
+`main` is protected: every change goes through a pull request, which merges once the `test` and `conformance` checks pass. Keep pull requests small and focused on one change, and say in the description what you changed and how you checked it.
