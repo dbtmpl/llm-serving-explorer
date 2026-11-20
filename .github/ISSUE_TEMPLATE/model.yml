@@ -1,0 +1,21 @@
+name: Model disagrees with a source
+description: A number or behaviour differs from vLLM, llm-d, a paper or a measurement
+labels: [needs-triage]
+body:
+  - type: textarea
+    id: claim
+    attributes:
+      label: What the site shows
+    validations:
+      required: true
+  - type: textarea
+    id: source
+    attributes:
+      label: What the source says
+      description: A link to the paper, documentation, source line or measurement, and the value it gives.
+    validations:
+      required: true
+  - type: textarea
+    id: settings
+    attributes:
+      label: Settings to reproduce it

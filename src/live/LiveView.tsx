@@ -16,7 +16,7 @@ import { ReplayInspector } from "../replay/ReplayInspector.js";
 import { DEFAULT_REPLAY, type ReplayId } from "../replay/scenarios.js";
 import type { ReplayFile } from "../replay/schema.js";
 import { exploreRun, type Run, type RunWorld } from "./run.js";
-import { ARCHITECTURES, DEFAULT_ARCH, DEFAULT_PARAMS, GPUS, MODELS, advance, costPerMTok, createWorld, elapsed, evictIdleNow, fitOf, fitsWith, fixesFor, kvFill, livePods, median, replicaSpec, setParam, spawnBurst, tokensPerSecond, type Fix, type Params, type World } from "../sim/index.js";
+import { ARCHITECTURES, DEFAULT_ARCH, DEFAULT_PARAMS, GPUS, MODELS, advance, costPerMTok, createWorld, elapsed, evictIdleNow, fitOf, fitsWith, fixesFor, kvFill, livePods, median, replicaSpec, setParam, setSessions, spawnBurst, tokensPerSecond, type Fix, type Params, type World } from "../sim/index.js";
 import "./live.css";
 
 const EMPTY_TEXT = panelFields("empty", { title: "title", text: "text", hint: "hint" });
@@ -1200,9 +1200,10 @@ export function LiveView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /** Bring the number of sessions talking to the stack to `n`: more start, or the extra ones end after their current turn. */
   const send = (n: number) => {
     touchWorld();
-    spawnBurst(worldRef.current, n);
+    setSessions(worldRef.current, n);
     setPlaying(true);
   };
 
@@ -1355,9 +1356,9 @@ export function LiveView() {
           </header>
           <div className="lv-burst">
             {[1, 10, 20, 100, 1000, 10000].map((n) => (
-              <button key={n} data-testid={`send-${n}`} onClick={() => send(n)}>
+              <button key={n} data-testid={`send-${n}`} onClick={() => send(n)} title={`Keep ${n.toLocaleString("en-US")} ${n === 1 ? "session" : "sessions"} talking: more start, or the extra ones finish their current turn and stop`}>
                 <b>{n >= 1000 ? `${n / 1000}k` : n}</b>
-                <span>{n === 1 ? "session" : "at once"}</span>
+                <span>{n === 1 ? "session" : "sessions"}</span>
               </button>
             ))}
           </div>

@@ -27,7 +27,7 @@ import { ModelRuns, compareScenario, runModel } from "../suite.js";
 import { SUMMARY_FILE, buildSummary } from "../summary.js";
 
 describe("scenarios and references", () => {
-  it("has at least the scenarios phase 1 promises", () => {
+  it("has the core scenarios: KV budget, prefix cache, three routing policies, preemption and shedding", () => {
     expect(scenarioIds()).toEqual(
       expect.arrayContaining(["kv-budget-8b-h100", "prefix-cache", "routing-round-robin", "routing-least-loaded", "routing-prefix-aware", "preemption-overflow", "queue-deadline-shedding"])
     );

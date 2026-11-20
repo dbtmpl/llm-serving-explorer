@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { kinds, run, world } from "../../testing.js";
 import { FRONTEND_HOPS, tokenizeSeconds } from "../frontend.js";
-import { LENGTH_JITTER, MIN_OUTPUT_TOKENS, spawnBurst } from "../index.js";
+import { LENGTH_JITTER, MIN_OUTPUT_TOKENS, liveSessions, setSessions, spawnBurst } from "../index.js";
 
 describe("request lengths", () => {
   it("are drawn within the configured ranges around the means", () => {
@@ -46,6 +46,28 @@ describe("closed-loop sessions (Schroeder et al., NSDI 2006)", () => {
     spawnBurst(w, 3);
     run(w, 120, () => w.m.completed === 6 && w.t > 30);
     expect(w.m.completed).toBe(6);
+  });
+});
+
+describe("setting the number of sessions", () => {
+  it("adds sessions up to the target and winds the extra ones down after their current turn", () => {
+    const w = world({ returnProb: 1, maxTurns: 50, thinkTimeS: 1 });
+    setSessions(w, 100);
+    expect(liveSessions(w)).toBe(100);
+    run(w, 20);
+    expect(liveSessions(w)).toBe(100);
+    // asking for the same number again changes nothing
+    setSessions(w, 100);
+    expect(liveSessions(w)).toBe(100);
+    setSessions(w, 1);
+    expect(liveSessions(w)).toBe(1);
+    run(w, 120, () => w.reqs.size <= 1);
+    run(w, 30);
+    // the one session left keeps talking; the others sent no further turn
+    expect([...w.sessions.values()].filter((s) => s.state !== "idle").length).toBe(1);
+    expect(w.reqs.size).toBeLessThanOrEqual(1);
+    setSessions(w, 10);
+    expect(liveSessions(w)).toBe(10);
   });
 });
 

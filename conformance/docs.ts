@@ -1,5 +1,5 @@
 /**
- * The generated parts of `docs/parity.md` (one block set per reference) and of the root README's
+ * The generated parts of `conformance/parity.md` (one block set per reference) and of the root README's
  * parity section. The rest of those pages is prose. `pnpm docs:sync` rewrites them; a test fails
  * when they are out of date.
  */
@@ -65,12 +65,6 @@ export function renderHeadline(s: Summary, ref: string): string {
   ].join("\n");
 }
 
-/** The one count per reference that the root README quotes in prose, beside the deviation headline; a test fails if the README says anything else. */
-export function readmeFigure(s: Summary, ref: string): string {
-  const h = s.references[ref]!.headline;
-  return `${h.agree} of ${h.total} checks agree (${pct(h.share)})`;
-}
-
 const GROUP_DEFINITION: Record<(typeof GROUPS)[number], string> = {
   timings_defaults: "the same metrics for checks that run the model with the site's default parameters, before any fit.",
   capacity: "KV blocks per replica, and the prefix-cache and host-tier hit rates; deviation is the relative difference.",
@@ -108,7 +102,7 @@ export function renderReadmeParity(s: Summary): string {
       "",
       ...distributionTable(r),
       "",
-      `Counting checks instead: ${r.headline.agree} of ${r.headline.total} checks agree (${pct(r.headline.share)}), ${r.headline.knownDifferences} known differences; ${r.verified.length} of the ${s.approaches.total} approaches in the [approach table](../README.md#what-is-modelled-and-where-it-comes-from) are covered by at least one of its scenarios.`,
+      `Counting checks instead: ${r.headline.agree} of ${r.headline.total} checks agree (${pct(r.headline.share)}), ${r.headline.knownDifferences} known differences; ${r.verified.length} of the ${s.approaches.total} approaches in the [approach table](../src/sim/README.md#all-approaches) are covered by at least one of its scenarios.`,
       "",
       "| Kind of check | What must hold | Checks | Agree | Known difference |",
       "|---|---|---|---|---|",
@@ -118,7 +112,7 @@ export function renderReadmeParity(s: Summary): string {
       row("Directional", "The same intervention moves the same metric the same way by a similar factor (memory tiers, eviction, routing policy, autoscaling)", k.directional, k.directional.directional_agree ?? 0),
       `| **All** | | **${r.checks.total}** | **${r.headline.agree}** | **${r.headline.knownDifferences}** |`,
       "",
-      `Every check that does not hold as written (the scenario files carry the full reasons, [the parity page](../docs/parity.md) the numbers):`,
+      `Every check that does not hold as written (the scenario files carry the full reasons, [the parity page](parity.md) the numbers):`,
       "",
       ...failingTable(r),
       ""

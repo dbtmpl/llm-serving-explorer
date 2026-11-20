@@ -663,9 +663,9 @@ body,
   width: 214px;
   pointer-events: auto;
   cursor: pointer;
-  background: rgba(255, 255, 255, 0.94);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
   border: 1px solid var(--line);
   border-left: 3px solid var(--ink);
   border-radius: 10px;

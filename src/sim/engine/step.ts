@@ -78,7 +78,7 @@ function finish(w: World, pod: Pod, r: Req): void {
     s.lastPod = pod.id;
     s.lastTtft = ttft;
     s.lastTpot = tpot;
-    const back = s.turn < w.params.maxTurns && rand(w) < w.params.returnProb;
+    const back = !s.closing && s.turn < w.params.maxTurns && rand(w) < w.params.returnProb;
     s.state = back ? "thinking" : "idle";
     s.nextTurnAt = w.t + thinkSeconds(w);
     w.store.turns++;

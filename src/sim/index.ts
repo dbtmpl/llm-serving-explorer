@@ -23,7 +23,7 @@ export { evictIdleNow } from "./kvcache/forced.js";
 export { reloadTimes } from "./kvcache/reload.js";
 export { SCORER_WEIGHTS, TIER_AFFINITY, prefixAwareTerms } from "./routing/prefixAware.js";
 export { POD_QUEUE_SLACK } from "./routing/index.js";
-export { MIN_OUTPUT_TOKENS, spawnBurst } from "./workload/index.js";
+export { MIN_OUTPUT_TOKENS, liveSessions, setSessions, spawnBurst } from "./workload/index.js";
 export { loadTrace, type TraceRequest } from "./workload/trace.js";
 export { advance, setParam } from "./engine/tick.js";
 export { restartFleet } from "./engine/fleet.js";

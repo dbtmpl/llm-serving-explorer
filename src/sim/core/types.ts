@@ -74,6 +74,8 @@ export interface Session {
   ctxTokens: number;
   reqId: number | null;
   state: "active" | "thinking" | "idle";
+  /** Set when the number of sessions was lowered: the session ends after its current turn. */
+  closing?: boolean;
   nextTurnAt: number;
   born: number;
   lastPod: number;

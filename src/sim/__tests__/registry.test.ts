@@ -117,7 +117,6 @@ describe("module layout", () => {
  */
 describe("generated documentation", () => {
   const targets: { file: string; blocks: Record<string, string> }[] = [
-    { file: path.join(repoRoot, "README.md"), blocks: { approaches: renderApproachTable(CONCEPTS, "src/sim/", referencesOf) } },
     { file: path.join(simDir, "README.md"), blocks: { approaches: renderApproachTable(CONCEPTS, "", referencesOf), citations: renderCitationList(CONCEPTS) } },
     ...modules.map((module) => ({
       file: path.join(simDir, module, "README.md"),

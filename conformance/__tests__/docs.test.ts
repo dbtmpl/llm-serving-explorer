@@ -1,19 +1,19 @@
 /**
- * The generated parts of docs/parity.md and of conformance/README.md's parity section are in step with the
+ * The generated parts of conformance/parity.md and of conformance/README.md's parity section are in step with the
  * scenarios, the fits and the registry. `pnpm docs:sync` rewrites them.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { replaceGenerated } from "../../src/sim/docs.js";
-import { readmeFigure, readmeHeadline, renderCalibration, renderCrossReference, renderHeadline, renderKnownDifferences, renderNotVerifiable, renderReadmeParity } from "../docs.js";
+import { readmeHeadline, renderCalibration, renderCrossReference, renderHeadline, renderKnownDifferences, renderNotVerifiable, renderReadmeParity } from "../docs.js";
 import { REFERENCES } from "../refs/index.js";
 import { CONFORMANCE_DIR } from "../scenario.js";
 import { buildSummary } from "../summary.js";
 
-const PAGE = path.join(CONFORMANCE_DIR, "..", "docs", "parity.md");
+const PAGE = path.join(CONFORMANCE_DIR, "parity.md");
 
-describe("docs/parity.md", () => {
+describe("conformance/parity.md", () => {
   it("is in step with the scenarios, the fits and the registry (run pnpm docs:sync)", () => {
     const summary = buildSummary();
     const current = readFileSync(PAGE, "utf8");
@@ -46,10 +46,11 @@ describe("docs/parity.md", () => {
     const summary = buildSummary();
     for (const r of REFERENCES) {
       if (!summary.references[r.id]!.checks.total) continue;
-      for (const figure of [readmeFigure(summary, r.id), readmeHeadline(summary, r.id)]) expect(readme, `README must say "${figure}"`).toContain(figure);
+      const figure = readmeHeadline(summary, r.id);
+      expect(readme, `README must say "${figure}"`).toContain(figure);
     }
   }, 60_000);
   it("links to the parity page from the conformance README", () => {
-    expect(readFileSync(path.join(CONFORMANCE_DIR, "README.md"), "utf8")).toContain("../docs/parity.md");
+    expect(readFileSync(path.join(CONFORMANCE_DIR, "README.md"), "utf8")).toContain("](parity.md)");
   });
 });
