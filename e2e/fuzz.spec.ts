@@ -81,7 +81,6 @@ test.describe("fuzz: changing settings in every state", () => {
         ["mode", async () => {
           const back = page.getByTestId("mode-explore");
           if (await back.isVisible()) return back.click({ timeout: 800 });
-          await page.getByTestId("more").click({ timeout: 800 });
           await page.getByTestId("mode-calibrated").click({ timeout: 800 });
         }],
         ["explain", () => page.getByTestId("notes-toggle").click({ timeout: 800 })],

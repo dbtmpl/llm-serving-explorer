@@ -21,7 +21,7 @@ The simulation behind it is a TypeScript model of vLLM's scheduler and memory an
 - **Measured vLLM**, 300 ShareGPT requests on an RTX PRO 6000 and an RTX 4090: median timing deviation 10.8% over 20 comparisons with the site's default parameters, 2.7% over 28 comparisons on held-out requests after fitting.
 - **[LLMServingSim](https://github.com/casys-kaist/LLMServingSim)**, a second port of vLLM's scheduler: median timing deviation 10.7% over 32 comparisons with the site's default parameters, 2.8% over 40 comparisons on held-out requests after fitting.
 
-The measurements cover one model and one workload on two GPUs, so absolute timings are indicative. To watch BLIS itself, open **Calibrated replay (BLIS)** in the app's menu: it replays recorded BLIS runs of four scenarios on the same graph.
+The measurements cover one model and one workload on two GPUs, so absolute timings are indicative. To watch BLIS itself, press **Switch to Calibrated BLIS Replay** in the bottom right corner of the app: it replays recorded BLIS runs of four scenarios on the same graph.
 
 <p align="center">
   <img alt="Demo: one request explained in numbered notes, ten requests sharing one pod, then a thousand with pods scaling out" src="docs/assets/demo.webp" width="100%">
