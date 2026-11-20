@@ -340,7 +340,7 @@ checks:
     quantity: kv_blocks_per_replica
     rel_tol: 0.001
     params: defaults
-    tolerance: "0.1 percent: the capacity rule of 2026-11-16 (docs/parity.md), applied unchanged to a real engine. The terms that remain are estimates on both sides and a difference below one part in a thousand changes no admission decision; a larger one is explained term by term in the known difference."
+    tolerance: "0.1 percent: the capacity rule of 2026-11-16 (conformance/parity.md), applied unchanged to a real engine. The terms that remain are estimates on both sides and a difference below one part in a thousand changes no admission decision; a larger one is explained term by term in the known difference."
     reference_gap:
       reason: >-
         The real engine reported 36,649 KV blocks; LLMServingSim derives 37,090 from the same memory utilisation (0.92 of the 94.97 GiB its hardware file states, less the 16.06 GB of weights, over

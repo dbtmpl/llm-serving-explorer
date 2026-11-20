@@ -6,7 +6,7 @@ Accepted (2026-11-14). Amended by [ADR 0005](0005-remove-blis-replay.md), which 
 
 ## Context
 
-The first version replayed BLIS event files in eleven tabbed views. Feedback on it asked for one view: a single animated graph (request, tokenizer, router, pods, GPUs) that starts empty and grows, runs in slow motion, lets the viewer change components and hyperparameters while requests are in flight, shows KV blocks moving HBM to DRAM to SSD, and teaches FLOPs, bytes, roofline, memory budget, the engine step loop, host time.
+The first version replayed BLIS event files in eleven tabbed views. Readers needed one view instead: a single animated graph (request, tokenizer, router, pods, GPUs) that starts empty and grows, runs in slow motion, lets the viewer change components and hyperparameters while requests are in flight, shows KV blocks moving HBM to DRAM to SSD, and teaches FLOPs, bytes, roofline, memory budget, the engine step loop, host time.
 
 Three of those needs cannot be met by replaying a finished BLIS run:
 

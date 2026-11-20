@@ -25,7 +25,7 @@ checks:
     quantity: kv_blocks_per_replica
     rel_tol: 0.001
     params: defaults
-    tolerance: "0.1 percent: the capacity rule of 2026-11-16 (docs/parity.md), applied unchanged. Both sides are arithmetic on the same memory, weights and block size; a difference is exactly the terms one of them leaves out."
+    tolerance: "0.1 percent: the capacity rule of 2026-11-16 (conformance/parity.md), applied unchanged. Both sides are arithmetic on the same memory, weights and block size; a difference is exactly the terms one of them leaves out."
     known_difference:
       reference: llmservingsim
       cause: "LLMServingSim sets nothing aside for activations or CUDA graphs"

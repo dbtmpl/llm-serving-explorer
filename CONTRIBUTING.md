@@ -18,7 +18,7 @@ pnpm dev
 | `src/sim/` | The simulation, one module per concept. Start with [`src/sim/README.md`](src/sim/README.md). |
 | `src/sim/citations.ts` | Every source the model relies on. |
 | `src/content/` | Every piece of explanatory text on the site, as markdown. See [`src/content/README.md`](src/content/README.md). |
-| `conformance/` | Tests that compare the model with three references (BLIS, measured vLLM runs, LLMServingSim), and the parity results. A model change can make a recorded difference disappear or a new one appear; see [`conformance/README.md`](conformance/README.md). |
+| `conformance/` | Tests that compare the model with three references (BLIS, measured vLLM runs, LLMServingSim), and the parity page. A model change can make a recorded difference disappear or a new one appear; see [`conformance/README.md`](conformance/README.md). |
 | `src/live/` | The user interface: rendering, menus, inspector, tutorial, callouts. |
 | `e2e/` | Playwright tests. |
 

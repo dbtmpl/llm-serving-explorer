@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-11-16). Changes the cost model of [ADR 0006](0006-modular-simulation-with-citations.md) (`src/sim/cost/`) and the calibration of [ADR 0007](0007-calibrated-replay-mode.md) (`conformance/calibration/`). The evidence is in [`docs/parity.md`](../parity.md).
+Accepted (2026-11-16). Changes the cost model of [ADR 0006](0006-modular-simulation-with-citations.md) (`src/sim/cost/`) and the calibration of [ADR 0007](0007-calibrated-replay-mode.md) (`conformance/calibration/`). The evidence is in [`conformance/parity.md`](../parity.md).
 
 ## Context
 

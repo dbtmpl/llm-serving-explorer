@@ -6,7 +6,7 @@ Accepted (2026-11-15). Builds on [ADR 0004](0004-live-graph-view.md), [ADR 0005]
 
 ## Context
 
-The site's graph is driven by a teaching model (`src/sim/`). The conformance suite checks that model against [BLIS](https://github.com/inference-sim/inference-sim), which embeds the llm-d router's own scoring code and a Go translation of vLLM's scheduler, but a visitor cannot see BLIS itself. ADR 0005 removed the old BLIS replay app because it needed a patched submodule, an event schema and a WebAssembly build. The plan accepted on 2026-11-15 asks for a second mode on the same graph that replays BLIS runs, without any change to BLIS.
+The site's graph is driven by a teaching model (`src/sim/`). The conformance suite checks that model against [BLIS](https://github.com/inference-sim/inference-sim), which embeds the llm-d router's own scoring code and a Go translation of vLLM's scheduler, but a visitor cannot see BLIS itself. ADR 0005 removed the old BLIS replay app because it needed a patched submodule, an event schema and a WebAssembly build. A visitor should be able to watch BLIS itself on the same graph, without any change to BLIS.
 
 What the pinned BLIS gives without a patch: per request, the arrival time, TTFT, end-to-end time, scheduling delay, time held at the router, cached prefix tokens, pod and fate (the Result's `request_rows`); per pod, a time series of KV usage and running and waiting requests (`server_series`); a count of preemptions; and, in its trace log (`--log trace`), every router plugin's score for every pod at every routing decision. It has no event stream: nothing says which block was allocated, which step ran or when a request was preempted.
 

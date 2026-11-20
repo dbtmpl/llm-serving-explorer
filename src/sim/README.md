@@ -82,6 +82,8 @@ When a paper introduces a decision that has no home yet (for example KV compress
 | [Workload](workload/) | Trace replay | Requests are injected at recorded times with recorded lengths, so a run can be repeated or compared exactly. | Simplified | Not verifiable | [Schroeder et al., NSDI 2006](https://www.usenix.org/conference/nsdi-06/presentation/open-versus-closed-cautionary-tale); [Gao et al., USENIX ATC 2024](https://arxiv.org/abs/2403.19708) |
 <!-- generated:approaches:end -->
 
+**Fidelity:** *Exact* reproduces a published formula or rule and is tested against it. *Structural* follows the source's mechanism with our own constants, exposed as parameters. *Simplified* is a stand-in whose module README says what it leaves out. "Verified against" names the [conformance scenarios](../../conformance/README.md) that check the approach against each reference.
+
 ## Sources
 
 <!-- generated:citations:start -->

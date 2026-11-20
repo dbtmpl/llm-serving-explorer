@@ -66,6 +66,41 @@ export function spawnBurst(w: World, n: number, over = 0): void {
   w.pending.sort((a, b) => a - b);
 }
 
+/** Sessions that will still send a turn: scheduled, waiting on an answer, or thinking about the next one. */
+export function liveSessions(w: World): number {
+  let n = w.pending.length;
+  for (const s of w.sessions.values()) if (s.state !== "idle" && !s.closing) n++;
+  return n;
+}
+
+/**
+ * Bring the number of live sessions to `n`. Below it, new sessions start; above it, the newest
+ * scheduled ones are dropped, then sessions thinking about a follow-up go idle, then sessions
+ * waiting on an answer finish their current turn and send no further one.
+ */
+export function setSessions(w: World, n: number): void {
+  let extra = liveSessions(w) - n;
+  if (extra < 0) return spawnBurst(w, -extra);
+  const drop = Math.min(extra, w.pending.length);
+  w.pending.splice(w.pending.length - drop, drop);
+  extra -= drop;
+  const newestFirst = [...w.sessions.values()].reverse();
+  for (const s of newestFirst) {
+    if (extra <= 0) return;
+    if (s.state === "thinking" && !s.closing) {
+      s.state = "idle";
+      extra--;
+    }
+  }
+  for (const s of newestFirst) {
+    if (extra <= 0) return;
+    if (s.state === "active" && !s.closing) {
+      s.closing = true;
+      extra--;
+    }
+  }
+}
+
 /** Lengths fixed by a trace instead of drawn: new prompt tokens and output tokens. */
 export interface FixedLengths {
   newTokens: number;

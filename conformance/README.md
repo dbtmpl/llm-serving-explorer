@@ -6,7 +6,7 @@ Tests that compare the TypeScript model in `src/sim/` with three references, eac
 - **Measured vLLM** (`vllm-measured`): per-request timings, engine settings and KV block counts from two published vLLM runs (0.31.0 and 0.19.0) of 300 ShareGPT requests, on one RTX PRO 6000 and one RTX 4090. Evidence for timings and KV pool size on real hardware, for one model and one workload.
 - **[LLMServingSim](https://github.com/casys-kaist/LLMServingSim)** (`llmservingsim`): a second, independent Python port of vLLM's scheduler and block pool, with step times from kernels profiled on those two GPUs. Its authors validate it against the measured runs, so there its agreement with them is not independent evidence.
 
-Why three, and how their disagreements are handled: [ADR 0009](../docs/adr/0009-three-references.md). [`docs/parity.md`](../docs/parity.md) explains every known difference with its numbers.
+Why three, and how their disagreements are handled: [ADR 0009](../docs/adr/0009-three-references.md). [`conformance/parity.md`](parity.md) explains every known difference with its numbers.
 
 ## Parity with BLIS, llm-d and vLLM
 
@@ -23,7 +23,7 @@ Each reference is reported on its own; agreement is never pooled. Where the mode
 | Directional effects | 8 | 14.0% | unbounded | 1 | 1 | 3 | 5 |
 | **All** | 46 | 2.2% | unbounded | 17 | 30 | 35 | 40 |
 
-Counting checks instead: 39 of 46 checks agree (84.8 percent), 7 known differences; 22 of the 28 approaches in the [approach table](../README.md#what-is-modelled-and-where-it-comes-from) are covered by at least one of its scenarios.
+Counting checks instead: 39 of 46 checks agree (84.8 percent), 7 known differences; 22 of the 28 approaches in the [approach table](../src/sim/README.md#all-approaches) are covered by at least one of its scenarios.
 
 | Kind of check | What must hold | Checks | Agree | Known difference |
 |---|---|---|---|---|
@@ -33,7 +33,7 @@ Counting checks instead: 39 of 46 checks agree (84.8 percent), 7 known differenc
 | Directional | The same intervention moves the same metric the same way by a similar factor (memory tiers, eviction, routing policy, autoscaling) | 8 | 6 | 2 |
 | **All** | | **46** | **39** | **7** |
 
-Every check that does not hold as written (the scenario files carry the full reasons, [the parity page](../docs/parity.md) the numbers):
+Every check that does not hold as written (the scenario files carry the full reasons, [the parity page](parity.md) the numbers):
 
 | Compared | Ours | Reference | Deviation | Missed | Cause |
 |---|---|---|---|---|---|
@@ -54,7 +54,7 @@ Every check that does not hold as written (the scenario files carry the full rea
 | Timings, default parameters (no fit) | 20 | 10.8% | 16.4% | 0 | 1 | 9 | 20 |
 | Timings and rates (fitted, held out) | 28 | 2.7% | 41.3% | 2 | 22 | 24 | 27 |
 
-Counting checks instead: 44 of 51 checks agree (86.3 percent), 7 known differences; 8 of the 28 approaches in the [approach table](../README.md#what-is-modelled-and-where-it-comes-from) are covered by at least one of its scenarios.
+Counting checks instead: 44 of 51 checks agree (86.3 percent), 7 known differences; 8 of the 28 approaches in the [approach table](../src/sim/README.md#all-approaches) are covered by at least one of its scenarios.
 
 | Kind of check | What must hold | Checks | Agree | Known difference |
 |---|---|---|---|---|
@@ -64,7 +64,7 @@ Counting checks instead: 44 of 51 checks agree (86.3 percent), 7 known differenc
 | Directional | The same intervention moves the same metric the same way by a similar factor (memory tiers, eviction, routing policy, autoscaling) | 0 | 0 | 0 |
 | **All** | | **51** | **44** | **7** |
 
-Every check that does not hold as written (the scenario files carry the full reasons, [the parity page](../docs/parity.md) the numbers):
+Every check that does not hold as written (the scenario files carry the full reasons, [the parity page](parity.md) the numbers):
 
 | Compared | Ours | Reference | Deviation | Missed | Cause |
 |---|---|---|---|---|---|
@@ -86,7 +86,7 @@ Every check that does not hold as written (the scenario files carry the full rea
 | Timings and rates (fitted, held out) | 40 | 2.8% | 41.6% | 6 | 28 | 34 | 37 |
 | Directional effects | 6 | 4.5% | 184.0% | 2 | 3 | 4 | 4 |
 
-Counting checks instead: 72 of 89 checks agree (80.9 percent), 17 known differences; 15 of the 28 approaches in the [approach table](../README.md#what-is-modelled-and-where-it-comes-from) are covered by at least one of its scenarios.
+Counting checks instead: 72 of 89 checks agree (80.9 percent), 17 known differences; 15 of the 28 approaches in the [approach table](../src/sim/README.md#all-approaches) are covered by at least one of its scenarios.
 
 | Kind of check | What must hold | Checks | Agree | Known difference |
 |---|---|---|---|---|
@@ -96,7 +96,7 @@ Counting checks instead: 72 of 89 checks agree (80.9 percent), 17 known differen
 | Directional | The same intervention moves the same metric the same way by a similar factor (memory tiers, eviction, routing policy, autoscaling) | 6 | 4 | 2 |
 | **All** | | **89** | **72** | **17** |
 
-Every check that does not hold as written (the scenario files carry the full reasons, [the parity page](../docs/parity.md) the numbers):
+Every check that does not hold as written (the scenario files carry the full reasons, [the parity page](parity.md) the numbers):
 
 | Compared | Ours | Reference | Deviation | Missed | Cause |
 |---|---|---|---|---|---|
@@ -143,7 +143,7 @@ BLIS_BIN=/path/to/blis pnpm conformance:reference [--ref <id>] [--only <id>] [--
 LLMSERVINGSIM_DIR=<built checkout> LLMSERVINGSIM_PYTHON=<python> pnpm conformance:reference --ref llmservingsim   # see "LLMServingSim as a reference"
 pnpm conformance:calibrate                    # refit the timing parameters to the committed references; writes calibration/fitted.json
 pnpm conformance:summary                      # write summary.json and print the headline figure
-pnpm docs:sync                                # regenerate the README tables and the generated parts of docs/parity.md
+pnpm docs:sync                                # regenerate the README tables and the generated parts of conformance/parity.md
 ```
 
 `pnpm test` runs the conformance suite too. `pnpm test:conformance` exists so CI can show it as its own check and so that you can run it alone.
@@ -171,9 +171,9 @@ A reference implements `Reference` (`refs/reference.ts`): `id`, `evidence`, `sup
   - `exact`: integers and decisions that must be equal. A check names a `quantity` (`kv_blocks_per_replica`, `prefix_cached_tokens`, `routed_pod`, `requests_per_pod`, `session_pod_changes`, `preemptions`, `request_fate`, `prefill_pool_requests`). Replicas are interchangeable, so `routed_pod` names them in order of first use.
   - `calibrated`: a `metric` (time to first token, time per token, end to end, throughput, KV hand-over time, tokens per speculative step) within a relative `rel_tol`. The TypeScript run of such a scenario uses the fitted timing parameters (see Calibration). Metrics are computed from the per-request rows, the same way for both simulators (`record.ts`, `metricOf`). The TypeScript front end's three illustrative network hops are excluded from its times (`run/typescript.ts`), because BLIS's default has none; its tokenisation stays, as BLIS has an admission delay that stands for it.
   - `directional`: the scenario has `arms` (the scenario with a few fields replaced); the check names a `metric`, a `baseline` and an `intervention` arm, an `effect` (`ratio` or `difference`), the expected `direction`, and a `band` the two simulators' effects must lie within of each other. Two zero effects, for a hit rate that falls to nothing in both, agree.
-- **The rule on tolerances.** A tolerance may be set or changed only by a dated, recorded decision with a reason that does not depend on the observed result (the decision of 2026-11-16 on capacities is in [`docs/parity.md`](../docs/parity.md)). Never loosen a tolerance, or change a scenario's parameters, to make a check pass.
+- **The rule on tolerances.** A tolerance may be set or changed only by a dated, recorded decision with a reason that does not depend on the observed result (the decision of 2026-11-16 on capacities is in [`conformance/parity.md`](parity.md)). Never loosen a tolerance, or change a scenario's parameters, to make a check pass.
 - **Deviations.** Every check also has a deviation, computed by the suite (`deviation.ts`) whether or not it holds: the signed relative difference for a quantity or metric, the share of individual decisions that differ for an exact check, the ratio of the two effects for a directional one. `pnpm conformance:report` prints it with both values and the tolerance; `summary.json` carries every check's row and the distribution per group, and the parity page and README lead with it. The count of checks that hold is the secondary figure.
-- **The rule on differences.** A check passes as stated, or it carries a `known_difference`: a `reference` (which one it is a difference with), a `cause` (a few words, for the table of failing checks), optionally `by_design: true`, a `reason` (what each side does and why they differ; at least a paragraph's worth, enforced by length) and `differences`, the exact keys that differ with both values. Known differences are per reference. Where two references cover a check and disagree with each other, the check carries a `reference_gap` (reason and the exact values) and the model is held against the span of the references, a `known_difference` with `reference: span` recording a miss; a check never passes merely by matching the more convenient reference. The test asserts the observed difference equals the recorded one. It therefore fails if the difference disappears (the model was fixed: delete the record) and if it grows or changes (a new divergence). Never loosen a check or change a scenario's parameters to make it pass.
+- **The rule on differences.** A check passes as stated, or it carries a `known_difference`: a `reference` (which one it is a difference with), a `cause` (a few words, for the table of failing checks), optionally `by_design: true`, a `reason` (what each side does and why they differ; at least a paragraph's worth, enforced by length) and `differences`, the exact keys that differ with both values. Known differences are per reference. Where two references cover a check and disagree with each other, the check carries a `reference_gap` (reason and the exact values) and the model is held against the span of the references, a `known_difference` with `reference: span` recording a miss; a check never passes merely by matching the more convenient reference. The test asserts the observed difference equals the recorded one. It therefore fails if the difference disappears (the model was fixed: delete the record) and if it grows or changes (a new divergence).
 - **References** (`reference/<id>/*.json`). The reduced BLIS record plus `inputHash` (a hash of everything handed to BLIS: scenario file, router configuration, trace, arguments), the BLIS commit, and the catalogue and registry hashes from the BLIS Result. The suite fails when `inputHash` no longer matches the scenario (regenerate) or the commit differs from `refs/blis/lock`.
 - **`refs/blis/lock`** pins the inference-sim commit (no submodule). The router configurations in `refs/blis/epp/` are byte copies of the ones that BLIS build ships (`blis router-configs --file ...`); the reference script checks that.
 
@@ -195,7 +195,7 @@ Local build on macOS (arm64), as verified: Homebrew `cmake` and `protobuf` (`bre
 - **What it supports.** Llama 3.1 8B on the RTX PRO 6000 and RTX 4090 (the GPUs it has profiles for that the model's catalogue has too); one or several replicas with round robin or least-loaded routing; multi-turn conversations; a CPU KV tier; prefill/decode instances; speculative decoding by acceptance rate. Not: llm-d routing, shedding, autoscaling, other GPUs or models, tensor parallelism above 1 (the adapter refuses them, saying which).
 - **Inputs.** A JSONL trace, one request per line with `input_toks`, `output_toks`, `arrival_time_ns` and token ids (its prefix cache hashes real ids, so the translator invents ids that share exactly what the conversation shares; follow-ups are ordinary requests at their own arrival times), and a cluster configuration JSON built from the example configuration of its own bench example (`refs/llmservingsim/data/`), with the scenario's memory utilisation, replicas, tiers and instance roles.
 - **Outputs, scraped from its stdout and CSV at the default log level; nothing is patched.** Per request: arrival, end, queuing delay, time to first token (all nanoseconds), tokens. From the log: KV blocks per instance, the preemption count (the line is absent when it is zero), total requested and prefix-hit prompt tokens, and the cumulative hit counters it prints every simulated second. A request's cached tokens are the increase of its instance's counter in the second it was admitted; the adapter returns them only where that is unambiguous (at most one admission per second that hit the cache, no host tier, no prefill/decode split) and checks that they add up to the total, otherwise `null`. It fails loudly on any line or column it cannot find: the adapter is pinned to the commit, and the upstream repository changes quickly. Not reported at all, so not stated: prefill/decode transfer times, tokens per speculative step, the running and waiting series (the log prints them, they are not in the record).
-- **KV capacity** is `(memory x utilisation - weights) / bytes per block`, arithmetic on its input; it is compared as that (see `docs/parity.md`) and never taken as a measurement of vLLM's start-up sizing.
+- **KV capacity** is `(memory x utilisation - weights) / bytes per block`, arithmetic on its input; it is compared as that (see `conformance/parity.md`) and never taken as a measurement of vLLM's start-up sizing.
 - **Scenario-level `references:`.** A scenario may name the references allowed to answer it (the measured scenarios name `vllm-measured` and `llmservingsim`; the `lss-*`, `calib-lss-*` and `timing-lss-*` scenarios name `llmservingsim`), so a reference that supports the model and GPU is not asked to answer a scenario built from another's inputs.
 - **Determinism.** A run takes 5 to 50 seconds and is deterministic: the committed CSV of its example is byte-identical across macOS and Linux.
 - **Bumping the pin.** Put the new full commit in `refs/llmservingsim/lock`, rebuild, check that the example's committed CSV is still reproduced (if the authors changed their profiles or scheduler it will not be, and that is the news), `pnpm conformance:extract-llmservingsim` (the prefix data and its hashes), `pnpm conformance:reference --ref llmservingsim`, read the diff of `reference/llmservingsim/`, update the known differences it moves, `pnpm conformance:calibrate`, `pnpm conformance:summary && pnpm docs:sync`.

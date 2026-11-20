@@ -204,10 +204,10 @@ On the new pod, in GPU memory
 GPU memory is split in four; the KV pool is what remains
 
 ### body
-Each GPU's memory has four parts, left to right in the box: the weights ({weights}); activations, CUDA graphs and runtime ({work}), the working space of the start-up profiling pass (set by the token budget and `max_num_seqs`), the captured graphs that launch it and the memory the process holds outside PyTorch; the headroom ({headroom}), the part above `gpu_memory_utilization` that the engine leaves unused; and the KV pool, which is what remains of the share the engine may use: {kv} per GPU, {blocks} blocks of 16 tokens for the pod. The KV cache holds the keys and values the model computed for every token it has read, so it never recomputes them.
+Left to right: the weights ({weights}); activations, CUDA graphs and runtime ({work}); the headroom above `gpu_memory_utilization` ({headroom}); and the KV pool, what remains: {kv} per GPU, {blocks} blocks of 16 tokens for the pod. It holds the keys and values of every token read, so the model never recomputes them.
 
 ### detail
-The grid of empty cells is that pool; each cell takes the colour of the session whose tokens it holds. The engine may use `gpu_memory_utilization` times the memory the driver reports [@vllmEngineArgs], [@vllmMemoryProfiling]; from that share it takes the weights, the activations and the CUDA graphs it captures, and the rest becomes the pool, cut into blocks so no memory is wasted [@kwon2023]. The headroom is not taken from the pool: it is the memory outside the share. The pool caps how many requests fit at once.
+The grid of empty cells is that pool; each cell takes the colour of the session whose tokens it holds. Activations are the working space of the start-up profiling pass, set by the token budget and `max_num_seqs`; the runtime share is the memory the process holds outside PyTorch. The engine may use `gpu_memory_utilization` times the memory the driver reports [@vllmEngineArgs], [@vllmMemoryProfiling]; from that share it takes the weights, the activations and the CUDA graphs it captures, and the rest becomes the pool, cut into blocks so no memory is wasted [@kwon2023]. The headroom is not taken from the pool: it is the memory outside the share. The pool caps how many requests fit at once.
 
 ### dive
 membudget, kvbytes, paged

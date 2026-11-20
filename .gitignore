@@ -8,7 +8,7 @@ test-results/
 playwright-report/
 coverage/
 
-# Local development notes and agent tooling (not part of the project)
+# Local development notes and tooling (not part of the project)
 .dev/
 .claude/
 CLAUDE.local.md
