@@ -31,7 +31,7 @@ The model runs no vLLM or llm-d code. Every push compares it with three referenc
 BLIS and LLMServingSim are simulators, and the measurements cover one model and one workload on two GPUs, so absolute timings are indicative.
 
 <p align="center">
-  <img alt="Demo: ten requests on one pod, then a thousand at once with pods scaling up" src="docs/assets/demo.webp" width="100%">
+  <img alt="Demo: one request explained step by step in numbered notes, then ten on one pod, then a thousand at once with pods scaling up" src="docs/assets/demo.webp" width="100%">
 </p>
 
 <p align="center">

@@ -484,6 +484,50 @@ export function LiveView() {
         return s;
       };
       const top = (hudRef.current?.getBoundingClientRect().bottom ?? 70) + STACK_GAP + bannerH;
+      type Item = (typeof items)[number];
+      /** The centre x a box may take at height y: clear of the menus at the top and of the notes button at the bottom right. */
+      const xRange = (it: Item, y: number): [number, number] => {
+        const hw = it.w / 2 + 8;
+        const minX = y < scene.panels.lh ? scene.panels.lw + hw : hw;
+        const maxX = y < scene.panels.rh ? cw - scene.panels.rw - hw : y + it.h > bottom - NOTES_BTN_PX ? cw - NOTES_BTN_PX - hw : cw - hw;
+        return [minX, maxX];
+      };
+      /**
+       * Each node stacks its own boxes, so two nodes' stacks can meet (the stream's below its node and a pod's
+       * below the graph). Older boxes keep their place; a newer one that would cover one moves to the nearest
+       * spot beside, above or below it that covers none, or stays put when there is no such spot.
+       */
+      const separate = (byAge: Item[], at: Map<number, { x: number; y: number }>) => {
+        const fixed: { x: number; y: number; w: number; h: number }[] = [];
+        const hits = (x: number, y: number, it: Item) =>
+          fixed.some((o) => Math.abs(x - o.x) < (it.w + o.w) / 2 + STACK_GAP && y < o.y + o.h + STACK_GAP && o.y < y + it.h + STACK_GAP);
+        for (const it of byAge) {
+          const p = at.get(it.c.id);
+          if (!p) continue;
+          if (hits(p.x, p.y, it)) {
+            let best: { x: number; y: number } | null = null;
+            let bestD = Infinity;
+            for (const o of fixed) {
+              const ys = [p.y, o.y + o.h + STACK_GAP, o.y - it.h - STACK_GAP];
+              const cands = [
+                { x: o.x + (o.w + it.w) / 2 + STACK_GAP, y: p.y },
+                { x: o.x - (o.w + it.w) / 2 - STACK_GAP, y: p.y },
+                ...ys.slice(1).map((y) => ({ x: p.x, y })),
+              ];
+              for (const c of cands) {
+                if (c.y < top || c.y + it.h > bottom) continue;
+                const [lo, hi] = xRange(it, c.y);
+                if (c.x < lo || c.x > hi || hits(c.x, c.y, it)) continue;
+                const d = Math.hypot(c.x - p.x, c.y - p.y);
+                if (d < bestD) (bestD = d), (best = c);
+              }
+            }
+            if (best) at.set(it.c.id, best);
+          }
+          const q = at.get(it.c.id)!;
+          fixed.push({ x: q.x, y: q.y, w: it.w, h: it.h });
+        }
+      };
       const anchors = new Map<number, { x: number; y: number }>();
       const keyOf = (it: (typeof items)[number]): string | null => {
         if (cw < NARROW_PX) {
@@ -571,14 +615,12 @@ export function LiveView() {
             if (side === "above") y = Math.max(y, 84);
             // never under the transport bar
             y = Math.min(y, bottom - it.h);
-            const hw = it.w / 2 + 8;
-            const minX = y < scene.panels.lh ? scene.panels.lw + hw : hw;
-            // clear of the menus at the top right and of the notes button at the bottom right
-            const maxX = y < scene.panels.rh ? cw - scene.panels.rw - hw : y + it.h > bottom - NOTES_BTN_PX ? cw - NOTES_BTN_PX - hw : cw - hw;
+            const [minX, maxX] = xRange(it, y);
             want.set(it.c.id, { x: Math.max(minX, Math.min(maxX, s.x)), y });
           }
         }
       }
+      if (cw >= NARROW_PX) separate(order, want);
       for (const it of items) {
         const t = want.get(it.c.id);
         const g = leaderOf(it.c);

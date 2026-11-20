@@ -71,6 +71,34 @@ test.describe("live graph view", () => {
     expect(errors).toEqual([]);
   });
 
+  test("explanation boxes of different parts never cover each other", async ({ page }) => {
+    test.setTimeout(60_000);
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto("/");
+    await page.getByTestId("send-first").click();
+    // the first request at the default speed shows the stream's and the pod's boxes together, below the graph
+    let worst = 0;
+    for (let i = 0; i < 100; i++) {
+      await page.waitForTimeout(280);
+      const overlap = await page.evaluate(() => {
+        const rs = [...document.querySelectorAll<HTMLElement>('[data-testid="callout"]')]
+          .filter((e) => Number(getComputedStyle(e).opacity) > 0.9)
+          .map((e) => e.getBoundingClientRect());
+        let most = 0;
+        for (let a = 0; a < rs.length; a++)
+          for (let b = a + 1; b < rs.length; b++) {
+            const w = Math.min(rs[a]!.right, rs[b]!.right) - Math.max(rs[a]!.left, rs[b]!.left);
+            const h = Math.min(rs[a]!.bottom, rs[b]!.bottom) - Math.max(rs[a]!.top, rs[b]!.top);
+            if (w > 0 && h > 0) most = Math.max(most, w * h);
+          }
+        return most;
+      });
+      worst = Math.max(worst, overlap);
+    }
+    // a few px while two boxes glide past each other is fine; a covered paragraph is not
+    expect(worst).toBeLessThan(400);
+  });
+
   test("pause stops the clock; 100 requests at once scale out to 9 pods", async ({ page }) => {
     const errors = guard(page);
     await page.goto("/");

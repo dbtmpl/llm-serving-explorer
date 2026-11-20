@@ -44,9 +44,11 @@ export function flyToLog(el: HTMLElement, button: HTMLElement | null): void {
   const ghost = el.cloneNode(true) as HTMLElement;
   ghost.removeAttribute("data-testid");
   ghost.classList.add("lv-fly");
-  Object.assign(ghost.style, { position: "fixed", left: `${from.left}px`, top: `${from.top}px`, width: `${from.width}px`, height: `${from.height}px`, margin: "0", transform: "none", opacity: String(opacity), pointerEvents: "none", zIndex: "30" });
+  Object.assign(ghost.style, { position: "fixed", left: `${from.left}px`, top: `${from.top}px`, width: `${from.width}px`, height: `${from.height}px`, margin: "0", transform: "none", opacity: String(opacity), pointerEvents: "none" });
+  // first among the box's siblings, so it passes behind the boxes still shown instead of over them;
   // inside the app root, so the copy keeps the page's fonts and colours
-  (el.closest(".lv-root") ?? document.body).appendChild(ghost);
+  const host = el.parentElement ?? el.closest(".lv-root") ?? document.body;
+  host.insertBefore(ghost, host.firstChild);
   let reduce = false;
   try {
     reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
