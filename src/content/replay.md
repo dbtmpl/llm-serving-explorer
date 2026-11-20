@@ -1,6 +1,6 @@
 # Calibrated mode
 
-The explanatory text of the calibrated replay, reached from the transport bar's "more" menu (Calibrated replay (BLIS)): what the mode is, which scenarios it offers and what each shows, the badge that names the BLIS commit, the note on what a replay cannot show, and the notes in the inspector for a replay. Control labels stay in the code. Values in braces are filled in by the code from the replay file, so the text cannot disagree with the data.
+The explanatory text of the calibrated replay, reached from the "Switch to Calibrated BLIS Replay" button in the bottom right corner: what the mode is, which scenarios it offers and what each shows, the badge that names the BLIS commit, the note on what a replay cannot show, and the notes in the inspector for a replay. Control labels stay in the code. Values in braces are filled in by the code from the replay file, so the text cannot disagree with the data.
 
 ## `mode.calibrated` Calibrated mode
 _Where:_ Left menu, under the "Back to the approximate model" button, while a replay is shown.

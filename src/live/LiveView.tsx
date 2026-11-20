@@ -100,6 +100,16 @@ function warpLabel(warp: number, narrow: boolean): string {
 }
 
 /** A speech bubble with lines of text; struck through when the notes are off. */
+function ReplayIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 12a9 9 0 1 0 3-6.7" />
+      <path d="M3 4v5h5" />
+      <path d="M10 9l5 3-5 3z" />
+    </svg>
+  );
+}
+
 function NotesIcon({ off }: { off: boolean }) {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -324,6 +334,7 @@ export function LiveView() {
   live.current.explain = explain;
   live.current.callouts = callouts;
   const calloutEls = useRef(new Map<number, HTMLDivElement>());
+  const cornerRef = useRef<HTMLDivElement>(null);
   const leaderSvg = useRef<SVGSVGElement>(null);
   const leftRef = useRef<HTMLDivElement>(null);
   const rightRef = useRef<HTMLDivElement>(null);
@@ -473,8 +484,17 @@ export function LiveView() {
         return el ? [{ c, el, h: el.offsetHeight, w: el.offsetWidth }] : [];
       });
       const g = scene.contentOnScreen() ?? { l: 0, t: ch / 2, r: cw, b: ch / 2 };
-      // on a phone the notes button floats in the corner above the transport bar; boxes stop above it
-      const bottom = ch - (scene.panels.bottom || 96) - (cw < NARROW_PX ? NOTES_BTN_PX : 0);
+      // the corner buttons (BLIS replay, notes) float at the bottom right, above the transport bar
+      const corner = (() => {
+        const el = cornerRef.current;
+        const host = items[0]?.el.offsetParent;
+        if (!el || !host) return null;
+        const a = el.getBoundingClientRect();
+        const h = host.getBoundingClientRect();
+        return { left: a.left - h.left - 8, top: a.top - h.top - 8 };
+      })();
+      // on a phone boxes stop above the corner buttons
+      const bottom = Math.min(ch - (scene.panels.bottom || 96) - (cw < NARROW_PX ? NOTES_BTN_PX : 0), cw < NARROW_PX && corner ? corner.top : Infinity);
       // stacks: a key, the room each side has, and what is already in it; older boxes keep their side
       type Stack = { room: { above: number; below: number }; used: { above: number; below: number }; boxes: { above: typeof items; below: typeof items } };
       const stacks = new Map<string, Stack>();
@@ -485,11 +505,12 @@ export function LiveView() {
       };
       const top = (hudRef.current?.getBoundingClientRect().bottom ?? 70) + STACK_GAP + bannerH;
       type Item = (typeof items)[number];
-      /** The centre x a box may take at height y: clear of the menus at the top and of the notes button at the bottom right. */
+      /** The centre x a box may take at height y: clear of the menus at the top and of the corner buttons at the bottom right. */
       const xRange = (it: Item, y: number): [number, number] => {
         const hw = it.w / 2 + 8;
         const minX = y < scene.panels.lh ? scene.panels.lw + hw : hw;
-        const maxX = y < scene.panels.rh ? cw - scene.panels.rw - hw : y + it.h > bottom - NOTES_BTN_PX ? cw - NOTES_BTN_PX - hw : cw - hw;
+        const nearCorner = corner ? y + it.h > corner.top : y + it.h > bottom - NOTES_BTN_PX;
+        const maxX = y < scene.panels.rh ? cw - scene.panels.rw - hw : nearCorner ? (corner ? corner.left : cw - NOTES_BTN_PX) - hw : cw - hw;
         return [minX, maxX];
       };
       /**
@@ -1690,6 +1711,17 @@ export function LiveView() {
       </div>
 
       {!calibrated && !stepMode && tour === null && !(narrow && showLeft) && (
+        <div className="lv-corner-btns" ref={cornerRef}>
+        <button
+          className="lv-notes-btn lv-mode-btn"
+          data-testid="mode-calibrated"
+          aria-label="Switch to the calibrated BLIS replay: recorded BLIS runs of fixed scenarios, read-only"
+          title="Recorded BLIS runs of fixed scenarios, read-only"
+          onClick={() => switchMode("calibrated")}
+        >
+          <ReplayIcon />
+          <span>{narrow ? "BLIS replay" : "Switch to Calibrated BLIS Replay"}</span>
+        </button>
         <button
           className={`lv-notes-btn ${explain ? "on" : ""}`}
           data-testid="notes-toggle"
@@ -1701,6 +1733,7 @@ export function LiveView() {
           <NotesIcon off={!explain} />
           {!narrow && <span>{explain ? "Notes on" : "Notes off"}</span>}
         </button>
+        </div>
       )}
 
       <div className="lv-transport" data-tour="transport">
@@ -1771,17 +1804,14 @@ export function LiveView() {
               <small>{calibrated ? "replay the scenario from the start" : "an empty graph with the default settings"}</small>
             </button>
           )}
-          <hr />
-          {calibrated ? (
-            <button role="menuitem" data-testid="menu-explore" onClick={() => pick(() => switchMode("explore"))}>
-              Back to the approximate model
-              <small>change any setting while requests run</small>
-            </button>
-          ) : (
-            <button role="menuitem" data-testid="mode-calibrated" onClick={() => pick(() => switchMode("calibrated"))}>
-              Calibrated replay (BLIS)
-              <small>recorded BLIS runs of fixed scenarios, read-only</small>
-            </button>
+          {calibrated && (
+            <>
+              <hr />
+              <button role="menuitem" data-testid="menu-explore" onClick={() => pick(() => switchMode("explore"))}>
+                Back to the approximate model
+                <small>change any setting while requests run</small>
+              </button>
+            </>
           )}
         </div>
       )}

@@ -597,12 +597,18 @@ body,
 .lv-log li.tone-remote .lv-log-no {
   background: var(--remote);
 }
-/* notes on and off: a floating button in the bottom right corner, above the transport bar */
-.lv-root .lv-notes-btn {
+/* the corner buttons, bottom right above the transport bar: the BLIS replay switch over notes on and off */
+.lv-root .lv-corner-btns {
   position: absolute;
   right: 18px;
   bottom: 84px;
   z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+.lv-root .lv-notes-btn {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -624,9 +630,14 @@ body,
   opacity: 0.88;
 }
 @media (max-width: 899px) {
-  .lv-root .lv-notes-btn {
+  .lv-root .lv-corner-btns {
     right: 10px;
     bottom: 70px;
+  }
+  .lv-root .lv-mode-btn {
+    height: 44px;
+  }
+  .lv-root .lv-notes-btn:not(.lv-mode-btn) {
     width: 44px;
     height: 44px;
     padding: 0;

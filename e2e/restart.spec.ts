@@ -117,7 +117,6 @@ test.describe("restarting the fleet", () => {
     await page.getByTestId("speed-1").click();
     await openGroups(page);
     await pick(page, "model", "Llama 3.1 70B");
-    await page.getByTestId("more").click();
     await page.getByTestId("mode-calibrated").click();
     await page.waitForTimeout(1500);
     await expect(page.getByTestId("fit-banner")).toHaveCount(0);
