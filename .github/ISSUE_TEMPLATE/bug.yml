@@ -1,0 +1,22 @@
+name: Bug
+description: Something on the site or in the model behaves wrongly
+labels: [needs-triage]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Architecture, settings and the buttons you pressed. A screenshot helps.
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and device
+      placeholder: Firefox 140 on macOS, Safari on iPhone 15, ...

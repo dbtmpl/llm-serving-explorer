@@ -97,7 +97,7 @@ It is a teaching model: the mechanisms should be right and the magnitudes plausi
 | [`public/replay/`](public/replay/) | The replay files, generated from the pinned BLIS |
 | [`conformance/`](conformance/) | Scenarios, the three references, calibration, the parity page and the tests that compare the model with them |
 | [`e2e/`](e2e/) | Playwright end-to-end tests |
-| [`docs/`](docs/) | Design choices, architecture decision records and the demo |
+| [`docs/`](docs/) | Design choices and the demo |
 
 The simulation does not depend on the interface and runs on its own:
 

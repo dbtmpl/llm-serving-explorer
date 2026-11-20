@@ -35,7 +35,7 @@ The simulation is a teaching model, so every behaviour must be traceable to a so
 
 If your change is meant to leave behaviour alone, `src/sim/engine/__tests__/behaviour.test.ts` must pass unchanged. If it changes the model on purpose, update the snapshots with `pnpm test -u` and explain the change in the commit message.
 
-Where sources disagree, record which reading you took in [docs/design-choices.md](docs/design-choices.md). Record structural decisions in [docs/adr/](docs/adr/) and new terms in [GLOSSARY.md](GLOSSARY.md).
+Where sources disagree, record which reading you took in [docs/design-choices.md](docs/design-choices.md). Record new terms in [GLOSSARY.md](GLOSSARY.md).
 
 ## Before opening a pull request
 

@@ -12,7 +12,7 @@
  *     those two times, not every token), pausing while a preempted request waits to resume.
  * A pod's inside is the aggregate BLIS reports: how full its KV pool is and how many requests run
  * and wait. There is no block map, no forward-pass sweep and no roofline dot because BLIS emits no
- * step-level events (see ADR 0007).
+ * step-level events.
  */
 import { DEFAULT_PARAMS, DISPLAY_CELLS, createWorld, memoryBudget, replicaSpec, type Params, type Pod, type Req, type RouteDecision, type Session, type SimEvent, type World } from "../sim/index.js";
 import type { Run, RunWorld } from "../live/run.js";

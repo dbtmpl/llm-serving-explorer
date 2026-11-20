@@ -53,8 +53,6 @@ jobs:
           echo "LLMSERVINGSIM_PYTHON=$(which python)" >> "$GITHUB_ENV"
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: 12
 
       - uses: actions/setup-node@v4
         with:

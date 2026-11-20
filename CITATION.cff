@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use LLM Serving Explorer or its conformance results, please cite it as below."
+type: software
+title: "LLM Serving Explorer"
+abstract: "An animated, interactive explanation of how an LLM inference stack (vLLM behind llm-d) serves requests, driven by an in-browser model checked against BLIS, LLMServingSim and measured vLLM runs."
+authors:
+  - family-names: Biertimpel
+    given-names: David
+repository-code: "https://github.com/dbtmpl/llm-serving-explorer"
+url: "https://dbtmpl.github.io/llm-serving-explorer/"
+license: Apache-2.0
+version: 0.1.0
+keywords:
+  - llm inference
+  - vllm
+  - llm-d
+  - kv cache
+  - simulation
+  - visualization
