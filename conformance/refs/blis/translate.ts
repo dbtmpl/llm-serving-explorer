@@ -141,7 +141,7 @@ export function toBlis(s: Scenario, arm: string = MAIN_ARM): BlisInput {
     stringify({
       kind: "Scenario",
       name,
-      engine: { kind: "vllm", version: "0.32.0" },
+      engine: { kind: "vllm" },
       model,
       coefficients,
       cluster: { hardware: gpu, ...(d.disagg ? { fabric: FABRIC } : {}), nodes, gpus_per_node: GPUS_PER_NODE }

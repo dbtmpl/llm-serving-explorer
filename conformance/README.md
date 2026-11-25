@@ -2,7 +2,7 @@
 
 Tests that compare the TypeScript model in `src/sim/` with three references, each a module under `refs/<id>/` implementing `Reference` (`refs/reference.ts`):
 
-- **[BLIS](https://github.com/inference-sim/inference-sim)** (`blis`): a discrete-event simulator running the llm-d router's code (its Endpoint Picker, in process) in front of a Go translation of vLLM 0.32's scheduler. Evidence for llm-d's and vLLM's decisions: routing, queueing, admission, preemption, KV accounting.
+- **[BLIS](https://github.com/inference-sim/inference-sim)** (`blis`): a discrete-event simulator running the llm-d router's code (its Endpoint Picker, in process) in front of a Go translation of vLLM 0.34's scheduler. Evidence for llm-d's and vLLM's decisions: routing, queueing, admission, preemption, KV accounting.
 - **Measured vLLM** (`vllm-measured`): per-request timings, engine settings and KV block counts from two published vLLM runs (0.31.0 and 0.19.0) of 300 ShareGPT requests, on one RTX PRO 6000 and one RTX 4090. Evidence for timings and KV pool size on real hardware, for one model and one workload.
 - **[LLMServingSim](https://github.com/casys-kaist/LLMServingSim)** (`llmservingsim`): a second, independent Python port of vLLM's scheduler and block pool, with step times from kernels profiled on those two GPUs. Its authors validate it against the measured runs, so there its agreement with them is not independent evidence.
 
@@ -13,37 +13,58 @@ Tests that compare the TypeScript model in `src/sim/` with three references, eac
 Each reference is reported on its own; agreement is never pooled. Where the model is fitted, the readings before and after the fit are kept apart.
 
 <!-- generated:parity-readme:start -->
-**BLIS** (commit `c79c7456`): median deviation 2.2% over 46 comparisons, 30 of them within 5%.
+**BLIS** (commit `e7597a8c`): median deviation 2.8% over 76 comparisons, 44 of them within 5%.
 
 | Group | Comparisons | Median deviation | Largest deviation | Within 1% | Within 5% | Within 10% | Within 25% |
 |---|---|---|---|---|---|---|---|
 | Capacity and KV accounting | 2 | 0.8% | 1.0% | 2 | 2 | 2 | 2 |
 | Decisions | 12 | 0% | 75.0% | 10 | 10 | 10 | 10 |
-| Timings and rates (fitted, held out) | 24 | 2.7% | 33.6% | 4 | 17 | 20 | 23 |
-| Directional effects | 8 | 14.0% | unbounded | 1 | 1 | 3 | 5 |
-| **All** | 46 | 2.2% | unbounded | 17 | 30 | 35 | 40 |
+| Timings and rates (fitted, held out) | 54 | 3.1% | 44.6% | 13 | 30 | 44 | 51 |
+| Directional effects | 8 | 9.5% | 79.0% | 1 | 2 | 4 | 6 |
+| **All** | 76 | 2.8% | 79.0% | 26 | 44 | 60 | 69 |
 
-Counting checks instead: 39 of 46 checks agree (84.8 percent), 7 known differences; 22 of the 28 approaches in the [approach table](../src/sim/README.md#all-approaches) are covered by at least one of its scenarios.
+Counting checks instead: 68 of 76 checks agree (89.5 percent), 8 known differences; 22 of the 28 approaches in the [approach table](../src/sim/README.md#all-approaches) are covered by at least one of its scenarios.
 
 | Kind of check | What must hold | Checks | Agree | Known difference |
 |---|---|---|---|---|
 | Exact | Decisions and discrete counts are equal (the pod chosen, cached prefix tokens, which requests are shed or preempted) | 12 | 10 | 2 |
 | Capacity | KV blocks per replica within 0.1%: both sides derive them from estimates | 2 | 0 | 2 |
-| Calibrated | A timing or rate is within the tolerance written in the scenario | 24 | 23 | 1 |
-| Directional | The same intervention moves the same metric the same way by a similar factor (memory tiers, eviction, routing policy, autoscaling) | 8 | 6 | 2 |
-| **All** | | **46** | **39** | **7** |
+| Calibrated | A timing or rate is within the tolerance written in the scenario | 54 | 51 | 3 |
+| Directional | The same intervention moves the same metric the same way by a similar factor (memory tiers, eviction, routing policy, autoscaling) | 8 | 7 | 1 |
+| **All** | | **76** | **68** | **8** |
+
+Comparison with the previous BLIS commit (`c79c7456` vs `e7597a8c`):
+
+| Metric | `c79c7456` | `e7597a8c` |
+|---|---|---|
+| Scenarios (with checks / calibration) | 19 / 27 | 19 / 27 |
+| Checks agreeing | 39 of 46 (84.8 percent) | 68 of 76 (89.5 percent) |
+| Known differences | 7 | 8 |
+| Overall median deviation | 2.2% | 2.8% |
+| Overall largest deviation | unbounded | 79.0% |
+| Within 1% / 5% / 10% / 25% | 17 / 30 / 35 / 40 (of 46) | 26 / 44 / 60 / 69 (of 76) |
+| Capacity and KV accounting | 2, median 0.8%, max 1.0%, within 5%: 2 | 2, median 0.8%, max 1.0%, within 5%: 2 |
+| Decisions | 12, median 0%, max 75.0%, within 5%: 10 | 12, median 0%, max 75.0%, within 5%: 10 |
+| Timings and rates (fitted, held out) | 24, median 2.7%, max 33.6%, within 5%: 17 | 54, median 3.1%, max 44.6%, within 5%: 30 |
+| Directional effects | 8, median 14.0%, max unbounded, within 5%: 1 | 8, median 9.5%, max 79.0%, within 5%: 2 |
+| Exact checks (agree / total) | 10 / 12 | 10 / 12 |
+| Capacity checks (agree / total) | 0 / 2 | 0 / 2 |
+| Calibrated checks (agree / total) | 23 / 24 | 51 / 54 |
+| Directional checks (agree / total) | 6 / 8 | 7 / 8 |
 
 Every check that does not hold as written (the scenario files carry the full reasons, [the parity page](parity.md) the numbers):
 
-| Compared | Ours | Reference | Deviation | Missed | Cause |
-|---|---|---|---|---|---|
-| `autoscale-overload`: mean time to first token, fixed to autoscaled | 8.4% of baseline | 40% of baseline | ratio 0.21 | effect ratio 0.33 to 3 (different by design) | The autoscalers follow different rules and reach different sizes |
-| `kv-budget-70b-h200-tp4`: KV blocks per replica | 75,234 blocks | 74,760 blocks | +0.6% | 0.1% | BLIS's flat graph median is above what measured engines set aside; the model follows the measurements |
-| `kv-budget-8b-h100`: KV blocks per replica | 28,205 blocks | 27,926 blocks | +1.0% | 0.1% | BLIS's flat graph median is above what measured engines set aside; the model follows the measurements |
-| `routing-round-robin`: pod chosen per request | per request | per request | 8 of 12 differ (67%) | different by design | llm-d picks at random among tied pods; the model rotates strictly, as Envoy does |
-| `routing-round-robin`: requests per pod | 3/3/3/3 | 4/4/3/1 | 3 of 4 differ (75%); largest 200% | different by design | Same cause: random choice among tied pods against strict rotation |
-| `tiers-offload`: host-tier hit rate, gpu-only to with-dram | 49.8% | 0.0% | unbounded (reference effect is zero), direction differs | effect ratio 0.67 to 1.5 | The reference reports a zero host-tier hit counter although the tier works (its counter, not the behaviour) |
-| `timing-8b-h100-burst`: mean time to first token | 728 ms | 545 ms | +33.6% | 30% | One compute-efficiency factor cannot follow the reference's prefill cost curve |
+| Compared | Ours | `c79c7456` | `e7597a8c` | Deviation (`e7597a8c`) | Missed | Cause |
+|---|---|---|---|---|---|---|
+| `autoscale-overload`: mean time to first token, fixed to autoscaled | 8.4% of baseline | 40% of baseline | 40% of baseline | ratio 0.21 | effect ratio 0.33 to 3 (different by design) | The autoscalers follow different rules and reach different sizes |
+| `kv-budget-70b-h200-tp4`: KV blocks per replica | 75,234 blocks | 74,760 blocks | 74,761 blocks | +0.6% | 0.1% | BLIS's flat graph median is above what measured engines set aside; the model follows the measurements |
+| `kv-budget-8b-h100`: KV blocks per replica | 28,205 blocks | 27,926 blocks | 27,927 blocks | +1.0% | 0.1% | BLIS's flat graph median is above what measured engines set aside; the model follows the measurements |
+| `routing-round-robin`: pod chosen per request | per request | per request | per request | 8 of 12 differ (67%) | different by design | llm-d picks at random among tied pods; the model rotates strictly, as Envoy does |
+| `routing-round-robin`: requests per pod | 3/3/3/3 | 4/4/3/1 | 4/4/3/1 | 3 of 4 differ (75%); largest 200% | different by design | Same cause: random choice among tied pods against strict rotation |
+| `tiers-offload`: host-tier hit rate, gpu-only to with-dram | 49.8% | 0.0% | 49.1% | ratio 1.02 | holds (resolved) | Resolved (was: The reference reports a zero host-tier hit counter although the tier works (its counter, not the behaviour)) |
+| `timing-8b-h100-burst`: mean time to first token | 728 ms | 545 ms | 545 ms | +33.5% | 30% | One compute-efficiency factor cannot follow the reference's prefill cost curve |
+| `timing-8b-h100-burst`: median time to first token | 726 ms | — | 502 ms | +44.6% | 30% | One compute-efficiency factor cannot follow the reference's prefill cost curve |
+| `timing-8b-h100-burst`: 99th percentile time to first token | 1,190 ms | — | 884 ms | +35.2% | 30% | One compute-efficiency factor cannot follow the reference's prefill cost curve |
 
 **Measured vLLM** (revision `49df63f2`): median timing deviation 10.8% over 20 comparisons with the site's default parameters, 2.7% over 28 comparisons on held-out requests after fitting.
 
@@ -123,7 +144,7 @@ Every check that does not hold as written (the scenario files carry the full rea
 
 **In short**
 
-- **BLIS.** Seven checks do not hold as written: round robin (Envoy's strict rotation against llm-d's random choice among tied pods, two checks); time to first token when 32 requests arrive at once (one compute-efficiency factor cannot follow BLIS's prefill cost); BLIS's host-tier hit counter, which reads zero; the drop in queue wait under autoscaling (different autoscaler rules); and one replica's KV pool, which the model sizes 1.0 percent (8B, H100) and 0.6 percent (70B, four H200s) larger, because BLIS charges a flat 1.16 GB median for CUDA graphs where the model follows what measured engines set aside.
+- **BLIS.** Eight checks do not hold as written: round robin (Envoy's strict rotation against llm-d's random choice among tied pods, two checks); time to first token when 32 requests arrive at once (mean, median and 99th percentile: one compute-efficiency factor cannot follow BLIS's prefill cost); the drop in queue wait under autoscaling (different autoscaler rules); and one replica's KV pool, which the model sizes 1.0 percent (8B, H100) and 0.6 percent (70B, four H200s) larger, because BLIS charges a flat 1.16 GB median for CUDA graphs where the model follows what measured engines set aside. (BLIS's host-tier hit counter, which read zero at `c79c7456`, now reports 49.1% and holds.)
 - **Measured vLLM, default parameters** (MBU 0.85, MFU 0.7). Every timing check on the RTX PRO 6000 holds; on the RTX 4090 all but the median end-to-end time (+16.4 percent against a 15 percent tolerance), with time per token +10.6 percent. The KV pool is within 0.07 percent of the RTX PRO 6000's and 1.2 percent above the RTX 4090's, using an empirical 0.7 GB per GPU for memory outside PyTorch fitted to these two runs.
 - **Measured vLLM, fitted.** Parameters fitted on the RTX PRO 6000 hold all four checks on the RTX 4090; those fitted on the RTX 4090 hold none on the RTX PRO 6000, because that fit ends at its MBU bound. The prefix-cache check (a 7.6 percent hit rate) is out of reach: the model's prefix cache is per conversation, and the trace gives token counts, not the prefixes separate conversations share.
 - **LLMServingSim.** Decisions agree on 6 of 7 exact checks (cached prefix tokens per follow-up, round-robin placement, `max_num_seqs`, preemptions); the miss is the RTX 4090's preemption count over a long saturated run, 204 against 191. Its KV pool (37,090 blocks on the RTX PRO 6000, against 36,649 measured) sets nothing aside for activations, CUDA graphs or memory outside PyTorch. At small batches, the model's front-end tokenisation (30 ms plus 4 µs per token), which LLMServingSim lacks, is most of the gap in time to first token. In a prefill/decode split its time to first token ends at the prefill replica, before the hand-over, so that effect differs by definition.

@@ -17,7 +17,7 @@ LLM Serving Explorer animates how an inference stack such as [vLLM](https://gith
 
 The simulation behind it is a TypeScript model of vLLM's scheduler and memory and of llm-d's router. Every push checks it against three references ([details](conformance/README.md#parity-with-blis-llm-d-and-vllm)):
 
-- **[BLIS](https://github.com/inference-sim/inference-sim)**, which runs the llm-d router's code in front of a Go translation of vLLM's scheduler: median deviation 2.2% over 46 comparisons, 30 of them within 5%.
+- **[BLIS](https://github.com/inference-sim/inference-sim)**, which runs the llm-d router's code in front of a Go translation of vLLM's scheduler: median deviation 2.8% over 76 comparisons, 44 of them within 5% (previously 2.2% over 46 comparisons, 30 within 5%, at commit `c79c7456`).
 - **Measured vLLM**, 300 ShareGPT requests on an RTX PRO 6000 and an RTX 4090: median timing deviation 10.8% over 20 comparisons with the site's default parameters, 2.7% over 28 comparisons on held-out requests after fitting.
 - **[LLMServingSim](https://github.com/casys-kaist/LLMServingSim)**, a second port of vLLM's scheduler: median timing deviation 10.7% over 32 comparisons with the site's default parameters, 2.8% over 40 comparisons on held-out requests after fitting.
 

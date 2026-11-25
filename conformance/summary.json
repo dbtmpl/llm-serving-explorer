@@ -9,14 +9,14 @@
       "id": "blis",
       "name": "BLIS",
       "kind": "simulator",
-      "lock": "c79c745619b16a8019339e3bbc79ee5e2923b258",
+      "lock": "e7597a8c9510f876653d7d87bd8baf195c37c5c7",
       "scenarios": {
         "total": 46,
         "calibration": 27,
         "withChecks": 19
       },
       "checks": {
-        "total": 46,
+        "total": 76,
         "byKind": {
           "exact": {
             "total": 12,
@@ -28,34 +28,34 @@
             "known_difference": 2
           },
           "calibrated": {
-            "total": 24,
-            "within_tolerance": 23,
-            "known_difference": 1
+            "total": 54,
+            "within_tolerance": 51,
+            "known_difference": 3
           },
           "directional": {
             "total": 8,
-            "directional_agree": 6,
-            "known_difference": 2
+            "directional_agree": 7,
+            "known_difference": 1
           }
         },
-        "agree": 39,
-        "knownDifferences": 7,
+        "agree": 68,
+        "knownDifferences": 8,
         "disputed": 0
       },
       "headline": {
         "definition": "share of the checks BLIS covers that agree (exact, within tolerance or directionally)",
-        "agree": 39,
-        "total": 46,
-        "share": 0.8478,
-        "knownDifferences": 7
+        "agree": 68,
+        "total": 76,
+        "share": 0.8947,
+        "knownDifferences": 8
       },
       "deviations": {
         "definition": "One deviation per check the reference covers: |model - reference| / reference for a quantity or metric, the share of individual decisions that differ for exact checks, |effect ratio - 1| for directional checks. Medians and maxima are over those numbers; 'within x%' counts the checks at or below x%.",
         "groups": {
           "capacity": {
             "n": 2,
-            "median": 0.008165,
-            "max": 0.009991,
+            "median": 0.008141,
+            "max": 0.009955,
             "unbounded": 0,
             "within": {
               "1": 2,
@@ -89,43 +89,43 @@
             }
           },
           "timings": {
-            "n": 24,
-            "median": 0.02662,
-            "max": 0.3357,
+            "n": 54,
+            "median": 0.0315,
+            "max": 0.4463,
             "unbounded": 0,
             "within": {
-              "1": 4,
-              "5": 17,
-              "10": 20,
-              "25": 23
+              "1": 13,
+              "5": 30,
+              "10": 44,
+              "25": 51
             }
           },
           "effects": {
             "n": 8,
-            "median": 0.1396,
-            "max": null,
-            "unbounded": 1,
+            "median": 0.09543,
+            "max": 0.7899,
+            "unbounded": 0,
             "within": {
               "1": 1,
-              "5": 1,
-              "10": 3,
-              "25": 5
+              "5": 2,
+              "10": 4,
+              "25": 6
             }
           }
         },
         "overall": {
-          "n": 46,
-          "median": 0.02187,
-          "max": null,
-          "unbounded": 1,
+          "n": 76,
+          "median": 0.02838,
+          "max": 0.7899,
+          "unbounded": 0,
           "within": {
-            "1": 17,
-            "5": 30,
-            "10": 35,
-            "25": 40
+            "1": 26,
+            "5": 44,
+            "10": 60,
+            "25": 69
           }
         },
-        "directionMismatches": 1
+        "directionMismatches": 0
       },
       "rows": [
         {
@@ -160,7 +160,7 @@
           "theirs": "40% of baseline",
           "deviation": {
             "kind": "effect",
-            "ratio": 0.21011415935381617,
+            "ratio": 0.21009325993150663,
             "directionMatches": true
           },
           "absDeviation": 0.7899,
@@ -202,10 +202,10 @@
           "theirs": "200% of baseline",
           "deviation": {
             "kind": "effect",
-            "ratio": 1.1096068554780247,
+            "ratio": 1.1102508796002557,
             "directionMatches": true
           },
-          "absDeviation": 0.1096,
+          "absDeviation": 0.1103,
           "deviationText": "ratio 1.11",
           "tolerance": "effect ratio 0.75 to 1.33",
           "holds": true,
@@ -220,12 +220,12 @@
           "group": "capacity",
           "what": "KV blocks per replica",
           "ours": "75,234 blocks",
-          "theirs": "74,760 blocks",
+          "theirs": "74,761 blocks",
           "deviation": {
             "kind": "relative",
-            "value": 0.006340288924558587
+            "value": 0.006326828159066893
           },
-          "absDeviation": 0.00634,
+          "absDeviation": 0.006327,
           "deviationText": "+0.6%",
           "tolerance": "0.1%",
           "holds": false,
@@ -240,12 +240,12 @@
           "group": "capacity",
           "what": "KV blocks per replica",
           "ours": "28,205 blocks",
-          "theirs": "27,926 blocks",
+          "theirs": "27,927 blocks",
           "deviation": {
             "kind": "relative",
-            "value": 0.009990689679868223
+            "value": 0.009954524295484657
           },
-          "absDeviation": 0.009991,
+          "absDeviation": 0.009955,
           "deviationText": "+1.0%",
           "tolerance": "0.1%",
           "holds": false,
@@ -303,13 +303,13 @@
           "group": "timings",
           "what": "mean time to first token",
           "ours": "88 ms",
-          "theirs": "80 ms",
+          "theirs": "81 ms",
           "deviation": {
             "kind": "relative",
-            "value": 0.10597091380678784
+            "value": 0.09063524628268177
           },
-          "absDeviation": 0.106,
-          "deviationText": "+10.6%",
+          "absDeviation": 0.09064,
+          "deviationText": "+9.1%",
           "tolerance": "30%",
           "holds": true,
           "cause": null,
@@ -554,10 +554,10 @@
           "theirs": "63% of baseline",
           "deviation": {
             "kind": "effect",
-            "ratio": 0.8303275320976565,
+            "ratio": 0.8299936526421144,
             "directionMatches": true
           },
-          "absDeviation": 0.1697,
+          "absDeviation": 0.17,
           "deviationText": "ratio 0.83",
           "tolerance": "effect ratio 0.5 to 2",
           "holds": true,
@@ -641,10 +641,10 @@
           "theirs": "4 ms",
           "deviation": {
             "kind": "relative",
-            "value": 0.0219490449675752
+            "value": 0.017202173861906644
           },
-          "absDeviation": 0.02195,
-          "deviationText": "+2.2%",
+          "absDeviation": 0.0172,
+          "deviationText": "+1.7%",
           "tolerance": "12%",
           "holds": true,
           "cause": null,
@@ -658,17 +658,17 @@
           "group": "effects",
           "what": "host-tier hit rate, gpu-only to with-dram",
           "ours": "49.8%",
-          "theirs": "0.0%",
+          "theirs": "49.1%",
           "deviation": {
             "kind": "effect",
-            "ratio": null,
-            "directionMatches": false
+            "ratio": 1.0160427807486632,
+            "directionMatches": true
           },
-          "absDeviation": null,
-          "deviationText": "unbounded (reference effect is zero), direction differs",
+          "absDeviation": 0.01604,
+          "deviationText": "ratio 1.02",
           "tolerance": "effect ratio 0.67 to 1.5",
-          "holds": false,
-          "cause": "The reference reports a zero host-tier hit counter although the tier works (its counter, not the behaviour)",
+          "holds": true,
+          "cause": null,
           "byDesign": false
         },
         {
@@ -682,10 +682,10 @@
           "theirs": "66% of baseline",
           "deviation": {
             "kind": "effect",
-            "ratio": 0.9434357946164426,
+            "ratio": 0.9431156991036366,
             "directionMatches": true
           },
-          "absDeviation": 0.05656,
+          "absDeviation": 0.05688,
           "deviationText": "ratio 0.943",
           "tolerance": "effect ratio 0.75 to 1.33",
           "holds": true,
@@ -699,14 +699,54 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "mean time to first token",
-          "ours": "203 ms",
-          "theirs": "208 ms",
+          "ours": "205 ms",
+          "theirs": "210 ms",
           "deviation": {
             "kind": "relative",
-            "value": -0.020606777312274976
+            "value": -0.02589073506189806
           },
-          "absDeviation": 0.02061,
-          "deviationText": "-2.1%",
+          "absDeviation": 0.02589,
+          "deviationText": "-2.6%",
+          "tolerance": "30%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-70b-h200-chat",
+          "check": "ttft-p50",
+          "reference": "blis",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "median time to first token",
+          "ours": "181 ms",
+          "theirs": "196 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.0803489135914365
+          },
+          "absDeviation": 0.08035,
+          "deviationText": "-8.0%",
+          "tolerance": "30%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-70b-h200-chat",
+          "check": "ttft-p99",
+          "reference": "blis",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "99th percentile time to first token",
+          "ours": "392 ms",
+          "theirs": "353 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.11059432125184135
+          },
+          "absDeviation": 0.1106,
+          "deviationText": "+11.1%",
           "tolerance": "30%",
           "holds": true,
           "cause": null,
@@ -719,15 +759,55 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "mean time per output token",
-          "ours": "23 ms",
+          "ours": "24 ms",
           "theirs": "22 ms",
           "deviation": {
             "kind": "relative",
-            "value": 0.038387567549270966
+            "value": 0.08078599783435503
           },
-          "absDeviation": 0.03839,
-          "deviationText": "+3.8%",
+          "absDeviation": 0.08079,
+          "deviationText": "+8.1%",
           "tolerance": "12%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-70b-h200-chat",
+          "check": "tpot-p50",
+          "reference": "blis",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "median time per output token",
+          "ours": "24 ms",
+          "theirs": "23 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.061234266875120485
+          },
+          "absDeviation": 0.06123,
+          "deviationText": "+6.1%",
+          "tolerance": "12%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-70b-h200-chat",
+          "check": "tpot-p99",
+          "reference": "blis",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "99th percentile time per output token",
+          "ours": "26 ms",
+          "theirs": "24 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.07518826058257137
+          },
+          "absDeviation": 0.07519,
+          "deviationText": "+7.5%",
+          "tolerance": "20%",
           "holds": true,
           "cause": null,
           "byDesign": false
@@ -739,15 +819,55 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "mean end-to-end time",
-          "ours": "3,280 ms",
+          "ours": "3,380 ms",
           "theirs": "3,180 ms",
           "deviation": {
             "kind": "relative",
-            "value": 0.03142386187448008
+            "value": 0.0637271168482077
           },
-          "absDeviation": 0.03142,
-          "deviationText": "+3.1%",
+          "absDeviation": 0.06373,
+          "deviationText": "+6.4%",
           "tolerance": "15%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-70b-h200-chat",
+          "check": "e2e-p50",
+          "reference": "blis",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "median end-to-end time",
+          "ours": "2,900 ms",
+          "theirs": "2,810 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.032565179520268474
+          },
+          "absDeviation": 0.03257,
+          "deviationText": "+3.3%",
+          "tolerance": "15%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-70b-h200-chat",
+          "check": "e2e-p99",
+          "reference": "blis",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "99th percentile end-to-end time",
+          "ours": "5,380 ms",
+          "theirs": "4,860 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.10575205533293754
+          },
+          "absDeviation": 0.1058,
+          "deviationText": "+10.6%",
+          "tolerance": "20%",
           "holds": true,
           "cause": null,
           "byDesign": false
@@ -763,10 +883,10 @@
           "theirs": "221 tok/s",
           "deviation": {
             "kind": "relative",
-            "value": -0.001990323743338936
+            "value": -0.004785750092422148
           },
-          "absDeviation": 0.00199,
-          "deviationText": "-0.2%",
+          "absDeviation": 0.004786,
+          "deviationText": "-0.5%",
           "tolerance": "10%",
           "holds": true,
           "cause": null,
@@ -780,13 +900,53 @@
           "group": "timings",
           "what": "mean time to first token",
           "ours": "59 ms",
-          "theirs": "67 ms",
+          "theirs": "65 ms",
           "deviation": {
             "kind": "relative",
-            "value": -0.11555031635131659
+            "value": -0.09470811380237508
           },
-          "absDeviation": 0.1156,
-          "deviationText": "-11.6%",
+          "absDeviation": 0.09471,
+          "deviationText": "-9.5%",
+          "tolerance": "30%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-8b-b200-chat",
+          "check": "ttft-p50",
+          "reference": "blis",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "median time to first token",
+          "ours": "54 ms",
+          "theirs": "62 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.13506804415239546
+          },
+          "absDeviation": 0.1351,
+          "deviationText": "-13.5%",
+          "tolerance": "30%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-8b-b200-chat",
+          "check": "ttft-p99",
+          "reference": "blis",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "99th percentile time to first token",
+          "ours": "92 ms",
+          "theirs": "84 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.09252498547280202
+          },
+          "absDeviation": 0.09252,
+          "deviationText": "+9.3%",
           "tolerance": "30%",
           "holds": true,
           "cause": null,
@@ -803,11 +963,51 @@
           "theirs": "5 ms",
           "deviation": {
             "kind": "relative",
-            "value": 0.04893096342247855
+            "value": 0.0027100702861172603
           },
-          "absDeviation": 0.04893,
-          "deviationText": "+4.9%",
+          "absDeviation": 0.00271,
+          "deviationText": "+0.3%",
           "tolerance": "12%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-8b-b200-chat",
+          "check": "tpot-p50",
+          "reference": "blis",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "median time per output token",
+          "ours": "5 ms",
+          "theirs": "5 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.003575611494918476
+          },
+          "absDeviation": 0.003576,
+          "deviationText": "+0.4%",
+          "tolerance": "12%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-8b-b200-chat",
+          "check": "tpot-p99",
+          "reference": "blis",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "99th percentile time per output token",
+          "ours": "5 ms",
+          "theirs": "5 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.0040905965317102645
+          },
+          "absDeviation": 0.004091,
+          "deviationText": "+0.4%",
+          "tolerance": "20%",
           "holds": true,
           "cause": null,
           "byDesign": false
@@ -819,15 +1019,55 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "mean end-to-end time",
-          "ours": "1,050 ms",
-          "theirs": "1,010 ms",
+          "ours": "976 ms",
+          "theirs": "979 ms",
           "deviation": {
             "kind": "relative",
-            "value": 0.0371824414379088
+            "value": -0.0029890952186455958
           },
-          "absDeviation": 0.03718,
-          "deviationText": "+3.7%",
+          "absDeviation": 0.002989,
+          "deviationText": "-0.3%",
           "tolerance": "15%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-8b-b200-chat",
+          "check": "e2e-p50",
+          "reference": "blis",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "median end-to-end time",
+          "ours": "789 ms",
+          "theirs": "798 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.011182183722526167
+          },
+          "absDeviation": 0.01118,
+          "deviationText": "-1.1%",
+          "tolerance": "15%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-8b-b200-chat",
+          "check": "e2e-p99",
+          "reference": "blis",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "99th percentile end-to-end time",
+          "ours": "2,080 ms",
+          "theirs": "2,060 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.009171950640941102
+          },
+          "absDeviation": 0.009172,
+          "deviationText": "+0.9%",
+          "tolerance": "20%",
           "holds": true,
           "cause": null,
           "byDesign": false
@@ -839,14 +1079,14 @@
           "kind": "calibrated",
           "group": "timings",
           "what": "throughput",
-          "ours": "418 tok/s",
-          "theirs": "421 tok/s",
+          "ours": "422 tok/s",
+          "theirs": "422 tok/s",
           "deviation": {
             "kind": "relative",
-            "value": -0.005792854239227463
+            "value": -0.00005343775103985209
           },
-          "absDeviation": 0.005793,
-          "deviationText": "-0.6%",
+          "absDeviation": 0.00005344,
+          "deviationText": "-0.005%",
           "tolerance": "10%",
           "holds": true,
           "cause": null,
@@ -863,10 +1103,50 @@
           "theirs": "545 ms",
           "deviation": {
             "kind": "relative",
-            "value": 0.33570187030335563
+            "value": 0.33507422612998244
           },
-          "absDeviation": 0.3357,
-          "deviationText": "+33.6%",
+          "absDeviation": 0.3351,
+          "deviationText": "+33.5%",
+          "tolerance": "30%",
+          "holds": false,
+          "cause": "One compute-efficiency factor cannot follow the reference's prefill cost curve",
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-8b-h100-burst",
+          "check": "ttft-p50",
+          "reference": "blis",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "median time to first token",
+          "ours": "726 ms",
+          "theirs": "502 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.4463106237061332
+          },
+          "absDeviation": 0.4463,
+          "deviationText": "+44.6%",
+          "tolerance": "30%",
+          "holds": false,
+          "cause": "One compute-efficiency factor cannot follow the reference's prefill cost curve",
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-8b-h100-burst",
+          "check": "ttft-p99",
+          "reference": "blis",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "99th percentile time to first token",
+          "ours": "1,190 ms",
+          "theirs": "884 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.3515461525838997
+          },
+          "absDeviation": 0.3515,
+          "deviationText": "+35.2%",
           "tolerance": "30%",
           "holds": false,
           "cause": "One compute-efficiency factor cannot follow the reference's prefill cost curve",
@@ -883,11 +1163,51 @@
           "theirs": "14 ms",
           "deviation": {
             "kind": "relative",
-            "value": 0.01081722670410923
+            "value": 0.007611013613616665
           },
-          "absDeviation": 0.01082,
-          "deviationText": "+1.1%",
+          "absDeviation": 0.007611,
+          "deviationText": "+0.8%",
           "tolerance": "12%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-8b-h100-burst",
+          "check": "tpot-p50",
+          "reference": "blis",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "median time per output token",
+          "ours": "15 ms",
+          "theirs": "15 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.005730397018137153
+          },
+          "absDeviation": 0.00573,
+          "deviationText": "-0.6%",
+          "tolerance": "12%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-8b-h100-burst",
+          "check": "tpot-p99",
+          "reference": "blis",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "99th percentile time per output token",
+          "ours": "17 ms",
+          "theirs": "16 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.033543338856288726
+          },
+          "absDeviation": 0.03354,
+          "deviationText": "+3.4%",
+          "tolerance": "20%",
           "holds": true,
           "cause": null,
           "byDesign": false
@@ -900,14 +1220,54 @@
           "group": "timings",
           "what": "mean end-to-end time",
           "ours": "3,610 ms",
-          "theirs": "3,390 ms",
+          "theirs": "3,400 ms",
           "deviation": {
             "kind": "relative",
-            "value": 0.06301801614624822
+            "value": 0.06010668258657674
           },
-          "absDeviation": 0.06302,
-          "deviationText": "+6.3%",
+          "absDeviation": 0.06011,
+          "deviationText": "+6.0%",
           "tolerance": "15%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-8b-h100-burst",
+          "check": "e2e-p50",
+          "reference": "blis",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "median end-to-end time",
+          "ours": "3,610 ms",
+          "theirs": "3,400 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.060998264381646565
+          },
+          "absDeviation": 0.061,
+          "deviationText": "+6.1%",
+          "tolerance": "15%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-8b-h100-burst",
+          "check": "e2e-p99",
+          "reference": "blis",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "99th percentile end-to-end time",
+          "ours": "3,630 ms",
+          "theirs": "3,430 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.05884637912595468
+          },
+          "absDeviation": 0.05885,
+          "deviationText": "+5.9%",
+          "tolerance": "20%",
           "holds": true,
           "cause": null,
           "byDesign": false
@@ -920,13 +1280,13 @@
           "group": "timings",
           "what": "throughput",
           "ours": "1,761 tok/s",
-          "theirs": "1,870 tok/s",
+          "theirs": "1,865 tok/s",
           "deviation": {
             "kind": "relative",
-            "value": -0.0581739331219527
+            "value": -0.055575936496596035
           },
-          "absDeviation": 0.05817,
-          "deviationText": "-5.8%",
+          "absDeviation": 0.05558,
+          "deviationText": "-5.6%",
           "tolerance": "10%",
           "holds": true,
           "cause": null,
@@ -943,10 +1303,50 @@
           "theirs": "92 ms",
           "deviation": {
             "kind": "relative",
-            "value": -0.0702094679868882
+            "value": -0.0793351384460886
           },
-          "absDeviation": 0.07021,
-          "deviationText": "-7.0%",
+          "absDeviation": 0.07934,
+          "deviationText": "-7.9%",
+          "tolerance": "30%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-8b-h100-chat",
+          "check": "ttft-p50",
+          "reference": "blis",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "median time to first token",
+          "ours": "75 ms",
+          "theirs": "87 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.13881709598503075
+          },
+          "absDeviation": 0.1388,
+          "deviationText": "-13.9%",
+          "tolerance": "30%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-8b-h100-chat",
+          "check": "ttft-p99",
+          "reference": "blis",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "99th percentile time to first token",
+          "ours": "148 ms",
+          "theirs": "131 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.12979030513940368
+          },
+          "absDeviation": 0.1298,
+          "deviationText": "+13.0%",
           "tolerance": "30%",
           "holds": true,
           "cause": null,
@@ -963,11 +1363,51 @@
           "theirs": "11 ms",
           "deviation": {
             "kind": "relative",
-            "value": 0.01737566612097171
+            "value": 0.012866587806003306
           },
-          "absDeviation": 0.01738,
-          "deviationText": "+1.7%",
+          "absDeviation": 0.01287,
+          "deviationText": "+1.3%",
           "tolerance": "12%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-8b-h100-chat",
+          "check": "tpot-p50",
+          "reference": "blis",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "median time per output token",
+          "ours": "11 ms",
+          "theirs": "11 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.012045026766774223
+          },
+          "absDeviation": 0.01205,
+          "deviationText": "+1.2%",
+          "tolerance": "12%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-8b-h100-chat",
+          "check": "tpot-p99",
+          "reference": "blis",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "99th percentile time per output token",
+          "ours": "12 ms",
+          "theirs": "11 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.03085771222865672
+          },
+          "absDeviation": 0.03086,
+          "deviationText": "+3.1%",
+          "tolerance": "20%",
           "holds": true,
           "cause": null,
           "byDesign": false
@@ -980,14 +1420,54 @@
           "group": "timings",
           "what": "mean end-to-end time",
           "ours": "2,090 ms",
-          "theirs": "2,070 ms",
+          "theirs": "2,080 ms",
           "deviation": {
             "kind": "relative",
-            "value": 0.011620465117404924
+            "value": 0.006869120019164592
           },
-          "absDeviation": 0.01162,
-          "deviationText": "+1.2%",
+          "absDeviation": 0.006869,
+          "deviationText": "+0.7%",
           "tolerance": "15%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-8b-h100-chat",
+          "check": "e2e-p50",
+          "reference": "blis",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "median end-to-end time",
+          "ours": "1,680 ms",
+          "theirs": "1,680 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.002904990205037337
+          },
+          "absDeviation": 0.002905,
+          "deviationText": "+0.3%",
+          "tolerance": "15%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-8b-h100-chat",
+          "check": "e2e-p99",
+          "reference": "blis",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "99th percentile end-to-end time",
+          "ours": "4,530 ms",
+          "theirs": "4,460 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": 0.015078155527483449
+          },
+          "absDeviation": 0.01508,
+          "deviationText": "+1.5%",
+          "tolerance": "20%",
           "holds": true,
           "cause": null,
           "byDesign": false
@@ -1000,13 +1480,13 @@
           "group": "timings",
           "what": "throughput",
           "ours": "377 tok/s",
-          "theirs": "378 tok/s",
+          "theirs": "377 tok/s",
           "deviation": {
             "kind": "relative",
-            "value": -0.002713406360174905
+            "value": -0.0018089375734499256
           },
-          "absDeviation": 0.002713,
-          "deviationText": "-0.3%",
+          "absDeviation": 0.001809,
+          "deviationText": "-0.2%",
           "tolerance": "10%",
           "holds": true,
           "cause": null,
@@ -1020,13 +1500,53 @@
           "group": "timings",
           "what": "mean time to first token",
           "ours": "244 ms",
-          "theirs": "279 ms",
+          "theirs": "284 ms",
           "deviation": {
             "kind": "relative",
-            "value": -0.12470400490803712
+            "value": -0.1392956192949996
           },
-          "absDeviation": 0.1247,
-          "deviationText": "-12.5%",
+          "absDeviation": 0.1393,
+          "deviationText": "-13.9%",
+          "tolerance": "30%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-8b-h100-heavy",
+          "check": "ttft-p50",
+          "reference": "blis",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "median time to first token",
+          "ours": "103 ms",
+          "theirs": "112 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.07676025204192238
+          },
+          "absDeviation": 0.07676,
+          "deviationText": "-7.7%",
+          "tolerance": "30%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-8b-h100-heavy",
+          "check": "ttft-p99",
+          "reference": "blis",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "99th percentile time to first token",
+          "ours": "845 ms",
+          "theirs": "1,040 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.18477739761046486
+          },
+          "absDeviation": 0.1848,
+          "deviationText": "-18.5%",
           "tolerance": "30%",
           "holds": true,
           "cause": null,
@@ -1043,11 +1563,51 @@
           "theirs": "20 ms",
           "deviation": {
             "kind": "relative",
-            "value": -0.02002410054661533
+            "value": -0.023032520833479453
           },
-          "absDeviation": 0.02002,
-          "deviationText": "-2.0%",
+          "absDeviation": 0.02303,
+          "deviationText": "-2.3%",
           "tolerance": "12%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-8b-h100-heavy",
+          "check": "tpot-p50",
+          "reference": "blis",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "median time per output token",
+          "ours": "20 ms",
+          "theirs": "20 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.01836671951923725
+          },
+          "absDeviation": 0.01837,
+          "deviationText": "-1.8%",
+          "tolerance": "12%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-8b-h100-heavy",
+          "check": "tpot-p99",
+          "reference": "blis",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "99th percentile time per output token",
+          "ours": "22 ms",
+          "theirs": "23 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.03195882390712579
+          },
+          "absDeviation": 0.03196,
+          "deviationText": "-3.2%",
+          "tolerance": "20%",
           "holds": true,
           "cause": null,
           "byDesign": false
@@ -1060,14 +1620,54 @@
           "group": "timings",
           "what": "mean end-to-end time",
           "ours": "6,520 ms",
-          "theirs": "6,690 ms",
+          "theirs": "6,720 ms",
           "deviation": {
             "kind": "relative",
-            "value": -0.02586082319822053
+            "value": -0.02936567446075658
           },
-          "absDeviation": 0.02586,
-          "deviationText": "-2.6%",
+          "absDeviation": 0.02937,
+          "deviationText": "-2.9%",
           "tolerance": "15%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-8b-h100-heavy",
+          "check": "e2e-p50",
+          "reference": "blis",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "median end-to-end time",
+          "ours": "6,140 ms",
+          "theirs": "6,340 ms",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.0310432089165451
+          },
+          "absDeviation": 0.03104,
+          "deviationText": "-3.1%",
+          "tolerance": "15%",
+          "holds": true,
+          "cause": null,
+          "byDesign": false
+        },
+        {
+          "scenario": "timing-8b-h100-heavy",
+          "check": "e2e-p99",
+          "reference": "blis",
+          "kind": "calibrated",
+          "group": "timings",
+          "what": "99th percentile end-to-end time",
+          "ours": "10.57 s",
+          "theirs": "10.74 s",
+          "deviation": {
+            "kind": "relative",
+            "value": -0.015770172453931468
+          },
+          "absDeviation": 0.01577,
+          "deviationText": "-1.6%",
+          "tolerance": "20%",
           "holds": true,
           "cause": null,
           "byDesign": false
@@ -1080,13 +1680,13 @@
           "group": "timings",
           "what": "throughput",
           "ours": "2,119 tok/s",
-          "theirs": "2,073 tok/s",
+          "theirs": "2,069 tok/s",
           "deviation": {
             "kind": "relative",
-            "value": 0.021801390326547973
+            "value": 0.024188621301100964
           },
-          "absDeviation": 0.0218,
-          "deviationText": "+2.2%",
+          "absDeviation": 0.02419,
+          "deviationText": "+2.4%",
           "tolerance": "10%",
           "holds": true,
           "cause": null,
@@ -1149,16 +1749,22 @@
           "claim": "Twelve requests over four replicas is three each."
         },
         {
-          "scenario": "tiers-offload",
-          "check": "host-tier-hit-rate",
-          "kind": "directional",
-          "claim": "With the tier, a share of prompt tokens is served from host memory; without it, none is."
-        },
-        {
           "scenario": "timing-8b-h100-burst",
           "check": "ttft-mean",
           "kind": "calibrated",
           "claim": "Mean time to first token agrees with BLIS after calibration."
+        },
+        {
+          "scenario": "timing-8b-h100-burst",
+          "check": "ttft-p50",
+          "kind": "calibrated",
+          "claim": "Median time to first token agrees with BLIS after calibration."
+        },
+        {
+          "scenario": "timing-8b-h100-burst",
+          "check": "ttft-p99",
+          "kind": "calibrated",
+          "claim": "99th-percentile time to first token agrees with BLIS after calibration."
         }
       ]
     },

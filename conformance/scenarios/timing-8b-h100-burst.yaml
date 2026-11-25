@@ -68,19 +68,67 @@ checks:
         34 percent more mean time to first token (39 percent before the step cost was changed to MBU 0.85, an explicit launch time per layer and a refit). Decoding agrees (time per token +1.1 percent,
         end to end +6.3 percent, throughput -5.8 percent, all inside tolerance).
       differences:
-        value: { typescript: 0.7282, blis: 0.5452 }
+        value: { typescript: 0.7282, blis: 0.5455 }
+  - id: ttft-p50
+    claim: Median time to first token agrees with BLIS after calibration.
+    kind: calibrated
+    metric: ttft_p50_s
+    rel_tol: 0.30
+    tolerance: "30 percent: the same standard as the mean."
+    known_difference:
+      reference: blis
+      cause: "One compute-efficiency factor cannot follow the reference's prefill cost curve"
+      reason: *r_curve
+      differences:
+        value: { typescript: 0.7259, blis: 0.5019 }
+  - id: ttft-p99
+    claim: 99th-percentile time to first token agrees with BLIS after calibration.
+    kind: calibrated
+    metric: ttft_p99_s
+    rel_tol: 0.30
+    tolerance: "30 percent: the same standard as the mean; the tail is set by the longest queue, which a step-cost error compounds."
+    known_difference:
+      reference: blis
+      cause: "One compute-efficiency factor cannot follow the reference's prefill cost curve"
+      reason: *r_curve
+      differences:
+        value: { typescript: 1.194, blis: 0.8836 }
   - id: tpot-mean
     claim: Mean time per output token agrees with BLIS after calibration.
     kind: calibrated
     metric: tpot_mean_s
     rel_tol: 0.12
     tolerance: "12 percent: the fit leaves up to 9 percent in time per token on its calibration scenarios (long contexts are the worst), so 12 percent allows for a different batch size and context length without admitting a wrong functional form."
+  - id: tpot-p50
+    claim: Median time per output token agrees with BLIS after calibration.
+    kind: calibrated
+    metric: tpot_p50_s
+    rel_tol: 0.12
+    tolerance: "12 percent: the same standard as the mean."
+  - id: tpot-p99
+    claim: 99th-percentile time per output token agrees with BLIS after calibration.
+    kind: calibrated
+    metric: tpot_p99_s
+    rel_tol: 0.20
+    tolerance: "20 percent: the tail of time per token is set by the few steps that carry a long prefill chunk or a large batch, which a mean-fitted model reproduces less closely than the mean."
   - id: e2e-mean
     claim: Mean end-to-end time agrees with BLIS after calibration.
     kind: calibrated
     metric: e2e_mean_s
     rel_tol: 0.15
     tolerance: "15 percent: end-to-end time is dominated by decoding (about 95 percent of it), so it should follow the time per token with a small addition from time to first token."
+  - id: e2e-p50
+    claim: Median end-to-end time agrees with BLIS after calibration.
+    kind: calibrated
+    metric: e2e_p50_s
+    rel_tol: 0.15
+    tolerance: "15 percent: the same standard as the mean."
+  - id: e2e-p99
+    claim: 99th-percentile end-to-end time agrees with BLIS after calibration.
+    kind: calibrated
+    metric: e2e_p99_s
+    rel_tol: 0.20
+    tolerance: "20 percent: the tail adds the longest queue to the longest answer."
   - id: throughput
     claim: Output tokens per second over the run agree with BLIS after calibration.
     kind: calibrated

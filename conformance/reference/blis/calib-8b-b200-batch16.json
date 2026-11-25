@@ -1,19 +1,19 @@
 {
   "scenario": "calib-8b-b200-batch16",
   "reference": "blis",
-  "inputHash": "2b558392e0fcf4770c78c1216b48b0057848a1c87b3f95dc10754b93684efae9",
+  "inputHash": "76974a529b42b7c10be3964cbd108aed1e52f3a6226c43959568e91effd1af49",
   "provenance": {
-    "lock": "c79c745619b16a8019339e3bbc79ee5e2923b258",
-    "catalogHash": "db74e4bb49f75d658e5d0850934da60daf513274b937a03b7ab994760bd6d21f",
-    "registryHash": "8dbcf3b85eed842f2bc798b34d2b95716fc58117750f4164d869b26770353fe0",
-    "engineVersion": "0.32.0",
-    "routerModule": "github.com/llm-d/llm-d-router v1.0.0-blis.4"
+    "lock": "e7597a8c9510f876653d7d87bd8baf195c37c5c7",
+    "catalogHash": "49d62c569f6092a8168459f15543fc76b41227588dffd46d0e02e3a2343696ef",
+    "registryHash": "316e7969a3e6fef0b68b5b6fb617b951977f7044e8844a06deb1db4dec9c39d7",
+    "engineVersion": "0.34.0+0fda86a35419",
+    "routerModule": "github.com/llm-d/llm-d-router v1.0.0-blis.6"
   },
   "records": {
     "main": {
       "source": "blis",
       "scenario": "calib-8b-b200-batch16",
-      "kvBlocksPerReplica": 73620,
+      "kvBlocksPerReplica": 73621,
       "requests": [
         {
           "session": 1,
@@ -23,8 +23,8 @@
           "cachedTokens": 0,
           "pod": 0,
           "arrivalS": 1,
-          "firstTokenS": 1.054383,
-          "lastTokenS": 3.274609,
+          "firstTokenS": 1.052606,
+          "lastTokenS": 3.195026,
           "fate": "completed",
           "preemptions": null
         },
@@ -36,8 +36,8 @@
           "cachedTokens": 0,
           "pod": 0,
           "arrivalS": 1.08,
-          "firstTokenS": 1.141394,
-          "lastTokenS": 3.359423,
+          "firstTokenS": 1.140684,
+          "lastTokenS": 3.28296,
           "fate": "completed",
           "preemptions": null
         },
@@ -49,8 +49,8 @@
           "cachedTokens": 0,
           "pod": 0,
           "arrivalS": 1.16,
-          "firstTokenS": 1.223967,
-          "lastTokenS": 3.438487,
+          "firstTokenS": 1.219729,
+          "lastTokenS": 3.360104,
           "fate": "completed",
           "preemptions": null
         },
@@ -62,8 +62,8 @@
           "cachedTokens": 0,
           "pod": 0,
           "arrivalS": 1.24,
-          "firstTokenS": 1.302054,
-          "lastTokenS": 3.511854,
+          "firstTokenS": 1.299179,
+          "lastTokenS": 3.436793,
           "fate": "completed",
           "preemptions": null
         },
@@ -75,8 +75,8 @@
           "cachedTokens": 0,
           "pod": 0,
           "arrivalS": 1.32,
-          "firstTokenS": 1.380526,
-          "lastTokenS": 3.584787,
+          "firstTokenS": 1.379043,
+          "lastTokenS": 3.513024,
           "fate": "completed",
           "preemptions": null
         },
@@ -88,8 +88,8 @@
           "cachedTokens": 0,
           "pod": 0,
           "arrivalS": 1.4,
-          "firstTokenS": 1.464341,
-          "lastTokenS": 3.662463,
+          "firstTokenS": 1.459323,
+          "lastTokenS": 3.588793,
           "fate": "completed",
           "preemptions": null
         },
@@ -101,8 +101,8 @@
           "cachedTokens": 0,
           "pod": 0,
           "arrivalS": 1.48,
-          "firstTokenS": 1.543596,
-          "lastTokenS": 3.734522,
+          "firstTokenS": 1.540025,
+          "lastTokenS": 3.664094,
           "fate": "completed",
           "preemptions": null
         },
@@ -114,8 +114,8 @@
           "cachedTokens": 0,
           "pod": 0,
           "arrivalS": 1.56,
-          "firstTokenS": 1.623249,
-          "lastTokenS": 3.806136,
+          "firstTokenS": 1.621151,
+          "lastTokenS": 3.738925,
           "fate": "completed",
           "preemptions": null
         },
@@ -127,8 +127,8 @@
           "cachedTokens": 0,
           "pod": 0,
           "arrivalS": 1.64,
-          "firstTokenS": 1.703301,
-          "lastTokenS": 3.877303,
+          "firstTokenS": 1.702707,
+          "lastTokenS": 3.813279,
           "fate": "completed",
           "preemptions": null
         },
@@ -140,8 +140,8 @@
           "cachedTokens": 0,
           "pod": 0,
           "arrivalS": 1.72,
-          "firstTokenS": 1.783757,
-          "lastTokenS": 3.948018,
+          "firstTokenS": 1.779754,
+          "lastTokenS": 3.882227,
           "fate": "completed",
           "preemptions": null
         },
@@ -153,8 +153,8 @@
           "cachedTokens": 0,
           "pod": 0,
           "arrivalS": 1.8,
-          "firstTokenS": 1.864622,
-          "lastTokenS": 4.018278,
+          "firstTokenS": 1.862179,
+          "lastTokenS": 3.955615,
           "fate": "completed",
           "preemptions": null
         },
@@ -166,8 +166,8 @@
           "cachedTokens": 0,
           "pod": 0,
           "arrivalS": 1.88,
-          "firstTokenS": 1.94077,
-          "lastTokenS": 4.083092,
+          "firstTokenS": 1.940045,
+          "lastTokenS": 4.023653,
           "fate": "completed",
           "preemptions": null
         },
@@ -179,8 +179,8 @@
           "cachedTokens": 0,
           "pod": 0,
           "arrivalS": 1.96,
-          "firstTokenS": 2.022458,
-          "lastTokenS": 4.152428,
+          "firstTokenS": 2.018325,
+          "lastTokenS": 4.091229,
           "fate": "completed",
           "preemptions": null
         },
@@ -192,8 +192,8 @@
           "cachedTokens": 0,
           "pod": 0,
           "arrivalS": 2.04,
-          "firstTokenS": 2.104564,
-          "lastTokenS": 4.221297,
+          "firstTokenS": 2.102085,
+          "lastTokenS": 4.163135,
           "fate": "completed",
           "preemptions": null
         },
@@ -205,8 +205,8 @@
           "cachedTokens": 0,
           "pod": 0,
           "arrivalS": 2.12,
-          "firstTokenS": 2.181877,
-          "lastTokenS": 4.284811,
+          "firstTokenS": 2.181208,
+          "lastTokenS": 4.229775,
           "fate": "completed",
           "preemptions": null
         },
@@ -218,8 +218,8 @@
           "cachedTokens": 0,
           "pod": 0,
           "arrivalS": 2.2,
-          "firstTokenS": 2.264831,
-          "lastTokenS": 4.352739,
+          "firstTokenS": 2.260756,
+          "lastTokenS": 4.295944,
           "fate": "completed",
           "preemptions": null
         }

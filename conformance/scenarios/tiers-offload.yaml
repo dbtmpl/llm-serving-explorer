@@ -62,18 +62,6 @@ checks:
     direction: increase
     band: [0.67, 1.5]
     tolerance: "The two simulators' host-tier hit rates must be within a factor of 1.5 of each other: the rate is set by which conversations were evicted and fit in 32 GB, which both decide by least-recently-used order, but BLIS stores whole prompt chunks and not the answer's tokens and the TypeScript model whole conversations, so a few percent of tokens can differ."
-    known_difference:
-      reference: blis
-      cause: "The reference reports a zero host-tier hit counter although the tier works (its counter, not the behaviour)"
-      reason: >-
-        BLIS reports a host-tier hit rate of zero in this run (`cpu_tier_hit_rate` in its Result; the per-request rows carry no external-token count either) although the
-        run shows the tier working: a follow-up's scheduling delay is 56.6 ms with the tier against 41.1 ms without (the 15.5 ms is the copy of about 3,050 tokens of KV,
-        400 MB at about 26 GB/s), and the step that prefills it takes 12.6 ms against 63.1 ms, because the history is no longer recomputed. The TypeScript model reports
-        that 49.8 percent of all prompt tokens came from host memory. I did not find why BLIS leaves the counter at zero for a reload that completes before the request is first
-        scheduled (its lookup is recorded at first admission, and a request whose load has landed is scheduled without a new prefix lookup, blis-vllm batch_formation.go);
-        the timing check below shows the effect on time to first token, which both report.
-      differences:
-        effect: { typescript: 0.4984, blis: 0 }
   - id: follow-up-time-to-first-token
     claim: A follow-up's time to first token falls when its history is reloaded from host memory instead of recomputed.
     kind: directional

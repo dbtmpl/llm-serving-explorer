@@ -3,11 +3,25 @@
  * parity section. The rest of those pages is prose. `pnpm docs:sync` rewrites them; a test fails
  * when they are out of date.
  */
-import { loadFitted } from "./calibration/fitted.js";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
+import { loadFitted, type FittedReference } from "./calibration/fitted.js";
 import { REFERENCES, referenceById } from "./refs/index.js";
 import { GROUPS, GROUP_LABEL, type Distribution } from "./deviation.js";
-import { loadScenario, scenarioIds, SPAN } from "./scenario.js";
+import { CONFORMANCE_DIR, loadScenario, scenarioIds, SPAN } from "./scenario.js";
 import type { ReferenceSummary, Summary } from "./summary.js";
+
+interface PreviousBlis {
+  summary: ReferenceSummary;
+  calibration: FittedReference;
+}
+
+const PREVIOUS_BLIS_FILE = path.join(CONFORMANCE_DIR, "refs", "blis", "previous.json");
+
+function loadPreviousBlis(): PreviousBlis | null {
+  if (!existsSync(PREVIOUS_BLIS_FILE)) return null;
+  return JSON.parse(readFileSync(PREVIOUS_BLIS_FILE, "utf8")) as PreviousBlis;
+}
 
 const pct = (x: number): string => `${(x * 100).toFixed(1)} percent`;
 
@@ -38,8 +52,46 @@ export function readmeHeadline(s: Summary, ref: string): string {
   return `median deviation ${fmtPct(d.overall.median)} over ${d.overall.n} comparisons, ${d.overall.within["5"]} of them within 5%`;
 }
 
+/** Side-by-side comparison between the previous BLIS commit and the current one, so old metrics are not lost. */
+function versionComparisonTable(prev: ReferenceSummary, curr: ReferenceSummary): string[] {
+  const pHash = `\`${prev.lock.slice(0, 8)}\``;
+  const cHash = `\`${curr.lock.slice(0, 8)}\``;
+  const kindAgree = (r: ReferenceSummary, kind: keyof ReferenceSummary["checks"]["byKind"]): string => {
+    const c = r.checks.byKind[kind];
+    const agree = kind === "exact" ? (c.exact ?? 0) : kind === "directional" ? (c.directional_agree ?? 0) : (c.within_tolerance ?? 0);
+    return `${agree} / ${c.total}`;
+  };
+  const withinSummary = (d: Distribution): string => `${d.within["1"]} / ${d.within["5"]} / ${d.within["10"]} / ${d.within["25"]} (of ${d.n})`;
+  const groupCell = (g: Distribution): string => `${g.n}, median ${fmtPct(g.median)}, max ${fmtPct(g.max)}, within 5%: ${g.within["5"]}`;
+  const rows: [string, string, string][] = [
+    ["Scenarios (with checks / calibration)", `${prev.scenarios.withChecks} / ${prev.scenarios.calibration}`, `${curr.scenarios.withChecks} / ${curr.scenarios.calibration}`],
+    ["Checks agreeing", `${prev.headline.agree} of ${prev.headline.total} (${pct(prev.headline.share)})`, `${curr.headline.agree} of ${curr.headline.total} (${pct(curr.headline.share)})`],
+    ["Known differences", String(prev.headline.knownDifferences), String(curr.headline.knownDifferences)],
+    ["Overall median deviation", fmtPct(prev.deviations.overall.median), fmtPct(curr.deviations.overall.median)],
+    ["Overall largest deviation", fmtPct(prev.deviations.overall.max), fmtPct(curr.deviations.overall.max)],
+    ["Within 1% / 5% / 10% / 25%", withinSummary(prev.deviations.overall), withinSummary(curr.deviations.overall)],
+    ...GROUPS.filter((g) => prev.deviations.groups[g].n || curr.deviations.groups[g].n).map((g): [string, string, string] => [
+      GROUP_LABEL[g],
+      prev.deviations.groups[g].n ? groupCell(prev.deviations.groups[g]) : "—",
+      curr.deviations.groups[g].n ? groupCell(curr.deviations.groups[g]) : "—"
+    ]),
+    ["Exact checks (agree / total)", kindAgree(prev, "exact"), kindAgree(curr, "exact")],
+    ["Capacity checks (agree / total)", kindAgree(prev, "capacity"), kindAgree(curr, "capacity")],
+    ["Calibrated checks (agree / total)", kindAgree(prev, "calibrated"), kindAgree(curr, "calibrated")],
+    ["Directional checks (agree / total)", kindAgree(prev, "directional"), kindAgree(curr, "directional")]
+  ];
+  return [
+    `Comparison with the previous BLIS commit (${pHash} vs ${cHash}):`,
+    "",
+    `| Metric | ${pHash} | ${cHash} |`,
+    "|---|---|---|",
+    ...rows.map(([m, p, c]) => `| ${m} | ${p} | ${c} |`)
+  ];
+}
+
 export function renderHeadline(s: Summary, ref: string): string {
   const r = s.references[ref]!;
+  const prev = ref === "blis" ? loadPreviousBlis()?.summary : null;
   const k = r.checks.byKind;
   const row = (name: string, c: (typeof k)["exact"], agree: number, how: string) => `| ${name} | ${c.total} | ${agree} | ${c.known_difference ?? 0} | ${how} |`;
   const disputed = r.checks.disputed ? ` ${r.checks.disputed} checks it shares with another reference that disagrees with it are in the cross-reference section, not here.` : "";
@@ -58,6 +110,7 @@ export function renderHeadline(s: Summary, ref: string): string {
     row("Capacity", k.capacity, k.capacity.within_tolerance ?? 0, "a size derived from estimates within a relative tolerance set on principle"),
     row("Calibrated", k.calibrated, k.calibrated.within_tolerance ?? 0, "within the scenario's relative tolerance"),
     row("Directional", k.directional, k.directional.directional_agree ?? 0, "same direction, effect within the scenario's factor band"),
+    ...(prev && prev.lock !== r.lock ? ["", ...versionComparisonTable(prev, r)] : []),
     "",
     `Approaches in the registry: ${r.verified.length} of ${s.approaches.total} are named by at least one scenario this reference covers; ${s.approaches.notVerifiable} are named by none and say why (below). Being named by a scenario means checked, not agreeing: several approaches appear in a check that is a known difference. Approaches that cannot be verified are not in the figure at all, in either direction.`,
     "",
@@ -73,11 +126,37 @@ const GROUP_DEFINITION: Record<(typeof GROUPS)[number], string> = {
   effects: "the directional checks (an intervention's effect on a metric); deviation is |model effect / reference effect - 1|."
 };
 
-/** The checks that do not hold, one row each. */
-function failingTable(r: ReferenceSummary): string[] {
+/** The checks that do not hold, one row each. For BLIS with a previous snapshot, includes columns for both commits and keeps checks that held only after the bump. */
+function failingTable(r: ReferenceSummary, prev?: ReferenceSummary | null): string[] {
+  const cell = (t: string): string => t.replace(/\|/g, "\\|");
+  if (prev && prev.lock !== r.lock) {
+    const keyOf = (x: ReferenceSummary["rows"][number]) => `${x.scenario}/${x.check}`;
+    const prevByKey = new Map(prev.rows.map((x) => [keyOf(x), x]));
+    const currByKey = new Map(r.rows.map((x) => [keyOf(x), x]));
+    const shown = r.rows.filter((x) => !x.holds || prevByKey.get(keyOf(x))?.holds === false);
+    if (!shown.length) return ["No check differs."];
+    const pHash = `\`${prev.lock.slice(0, 8)}\``;
+    const cHash = `\`${r.lock.slice(0, 8)}\``;
+    return [
+      `| Compared | Ours | ${pHash} | ${cHash} | Deviation (${cHash}) | Missed | Cause |`,
+      "|---|---|---|---|---|---|---|",
+      ...shown.map((x) => {
+        const p = prevByKey.get(keyOf(x));
+        const c = currByKey.get(keyOf(x))!;
+        const missed = c.holds
+          ? "holds (resolved)"
+          : c.byDesign
+            ? `${c.kind === "exact" ? "different by design" : `${c.tolerance} (different by design)`}`
+            : c.kind === "exact"
+              ? "decision differs"
+              : c.tolerance;
+        const cause = c.holds ? `Resolved (was: ${p?.cause ?? ""})` : (c.cause ?? "");
+        return `| \`${c.scenario}\`: ${cell(c.what)} | ${cell(c.ours)} | ${cell(p ? p.theirs : "—")} | ${cell(c.theirs)} | ${cell(c.deviationText)} | ${cell(missed)} | ${cell(cause)} |`;
+      })
+    ];
+  }
   const rows = r.rows.filter((x) => !x.holds);
   if (!rows.length) return ["No check differs."];
-  const cell = (t: string): string => t.replace(/\|/g, "\\|");
   return [
     "| Compared | Ours | Reference | Deviation | Missed | Cause |",
     "|---|---|---|---|---|---|",
@@ -93,8 +172,10 @@ export { failingTable };
 /** The parity section of conformance/README.md: one block per reference, led by the deviations, then the checks that do not hold. */
 export function renderReadmeParity(s: Summary): string {
   const out: string[] = [];
+  const prevBlis = loadPreviousBlis()?.summary ?? null;
   for (const r of Object.values(s.references)) {
     if (!r.checks.total) continue;
+    const prev = r.id === "blis" ? prevBlis : null;
     const k = r.checks.byKind;
     const row = (name: string, what: string, c: (typeof k)["exact"], agree: number) => `| ${name} | ${what} | ${c.total} | ${agree} | ${c.known_difference ?? 0} |`;
     out.push(
@@ -111,10 +192,11 @@ export function renderReadmeParity(s: Summary): string {
       row("Calibrated", "A timing or rate is within the tolerance written in the scenario", k.calibrated, k.calibrated.within_tolerance ?? 0),
       row("Directional", "The same intervention moves the same metric the same way by a similar factor (memory tiers, eviction, routing policy, autoscaling)", k.directional, k.directional.directional_agree ?? 0),
       `| **All** | | **${r.checks.total}** | **${r.headline.agree}** | **${r.headline.knownDifferences}** |`,
+      ...(prev && prev.lock !== r.lock ? ["", ...versionComparisonTable(prev, r)] : []),
       "",
       `Every check that does not hold as written (the scenario files carry the full reasons, [the parity page](parity.md) the numbers):`,
       "",
-      ...failingTable(r),
+      ...failingTable(r, prev),
       ""
     );
   }
@@ -182,7 +264,27 @@ export function renderCalibration(ref: string): string {
     ...(p.specCost ? [`- \`${key}\`: draft cost \`specCost\` ${p.specCost.value} (default ${p.specCost.defaultValue}); time per token ${pctSigned(p.specCost.residualTpot)} from ${name}'s on \`${p.specCost.scenario}\`. ${ref === "blis" ? "BLIS prices its n-gram drafter at nothing, so the fit goes to the lower bound." : `${name} prices no drafter (it takes an acceptance rate), so the fitted draft cost is close to zero.`}`] : []),
     ...(p.linkGbps ? [`- \`${key}\`: link rate \`linkGbps\` ${p.linkGbps.value} Gbit/s (default ${p.linkGbps.defaultValue}); hand-over time ${pctSigned(p.linkGbps.residualKvTransfer)} from ${name}'s on \`${p.linkGbps.scenario}\`. ${ref === "blis" ? "BLIS's fabric is 400 Gbit/s InfiniBand at 0.811 of line rate, which is 324 Gbit/s." : ""}`] : [])
   ]);
-  return [...rows, "", "Loss profiles (the loss when a parameter is held at fixed values and the others are refitted; a profile within 25 percent of the best loss marks a parameter the data does not tell from the others):", "", ...profiles, "", ...extras].join("\n");
+  const prevCal = ref === "blis" ? loadPreviousBlis()?.calibration : null;
+  const calDiff: string[] = [];
+  if (prevCal && prevCal.lock !== fitted.lock) {
+    const pHash = `\`${prevCal.lock.slice(0, 8)}\``;
+    const cHash = `\`${fitted.lock.slice(0, 8)}\``;
+    const worstOf = (p: (typeof fitted.pairs)[string], f: (r: (typeof p.residuals)[number]) => number): string =>
+      pctSigned(p.residuals.map(f).reduce((a, b) => (Math.abs(b) > Math.abs(a) ? b : a)));
+    calDiff.push(
+      "",
+      `Calibration against previous BLIS commit (${pHash} vs ${cHash}):`,
+      "",
+      `| Pair | ${pHash} (MBU, MFU, loss, worst TTFT / TPOT) | ${cHash} (MBU, MFU, loss, worst TTFT / TPOT) |`,
+      "|---|---|---|",
+      ...Object.entries(fitted.pairs).map(([key, c]) => {
+        const p = prevCal.pairs[key];
+        const fmtPair = (x: typeof c) => `${x.timing.mbu}, ${x.timing.mfu}, ${x.lossAtFit}, ${worstOf(x, (r) => r.ttftMean)} / ${worstOf(x, (r) => r.tpotMean)}`;
+        return `| \`${key}\` | ${p ? fmtPair(p) : "—"} | ${fmtPair(c)} |`;
+      })
+    );
+  }
+  return [...rows, ...calDiff, "", "Loss profiles (the loss when a parameter is held at fixed values and the others are refitted; a profile within 25 percent of the best loss marks a parameter the data does not tell from the others):", "", ...profiles, "", ...extras].join("\n");
 }
 
 export type { ReferenceSummary };

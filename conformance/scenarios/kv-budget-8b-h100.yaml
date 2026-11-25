@@ -52,4 +52,4 @@ checks:
         allowance (2026-11-16 to 2026-11-17) the model was 613 blocks (+2.2 percent) over; before the derivation was changed, within 0.007 percent, an agreement between two estimates that both
         overshot the real overhead. Not tuned to BLIS.
       differences:
-        value: { typescript: 28205, blis: 27926 }
+        value: { typescript: 28205, blis: 27927 }
