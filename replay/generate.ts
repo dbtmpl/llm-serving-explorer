@@ -251,6 +251,8 @@ function pausesFrom(requests: ReplayRequest[], engines: Engine[], h: number): vo
       const frac = Math.min(1, (residual[i]! - residual[i - 1]!) / Math.max(1e-9, after - residual[i - 1]!));
       const steps = Math.max(1, Math.round(after - residual[i - 1]!));
       for (let k = 0; k < steps; k++) edges.push((i + 1) * h - frac * h);
+      // If bin i+1 only finishes the same step-up into `after`, don't count the rest of that rise as a second edge.
+      if (Math.abs(residual[i + 1]! - residual[i - 1]! - steps) < 0.35) i++;
     }
     if (edges.length !== paused.length) return;
     paused.forEach((r, k) => {

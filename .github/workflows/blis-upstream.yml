@@ -64,11 +64,13 @@ jobs:
           git --no-pager diff --stat -- conformance/reference
 
       - name: Refit the timing parameters
-        run: pnpm conformance:calibrate
+        run: pnpm conformance:calibrate --ref blis
 
       - name: Show what changed in the fit
         if: always()
         run: git --no-pager diff -- conformance/calibration
 
       - name: Which checks no longer hold
-        run: pnpm test:conformance
+        run: |
+          pnpm conformance:report --ref blis
+          pnpm exec vitest run conformance/__tests__/conformance.test.ts -t "against .*blis"

@@ -46,4 +46,4 @@ checks:
         8,192 tokens with the feed-forward width split four ways (503.3 MB), 9.9 MB of graphs and the empirical 0.7 GB outside PyTorch (src/sim/cost/memory.ts), 1.213 GB per GPU: about 0.62 GB per
         GPU less, 474 blocks more across the pod (+0.6 percent). Not tuned to BLIS.
       differences:
-        value: { typescript: 75234, blis: 74760 }
+        value: { typescript: 75234, blis: 74761 }

@@ -1,19 +1,19 @@
 {
   "scenario": "preemption-overflow",
   "reference": "blis",
-  "inputHash": "babcf6d935d59e08463340b7241502d80c50251ee8376e4e0abd1def18a1a7ae",
+  "inputHash": "0e1301226fd48dcc20d2cbf1c5a90a45c21a85ca6e7a0b310a4e77de4a4c1b88",
   "provenance": {
-    "lock": "c79c745619b16a8019339e3bbc79ee5e2923b258",
-    "catalogHash": "db74e4bb49f75d658e5d0850934da60daf513274b937a03b7ab994760bd6d21f",
-    "registryHash": "8dbcf3b85eed842f2bc798b34d2b95716fc58117750f4164d869b26770353fe0",
-    "engineVersion": "0.32.0",
-    "routerModule": "github.com/llm-d/llm-d-router v1.0.0-blis.4"
+    "lock": "e7597a8c9510f876653d7d87bd8baf195c37c5c7",
+    "catalogHash": "49d62c569f6092a8168459f15543fc76b41227588dffd46d0e02e3a2343696ef",
+    "registryHash": "316e7969a3e6fef0b68b5b6fb617b951977f7044e8844a06deb1db4dec9c39d7",
+    "engineVersion": "0.34.0+0fda86a35419",
+    "routerModule": "github.com/llm-d/llm-d-router v1.0.0-blis.6"
   },
   "records": {
     "main": {
       "source": "blis",
       "scenario": "preemption-overflow",
-      "kvBlocksPerReplica": 3599,
+      "kvBlocksPerReplica": 3600,
       "requests": [
         {
           "session": 1,
@@ -23,8 +23,8 @@
           "cachedTokens": 0,
           "pod": 0,
           "arrivalS": 1,
-          "firstTokenS": 1.473683,
-          "lastTokenS": 191.067135,
+          "firstTokenS": 1.473838,
+          "lastTokenS": 191.795408,
           "fate": "completed",
           "preemptions": null
         },
@@ -36,8 +36,8 @@
           "cachedTokens": 0,
           "pod": 0,
           "arrivalS": 1.5,
-          "firstTokenS": 1.986376,
-          "lastTokenS": 227.058001,
+          "firstTokenS": 1.987049,
+          "lastTokenS": 227.932688,
           "fate": "completed",
           "preemptions": null
         }

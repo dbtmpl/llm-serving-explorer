@@ -24,7 +24,7 @@ export const blis: Reference<BlisInput, BlisRaw> = {
   name: "BLIS",
   kind: "simulator",
   evidence:
-    "Decisions of llm-d and vLLM as simulated: BLIS runs the llm-d router's own code and a Go port of vLLM 0.32's scheduler, so agreement shows the TypeScript model makes the same routing, admission, preemption and KV-accounting decisions in the situations a scenario constructs. It is a simulator, not a cluster: its timings come from fitted coefficients and nothing in it ran on a GPU.",
+    "Decisions of llm-d and vLLM as simulated: BLIS runs the llm-d router's own code and a Go port of vLLM 0.34's scheduler, so agreement shows the TypeScript model makes the same routing, admission, preemption and KV-accounting decisions in the situations a scenario constructs. It is a simulator, not a cluster: its timings come from fitted coefficients and nothing in it ran on a GPU.",
   supports: {
     models: Object.keys(MODEL_NAMES),
     gpus: Object.keys(GPU_NAMES),
@@ -70,7 +70,11 @@ export const blis: Reference<BlisInput, BlisRaw> = {
     for (const file of ALL_EPP_FILES) {
       const shipped = execFileSync(binary, ["router-configs", "--file", file], { encoding: "utf8" });
       const ours = readFileSync(path.join(EPP_DIR, file), "utf8");
-      if (shipped !== ours) throw new Error(`conformance/refs/blis/epp/${file} differs from the file this BLIS ships (blis router-configs --file ${file}); copy the new one and re-run`);
+      if (shipped !== ours) {
+        const msg = `conformance/refs/blis/epp/${file} differs from the file this BLIS ships (blis router-configs --file ${file})`;
+        if (context.settings.BLIS_UPSTREAM) console.warn(`warning: ${msg}; continuing with upstream drift check`);
+        else throw new Error(`${msg}; copy the new one and re-run`);
+      }
     }
   },
   generate(s: Scenario, context: GenerateContext): ReferenceFile {
