@@ -18,9 +18,11 @@ import { stepCost } from "../cost/roofline.js";
 import { decodeStrategy, type DecodeSettings } from "../decoding/index.js";
 import { releaseHbm, shrinkTo } from "../kvcache/hbm.js";
 import { growTo, preempt } from "../kvcache/pool.js";
+import { pruneSharedPrefixes, recordSharedPrefix } from "../kvcache/prefix.js";
 import { thinkSeconds } from "../workload/index.js";
 import { admit, beginPrefill } from "./admit.js";
 import { IDLE_RETRY_S, LATENCY_WINDOW, MIXED_STEP } from "./constants.js";
+import { releaseRouterInFlight } from "./router.js";
 
 const decodeSettings = (w: World): DecodeSettings => ({ draftTokens: w.params.specK, acceptance: w.params.specAccept, draftCost: w.params.specCost });
 
@@ -34,6 +36,7 @@ function retireEntry(w: World, pod: Pod, r: Req): void {
   if (!w.params.prefixCaching) {
     releaseHbm(pod, e);
     pod.entries.delete(r.sid);
+    pruneSharedPrefixes(w, pod);
   }
 }
 
@@ -56,10 +59,12 @@ function retireEntry(w: World, pod: Pod, r: Req): void {
 export const cachedAfterTurn = (promptTokens: number, outputTokens: number): number => promptTokens + outputTokens - 1;
 
 function finish(w: World, pod: Pod, r: Req): void {
+  releaseRouterInFlight(w, r);
   pod.running.splice(pod.running.indexOf(r.id), 1);
   w.reqs.delete(r.id);
   const entry = pod.entries.get(r.sid);
   if (entry) entry.tokens = Math.min(entry.tokens, cachedAfterTurn(r.lIn, r.lOut));
+  if (w.params.sharedPrefixTokens > 0 && w.params.prefixCaching) recordSharedPrefix(w, pod, r, r.lIn);
   retireEntry(w, pod, r);
   const s = w.sessions.get(r.sid);
   const ttft = r.tFirst - r.tCreate;
@@ -99,8 +104,10 @@ export function applyPlan(w: World, pod: Pod): void {
     if (it.prefill) {
       if (r.stage !== "prefill") continue;
       r.prefillDone += it.n;
+      if (w.params.sharedPrefixTokens > 0 && w.params.prefixCaching) recordSharedPrefix(w, pod, r, r.prefillDone);
       if (r.prefillDone >= r.prefillTarget && pod.role === "prefill") {
         // disaggregated: this pod's job ends here; the KV goes to a decode pod
+        releaseRouterInFlight(w, r);
         pod.running.splice(pod.running.indexOf(r.id), 1);
         retireEntry(w, pod, r);
         r.stage = "handoff";

@@ -36,7 +36,15 @@ export function createWorld(params: Params = { ...DEFAULT_PARAMS }, seed: number
     remote: new Map(),
     remoteBytes: 0,
     lastChurn: 0,
-    handoff: []
+    handoff: [],
+    routerCursor: 0,
+    ownInFlight: Array.from({ length: Math.max(1, params.routerReplicas) }, () => new Map()),
+    routerSync: {
+      lastSyncT: 0,
+      nextSyncT: params.syncIntervalS,
+      peerInFlight: Array.from({ length: Math.max(1, params.routerReplicas) }, () => new Map()),
+      podKvUtil: new Map()
+    }
   };
 }
 

@@ -1,6 +1,6 @@
 /** "Dive in" panel: the selected component explained with its live numbers. */
 import type { ReactNode } from "react";
-import { BLOCK_TOKENS, SCORER_WEIGHTS, attnFlops, computeSeconds, decodeCurve, flopsPerToken, kvBytesPerToken, livePods, maxBatch, recomputeRatio, replicaSpec, ridge, seqLoad, tierBw, tierCapBlocks, weightBytes, type Pod } from "../sim/index.js";
+import { BLOCK_TOKENS, SCORER_WEIGHTS, attnFlops, boundedLoadCap, computeSeconds, decodeCurve, flopsPerToken, kvBytesPerToken, livePods, maxBatch, recomputeRatio, replicaSpec, ridge, seqLoad, tierBw, tierCapBlocks, weightBytes, type Pod } from "../sim/index.js";
 import type { RunWorld } from "./run.js";
 import { inspectorText } from "../content/index.js";
 import { fmtGB, fmtInt, fmtMs } from "./format.js";
@@ -221,18 +221,39 @@ function GatewayView({ w }: { w: RunWorld }) {
   const lr = w.lastRoute;
   const live = livePods(w).length;
   const desired = Math.max(p.minPods, Math.min(p.maxPods, Math.ceil(w.reqs.size / p.maxNumSeqs)));
+  const multi = p.routerReplicas > 1 || p.syncIntervalS > 0;
+  const hasBreakdown = !!lr?.candidates.some((c) => c.ownLoad !== undefined);
+  const meanObs = lr && lr.candidates.length ? lr.candidates.reduce((s, c) => s + c.load, 0) / lr.candidates.length : 0;
+  const extraNotes = [
+    ...(multi ? ["stale-state"] : []),
+    ...(p.routing === "bounded-load-affinity" ? ["bounded-load"] : []),
+    ...(p.routing === "age-discounted" ? ["age-discounted"] : [])
+  ];
   return (
     <>
       <Row k="queued at gateway" v={w.gatewayQueue.length} />
       <Row k="in flight" v={w.reqs.size} />
       <Row k="autoscaler target" v={`⌈${w.reqs.size} ÷ ${p.maxNumSeqs}⌉ = ${desired} pods`} />
       <Row k="pods live" v={live} />
+      {multi && (
+        <>
+          <Row k="router replicas" v={`${p.routerReplicas}× active-active`} />
+          <Row k="peer sync interval" v={p.syncIntervalS > 0 ? `${Math.round(p.syncIntervalS * 1000)} ms` : "live (0 ms)"} />
+          {lr?.routerReplica !== undefined && (
+            <Row k="last decision replica" v={`R${lr.routerReplica} · age ${Math.round((lr.peerStateAgeS ?? 0) * 1000)} ms`} />
+          )}
+        </>
+      )}
+      {lr?.policy === "bounded-load-affinity" && (
+        <Row k="bounded-load cap" v={`${boundedLoadCap(meanObs, p.boundedLoadEpsilon).toFixed(1)} reqs (ε=${p.boundedLoadEpsilon.toFixed(1)})`} />
+      )}
       {lr && (
         <table className="lv-table">
           <thead>
             <tr>
-              <th>last decision · session {lr.sid}</th>
-              <th>load</th>
+              <th>{hasBreakdown ? `session ${lr.sid}` : `last decision · session ${lr.sid}`}</th>
+              <th>{hasBreakdown ? "obs (o+p)" : "load"}</th>
+              {hasBreakdown && <th>true</th>}
               <th>cache</th>
               <th>score</th>
             </tr>
@@ -240,19 +261,20 @@ function GatewayView({ w }: { w: RunWorld }) {
           <tbody>
             {lr.candidates.slice(0, 8).map((c) => (
               <tr key={c.podId} className={c.podId === lr.chosen ? "on" : ""}>
-                <td>
+                <td style={{ whiteSpace: "nowrap" }}>
                   pod-{c.podId}
-                  {c.podId === lr.chosen ? " ← chosen" : ""}
+                  {c.podId === lr.chosen ? (hasBreakdown ? " ←" : " ← chosen") : ""}
                 </td>
-                <td>{c.load}</td>
-                <td>{c.tier ? `${(c.cache * 100).toFixed(0)}% ${c.tier}` : "–"}</td>
+                <td style={{ whiteSpace: "nowrap" }}>{hasBreakdown ? `${c.load} (${c.ownLoad ?? 0}+${c.peerLoad ?? 0})` : c.load}</td>
+                {hasBreakdown && <td>{c.trueLoad ?? c.load}</td>}
+                <td style={{ whiteSpace: "nowrap" }}>{c.tier ? `${(c.cache * 100).toFixed(0)}% ${c.tier}` : "–"}</td>
                 <td>{lr.policy === "round-robin" ? "–" : c.score.toFixed(2)}</td>
               </tr>
             ))}
           </tbody>
         </table>
       )}
-      <Note id="gateway.note" values={scoreWeights} />
+      <Note id="gateway.note" values={scoreWeights} extra={extraNotes} />
     </>
   );
 }

@@ -85,7 +85,7 @@ Comparison with the previous BLIS commit (`c79c7456` vs `e7597a8c`):
 | Calibrated checks (agree / total) | 23 / 24 | 51 / 54 |
 | Directional checks (agree / total) | 6 / 8 | 7 / 8 |
 
-Approaches in the registry: 22 of 28 are named by at least one scenario this reference covers; 6 are named by none and say why (below). Being named by a scenario means checked, not agreeing: several approaches appear in a check that is a known difference. Approaches that cannot be verified are not in the figure at all, in either direction.
+Approaches in the registry: 22 of 30 are named by at least one scenario this reference covers; 8 are named by none and say why (below). Being named by a scenario means checked, not agreeing: several approaches appear in a check that is a known difference. Approaches that cannot be verified are not in the figure at all, in either direction.
 
 Scenarios this reference covers: 46, of which 27 are calibration data (they carry no checks; the fit uses them) and 19 carry the 76 checks. BLIS commit: `e7597a8c`.
 <!-- generated:parity-headline-blis:end -->
@@ -199,7 +199,7 @@ The count of checks is secondary, because a tolerance is a line the suite drew: 
 | Calibrated | 49 | 43 | 6 | within the scenario's relative tolerance |
 | Directional | 0 | 0 | 0 | same direction, effect within the scenario's factor band |
 
-Approaches in the registry: 8 of 28 are named by at least one scenario this reference covers; 6 are named by none and say why (below). Being named by a scenario means checked, not agreeing: several approaches appear in a check that is a known difference. Approaches that cannot be verified are not in the figure at all, in either direction.
+Approaches in the registry: 8 of 30 are named by at least one scenario this reference covers; 8 are named by none and say why (below). Being named by a scenario means checked, not agreeing: several approaches appear in a check that is a known difference. Approaches that cannot be verified are not in the figure at all, in either direction.
 
 Scenarios this reference covers: 2, of which 0 are calibration data (they carry no checks; the fit uses them) and 2 carry the 52 checks. Measured vLLM revision: `49df63f2`.
 <!-- generated:parity-headline-vllm-measured:end -->
@@ -289,7 +289,7 @@ The count of checks is secondary, because a tolerance is a line the suite drew: 
 | Calibrated | 75 | 62 | 13 | within the scenario's relative tolerance |
 | Directional | 6 | 4 | 2 | same direction, effect within the scenario's factor band |
 
-Approaches in the registry: 15 of 28 are named by at least one scenario this reference covers; 6 are named by none and say why (below). Being named by a scenario means checked, not agreeing: several approaches appear in a check that is a known difference. Approaches that cannot be verified are not in the figure at all, in either direction.
+Approaches in the registry: 15 of 30 are named by at least one scenario this reference covers; 8 are named by none and say why (below). Being named by a scenario means checked, not agreeing: several approaches appear in a check that is a known difference. Approaches that cannot be verified are not in the figure at all, in either direction.
 
 Scenarios this reference covers: 19, of which 6 are calibration data (they carry no checks; the fit uses them) and 13 carry the 90 checks. LLMServingSim commit: `49df63f2`.
 <!-- generated:parity-headline-llmservingsim:end -->
@@ -425,6 +425,8 @@ These approaches have no check, and are not counted as agreement in either direc
 - **`admission/reserve`.** vLLM does not reserve KV memory for a request's whole output at admission, and BLIS follows vLLM, so there is no counterpart to compare.
 - **`batching/static`.** vLLM does no static batching (it schedules continuously) and BLIS translates vLLM, so there is no counterpart to compare.
 - **`kvcache/adaptive`.** BLIS reloads whenever its host-memory tier holds the prefix; it has no decision between copying and recomputing to compare. The scenario that exercises the tier (tiers-offload) is a check of the tiers, not of this rule.
+- **`routing/age-discounted`.** BLIS and LLMServingSim do not implement Dahlin exponential staleness decay on peer router snapshots; checked against Dahlin's age-discounting rule by unit and engine tests.
+- **`routing/bounded-load-affinity`.** BLIS and LLMServingSim do not implement Mirrokni bounded-load caps on top of llm-d's prefix-aware scorer; checked against the SODA 2018 cap formula by unit and engine tests.
 - **`workload/closed-loop-sessions`.** BLIS replays traces and generates open-loop streams; it has no counterpart to the closed-loop sessions (users who wait, think and return) that the site generates, so the scenarios feed both simulators a trace instead.
 - **`workload/trace-replay`.** It is how both simulators are given the same requests, not a mechanism BLIS models: every scenario uses it, and the conformance machinery fails when the two row sets differ, but there is nothing in BLIS to compare it with.
 <!-- generated:parity-notverifiable:end -->

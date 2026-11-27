@@ -23,7 +23,7 @@ Each reference is reported on its own; agreement is never pooled. Where the mode
 | Directional effects | 8 | 9.5% | 79.0% | 1 | 2 | 4 | 6 |
 | **All** | 76 | 2.8% | 79.0% | 26 | 44 | 60 | 69 |
 
-Counting checks instead: 68 of 76 checks agree (89.5 percent), 8 known differences; 22 of the 28 approaches in the [approach table](../src/sim/README.md#all-approaches) are covered by at least one of its scenarios.
+Counting checks instead: 68 of 76 checks agree (89.5 percent), 8 known differences; 22 of the 30 approaches in the [approach table](../src/sim/README.md#all-approaches) are covered by at least one of its scenarios.
 
 | Kind of check | What must hold | Checks | Agree | Known difference |
 |---|---|---|---|---|
@@ -75,7 +75,7 @@ Every check that does not hold as written (the scenario files carry the full rea
 | Timings, default parameters (no fit) | 20 | 10.8% | 16.4% | 0 | 1 | 9 | 20 |
 | Timings and rates (fitted, held out) | 28 | 2.7% | 41.3% | 2 | 22 | 24 | 27 |
 
-Counting checks instead: 44 of 51 checks agree (86.3 percent), 7 known differences; 8 of the 28 approaches in the [approach table](../src/sim/README.md#all-approaches) are covered by at least one of its scenarios.
+Counting checks instead: 44 of 51 checks agree (86.3 percent), 7 known differences; 8 of the 30 approaches in the [approach table](../src/sim/README.md#all-approaches) are covered by at least one of its scenarios.
 
 | Kind of check | What must hold | Checks | Agree | Known difference |
 |---|---|---|---|---|
@@ -107,7 +107,7 @@ Every check that does not hold as written (the scenario files carry the full rea
 | Timings and rates (fitted, held out) | 40 | 2.8% | 41.6% | 6 | 28 | 34 | 37 |
 | Directional effects | 6 | 4.5% | 184.0% | 2 | 3 | 4 | 4 |
 
-Counting checks instead: 72 of 89 checks agree (80.9 percent), 17 known differences; 15 of the 28 approaches in the [approach table](../src/sim/README.md#all-approaches) are covered by at least one of its scenarios.
+Counting checks instead: 72 of 89 checks agree (80.9 percent), 17 known differences; 15 of the 30 approaches in the [approach table](../src/sim/README.md#all-approaches) are covered by at least one of its scenarios.
 
 | Kind of check | What must hold | Checks | Agree | Known difference |
 |---|---|---|---|---|
@@ -139,7 +139,7 @@ Every check that does not hold as written (the scenario files carry the full rea
 | `timing-lss-8b-rtx-pro-6000-isolated`: mean end-to-end time | 2,790 ms | 2,420 ms | +15.3% | 15% | Follows the default time per token and the front end |
 | `timing-lss-8b-rtx-pro-6000-isolated`: mean time to first token | 161 ms | 121 ms | +32.7% | 30% | Front-end tokenisation LLMServingSim lacks |
 
-6 of the 28 approaches have no counterpart in any reference and are counted neither way; regenerate with `pnpm conformance:summary && pnpm docs:sync`.
+8 of the 30 approaches have no counterpart in any reference and are counted neither way; regenerate with `pnpm conformance:summary && pnpm docs:sync`.
 <!-- generated:parity-readme:end -->
 
 **In short**

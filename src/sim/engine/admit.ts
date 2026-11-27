@@ -9,9 +9,10 @@ import { computeSeconds } from "../cost/roofline.js";
 import { blocksFor } from "../kvcache/blocks.js";
 import { syncCells } from "../kvcache/hbm.js";
 import { growTo, makeRoom } from "../kvcache/pool.js";
-import { blockHashPrefix } from "../kvcache/prefix.js";
+import { blockHashPrefix, sharedPrefixTokensFor } from "../kvcache/prefix.js";
 import { adaptiveReload } from "../kvcache/reload.js";
 import { dropEntry, tierBw } from "../kvcache/tiers.js";
+import { releaseRouterInFlight } from "./router.js";
 
 /** The policies in use. With a second approach each becomes a parameter. */
 export const PREFIX_MATCHER = blockHashPrefix;
@@ -19,6 +20,7 @@ export const RELOAD = adaptiveReload;
 
 /** A request leaves the system without an answer. */
 export function failReq(w: World, pod: Pod | null, r: Req, why: string): void {
+  releaseRouterInFlight(w, r);
   w.reqs.delete(r.id);
   const s = w.sessions.get(r.sid);
   if (s) {
@@ -115,7 +117,17 @@ export function admit(w: World, pod: Pod, r: Req): boolean {
   }
 
   if (!e) {
-    e = { sid: r.sid, tokens: 0, blocks: 0, tier: "hbm", active: true, lastUsed: w.t, cells: [] };
+    let sharedHit = 0;
+    if (p.prefixCaching && p.sharedPrefixTokens > 0) {
+      const sharedTok = sharedPrefixTokensFor(w, r);
+      const g = w.sessions.get(r.sid)?.prefixGroup;
+      const sp = g !== undefined ? pod.sharedPrefixes?.get(g) : undefined;
+      if (sp && sharedTok > 0) {
+        sharedHit = Math.min(sp.tokens, sharedTok);
+        sp.lastUsed = w.t;
+      }
+    }
+    e = { sid: r.sid, tokens: sharedHit, blocks: 0, tier: "hbm", active: true, lastUsed: w.t, cells: [] };
     pod.entries.set(r.sid, e);
   }
   if (r.kvReady) {

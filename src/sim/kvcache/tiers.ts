@@ -22,6 +22,7 @@ import { emit } from "../core/world.js";
 import { linkBytesPerSecond } from "../disaggregation/index.js";
 import { leastRecentlyUsed } from "./eviction.js";
 import { releaseHbm } from "./hbm.js";
+import { pruneSharedPrefixes } from "./prefix.js";
 
 export const tieredCache: ApproachMeta = {
   id: "hbm-dram-ssd-remote",
@@ -63,6 +64,7 @@ function leaveNodeTier(pod: Pod, e: KvEntry, from: Tier): void {
 export function dropEntry(w: World, pod: Pod, e: KvEntry, from: Tier, cells: number[] = []): void {
   leaveNodeTier(pod, e, from);
   pod.entries.delete(e.sid);
+  if (from === "hbm") pruneSharedPrefixes(w, pod);
   w.m.drops++;
   emit(w, "kv.drop", { podId: pod.id, sid: e.sid, from, cells, bytes: entryBytes(pod, e), tokens: e.tokens });
 }
@@ -108,13 +110,22 @@ export function demote(w: World, pod: Pod, e: KvEntry): void {
   const cells = releaseHbm(pod, e);
   w.m.evictions++;
   const capacity = tierCapBlocks(pod, w.params.dramGB);
-  if (e.blocks > capacity) return toSsd(w, pod, e, "hbm", cells);
+  if (e.blocks > capacity) {
+    toSsd(w, pod, e, "hbm", cells);
+    pruneSharedPrefixes(w, pod);
+    return;
+  }
   while (pod.dramBlocks + e.blocks > capacity) {
     const victim = idleIn(pod, "dram", e);
-    if (!victim) return toSsd(w, pod, e, "hbm", cells);
+    if (!victim) {
+      toSsd(w, pod, e, "hbm", cells);
+      pruneSharedPrefixes(w, pod);
+      return;
+    }
     toSsd(w, pod, victim, "dram", []);
   }
   e.tier = "dram";
   pod.dramBlocks += e.blocks;
+  pruneSharedPrefixes(w, pod);
   emit(w, "kv.move", { podId: pod.id, sid: e.sid, from: "hbm", to: "dram", cells, bytes: entryBytes(pod, e), tokens: e.tokens, idleFor: w.t - e.lastUsed });
 }

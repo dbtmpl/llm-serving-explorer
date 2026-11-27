@@ -569,6 +569,36 @@ export const CITATIONS = {
     title: "Token bucket: capacity, refill rate and conformance test of a rate limiter",
     kind: "docs",
     url: "https://en.wikipedia.org/wiki/Token_bucket"
+  },
+  mirrokni2018: {
+    short: "Mirrokni et al., SODA 2018",
+    title: "Consistent Hashing with Bounded Loads",
+    kind: "paper",
+    url: "https://arxiv.org/abs/1608.01350"
+  },
+  dahlin2000: {
+    short: "Dahlin, IEEE TPDS 2000",
+    title: "Interpreting Stale Load Information",
+    kind: "paper",
+    url: "https://doi.org/10.1109/71.888559"
+  },
+  goren2020: {
+    short: "Goren et al., 2020",
+    title: "Tidal Water Filling: Distributed Load Balancing with Multiple Dispatchers",
+    kind: "paper",
+    url: "https://arxiv.org/abs/2008.00793"
+  },
+  llmdIssue3440: {
+    short: "llm-d-router Issue #3440",
+    title: "llm-d-router: active-active cross-replica load staleness",
+    kind: "source",
+    url: "https://github.com/llm-d/llm-d-router/issues/3440"
+  },
+  llmdPr4077: {
+    short: "llm-d-router PR #4077",
+    title: "llm-d-router: P2P cross-replica state syncer",
+    kind: "source",
+    url: "https://github.com/llm-d/llm-d-router/pull/4077"
   }
 } as const satisfies Record<string, Citation>;
 

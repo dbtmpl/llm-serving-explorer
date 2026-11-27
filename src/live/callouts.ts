@@ -7,7 +7,7 @@
 import { diveConcepts, stepText, type DiveConcept } from "../content/index.js";
 import { fmtGB, fmtInt, fmtMs } from "./format.js";
 import type { Scene, Target } from "./render.js";
-import { POD_QUEUE_SLACK, SCORER_WEIGHTS, TIER_AFFINITY, fitOf, prefixAwareTerms, replicaSpec, type SimEvent, type World } from "../sim/index.js";
+import { POD_QUEUE_SLACK, SCORER_WEIGHTS, TIER_AFFINITY, fitOf, prefixAwareTerms, replicaSpec, type Routing, type SimEvent, type World } from "../sim/index.js";
 
 export interface Callout {
   key: string;
@@ -87,7 +87,22 @@ export function scoreFacts(w: World) {
 }
 
 /** Which field of the `req.routed` entry describes each routing policy. */
-const HOW = { "prefix-aware": "how-prefix-aware", "least-loaded": "how-least-loaded", "round-robin": "how-round-robin" } as const;
+const HOW: Record<Routing, string> = {
+  "prefix-aware": "how-prefix-aware",
+  "bounded-load-affinity": "how-bounded-load-affinity",
+  "age-discounted": "how-age-discounted",
+  "least-loaded": "how-least-loaded",
+  "round-robin": "how-round-robin"
+};
+
+/** Which detail field of the `req.routed` entry explains each routing policy. */
+const DETAIL: Record<Routing, string> = {
+  "prefix-aware": "detail-prefix-aware",
+  "bounded-load-affinity": "detail-bounded-load-affinity",
+  "age-discounted": "detail-age-discounted",
+  "least-loaded": "detail-least-loaded",
+  "round-robin": "detail-round-robin"
+};
 
 export const TIER_NAME: Record<string, string> = { hbm: "HBM", dram: "DRAM", ssd: "SSD", remote: "the remote pool" };
 
@@ -137,14 +152,22 @@ export function calloutFor(e: SimEvent, w: World): Callout[] {
       return p ? [make("pod.failed", { key: `failed${e.podId}`, target: pod("gpu"), tone: "evict" }, { fixed: fmtGB(p.budget.weights + p.budget.activations + p.budget.graphs + p.budget.runtime), usable: fmtGB(p.budget.device - p.budget.headroom) })] : [];
     case "req.routed": {
       const policy = w.params.routing;
+      const values: Record<string, string | number> =
+        policy === "prefix-aware"
+          ? scoreFacts(w)
+          : policy === "bounded-load-affinity"
+            ? { eps: w.params.boundedLoadEpsilon.toFixed(1) }
+            : policy === "age-discounted"
+              ? { decayMs: Math.round(w.params.ageDecayS * 1000) }
+              : {};
       return [
         make(
           "req.routed",
           { key: "routed", once: true, target: { type: "gateway" }, tone: "info" },
-          { podId: e.podId!, ...(policy === "prefix-aware" ? scoreFacts(w) : {}) },
+          { podId: e.podId!, ...values },
           {
             body: [HOW[policy], e.via === "prefill" && "via-prefill", e.via === "decode-only" && "via-decode-only"],
-            detail: `detail-${policy}`
+            detail: DETAIL[policy]
           }
         )
       ];

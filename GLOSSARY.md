@@ -4,7 +4,10 @@
 - **Approach:** One published or deployed way of making that decision. Implemented in its own file, with its sources.
 - **Session:** One user conversation. It sends a first request and may send follow-up turns, go idle or leave.
 - **Gateway:** The front end that assembles the prompt (history plus the new message) and turns it into tokens.
-- **Router:** The component that picks a pod for each request. Modelled on llm-d's endpoint picker (EPP), which scores pods on prefix-cache affinity, queue depth and KV utilisation.
+- **Router:** The component that picks a pod for each request. Modelled on llm-d's endpoint picker (EPP), which scores pods on prefix-cache affinity, queue depth and KV utilisation. Can run as multiple active-active replicas whose peer load snapshots lag by a sync interval.
+- **Active-active stale state:** Running multiple independent router replicas behind a round-robin load balancer with periodic peer load sync. Each replica sees its own exact in-flight requests immediately while peer load snapshots lag, which can cause prefix-aware routing to herd concurrent bursts onto one warm pod.
+- **Bounded-load affinity:** Prefix-aware scoring paired with a Mirrokni et al. $(1 + \varepsilon)\,\max(\bar{L}, 1)$ load cap that sheds excess traffic once a warm pod exceeds the cap.
+- **Age-discounted routing:** Prefix-aware scoring using Dahlin's exponential staleness decay $L_{\text{own}} + L_{\text{peer}}\,e^{-\Delta t / \tau}$ so aged peer snapshots fade rather than blocking warm affinity.
 - **Pod:** One running copy of the inference engine with its GPUs. Pods are created, load weights, become ready, drain and terminate.
 - **Sequence:** One request as the engine sees it while it runs: the prompt plus the answer generated so far. vLLM's name.
 - **Batch slot:** One of the `max_num_seqs` places in a pod's running batch, drawn as a bar. A request holds one from admission until its last token.

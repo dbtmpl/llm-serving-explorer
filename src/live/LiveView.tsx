@@ -299,9 +299,19 @@ function fixText(f: Fix): { label: string; pool: string } {
   return { label, pool };
 }
 
+function urlArch() {
+  try {
+    const id = new URLSearchParams(window.location.search).get("arch");
+    return id ? ARCHITECTURES.find((a) => a.id === id) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function LiveView() {
+  const initialArch = useMemo(() => urlArch(), []);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const worldRef = useRef<World>(createWorld({ ...DEFAULT_PARAMS }));
+  const worldRef = useRef<World>(createWorld({ ...DEFAULT_PARAMS, ...(initialArch?.params ?? {}) }));
   const sceneRef = useRef(new Scene());
   // what drives the canvas: the TypeScript model, or (Calibrated mode) a BLIS replay
   const exploreRef = useRef<Run>(exploreRun(() => worldRef.current));
@@ -320,7 +330,7 @@ export function LiveView() {
   const [held, setHeld] = useState<Shown | null>(null);
   const [focus, setFocus] = useState<number | null>(null);
   const [tour, setTour] = useState<number | null>(null);
-  const [arch, setArch] = useState(DEFAULT_ARCH);
+  const [arch, setArch] = useState(initialArch?.id ?? DEFAULT_ARCH);
   const [histPos, setHistPos] = useState<[number, number, boolean]>([0, 0, false]);
   const [, refresh] = useReducer((x: number) => x + 1, 0);
   const live = useRef({ playing, speed, explain, callouts, seen: new Set<string>(), lastShown: new Map<string, number>(), nextId: 1, stepMode: false, held: null as Shown | null, focus: null as number | null, focusDone: false, script: newScript(), freeze: false, queue: [] as Callout[], tour: null as number | null, hist: [] as StepRec[], hi: -1, dirty: false, replay: null as Replay | null, warp: 1, finish: () => {}, toLog: (() => {}) as (c: Shown, kind: LogEntry["kind"], fly: boolean) => void });
@@ -1217,7 +1227,7 @@ export function LiveView() {
     } catch {
       seen = false;
     }
-    if (!seen) startTour();
+    if (!seen && !initialArch) startTour();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1438,7 +1448,28 @@ export function LiveView() {
             <Slider label="host time per step" value={p.hostMsBase} min={0} max={20} step={0.5} fmt={(v) => `${v} ms`} onChange={(v) => set("hostMsBase", v)} />
           </Group>
           <Group title="Routing and autoscaling">
-            <Choice label="routing policy" value={p.routing} options={[["prefix-aware", "prefix-aware"], ["least-loaded", "least-loaded"], ["round-robin", "round-robin"]]} onChange={(v) => set("routing", v)} />
+            <Choice
+              label="routing policy"
+              value={p.routing}
+              options={[
+                ["prefix-aware", "prefix-aware"],
+                ["bounded-load-affinity", "bounded-load affinity"],
+                ["age-discounted", "age-discounted"],
+                ["least-loaded", "least-loaded"],
+                ["round-robin", "round-robin"]
+              ]}
+              onChange={(v) => set("routing", v)}
+            />
+            <Choice label="router replicas" value={p.routerReplicas} options={[[1, "1"], [2, "2"], [4, "4"], [8, "8"]]} onChange={(v) => set("routerReplicas", v)} />
+            <Choice label="peer sync lag" value={p.syncIntervalS} options={[[0, "0 ms"], [0.02, "20 ms"], [0.2, "200 ms"], [0.5, "500 ms"]]} onChange={(v) => set("syncIntervalS", v)} />
+            <Choice label="shared prefix" value={p.sharedPrefixTokens} options={[[0, "0"], [1024, "1,024"], [1536, "1,536"], [2048, "2,048"]]} onChange={(v) => set("sharedPrefixTokens", v)} />
+            {p.routing === "bounded-load-affinity" && (
+              <Slider label="bounded-load slack ε" value={p.boundedLoadEpsilon} min={0.1} max={2.0} step={0.1} fmt={(v) => v.toFixed(1)} onChange={(v) => set("boundedLoadEpsilon", v)} />
+            )}
+            {p.routing === "age-discounted" && (
+              <Slider label="staleness decay τ" value={p.ageDecayS} min={0.05} max={1.0} step={0.05} fmt={(v) => `${Math.round(v * 1000)} ms`} onChange={(v) => set("ageDecayS", v)} />
+            )}
+            <Rich text={panelText("routing.stale")} className="lv-note" />
             <Choice label="prefill / decode pools" value={p.disagg} options={[[false, "one pool"], [true, "disaggregated"]]} onChange={(v) => set("disagg", v)} />
             {p.disagg && <Slider label="skip prefill pool below (uncached tokens)" value={p.pdThreshold} min={0} max={8192} step={64} fmt={fmtInt} onChange={(v) => set("pdThreshold", v)} />}
             {p.disagg && <Slider label="KV transfer link" value={p.linkGbps} min={10} max={400} step={10} fmt={(v) => `${v} Gbps`} onChange={(v) => set("linkGbps", v)} />}

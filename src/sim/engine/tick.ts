@@ -10,7 +10,7 @@ import { injectTrace, newRequest, newSession } from "../workload/index.js";
 import { failReq } from "./admit.js";
 import { CHURN_INTERVAL_S, CHURN_MIN_SESSIONS, HISTORY_SAMPLES, SAMPLE_INTERVAL_S, TERMINATED_LINGER_S, THROUGHPUT_WINDOW_S, TICK_S, TIME_EPSILON_S } from "./constants.js";
 import { autoscale, requeue, restartFleet, tickPod } from "./fleet.js";
-import { handoffs, route } from "./router.js";
+import { handoffs, route, syncRouters, syncRouterTopology } from "./router.js";
 import { kvFill, tokensPerSecond } from "./selectors.js";
 
 /** New sessions: a steady arrival rate, scheduled bursts, and users returning for another turn. */
@@ -109,6 +109,7 @@ function tick(w: World, h: number): void {
   arrivals(w, h);
   frontend(w);
   autoscale(w);
+  syncRouters(w);
   dispatch(w);
   if (w.handoff.length) handoffs(w);
   for (const pod of w.pods) tickPod(w, pod);
@@ -136,4 +137,5 @@ export function setParam<K extends keyof Params>(w: World, key: K, value: Params
   if (w.params[key] === value) return;
   w.params[key] = value;
   if (RESTART_KEYS.includes(key)) restartFleet(w);
+  if (key === "routerReplicas" || key === "syncIntervalS") syncRouterTopology(w);
 }

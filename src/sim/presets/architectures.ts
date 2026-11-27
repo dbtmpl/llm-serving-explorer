@@ -22,6 +22,10 @@ const VANILLA: Partial<Params> = {
   tokenBudget: 65536,
   prefixCaching: false,
   routing: "round-robin",
+  routerReplicas: 1,
+  syncIntervalS: 0,
+  sharedPrefixTokens: 0,
+  sharedPrefixGroups: 1,
   dramGB: 0,
   ssdGB: 0,
   remoteGB: 0,
@@ -80,6 +84,34 @@ export const ARCHITECTURES: Architecture[] = [
     short: "Today's full stack",
     citations: ["leviathan2023", "llmdFlowControl"],
     params: { ...VANILLA, batching: "continuous", admission: "on-demand", tokenBudget: 8192, prefixCaching: true, routing: "prefix-aware", dramGB: 32, ssdGB: 128, remoteGB: 256, disagg: true, specDecode: true, overlap: true, shedAfterS: 20 }
+  },
+  {
+    id: "active-active",
+    year: "2026",
+    short: "Active-active routers (stale state)",
+    citations: ["llmdIssue3440", "llmdPr4077", "mirrokni2018", "dahlin2000", "goren2020"],
+    params: {
+      ...VANILLA,
+      minPods: 4,
+      maxPods: 4,
+      routerReplicas: 4,
+      syncIntervalS: 0.2,
+      sharedPrefixTokens: 1536,
+      sharedPrefixGroups: 1,
+      promptTokens: 2048,
+      outputTokens: 128,
+      routing: "prefix-aware",
+      batching: "continuous",
+      admission: "on-demand",
+      tokenBudget: 8192,
+      prefixCaching: true,
+      dramGB: 0,
+      ssdGB: 0,
+      remoteGB: 0,
+      disagg: false,
+      specDecode: false,
+      overlap: true
+    }
   }
 ];
 

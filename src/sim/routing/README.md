@@ -10,6 +10,8 @@ Which pod gets the next request.
 | Routing | Round robin | Rotate through pods regardless of load or cache. | Exact | BLIS: `routing-round-robin`, `routing-prefix-vs-round-robin`; LLMServingSim: `lss-routing-round-robin` | [Envoy docs, load balancers](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/load_balancers) |
 | Routing | Least loaded | Send to the pod with the fewest requests in flight. | Simplified | BLIS: `routing-least-loaded` | [Envoy docs, load balancers](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/load_balancers) |
 | Routing | Prefix-cache aware | Weighted score of cached prefix, KV utilisation and queue depth, as in llm-d. | Structural | BLIS: 4 scenarios | [llm-d docs, router scheduling](https://github.com/llm-d/llm-d/blob/main/docs/architecture/router/scheduling.md); [Gateway API Inference Extension](https://github.com/kubernetes-sigs/gateway-api-inference-extension) |
+| Routing | Bounded-load affinity | Prefix-aware score with a (1+ε) overload cap (Mirrokni et al., SODA 2018) to stop hot-pod herding. | Structural | Not verifiable | [Mirrokni et al., SODA 2018](https://arxiv.org/abs/1608.01350); [llm-d docs, router scheduling](https://github.com/llm-d/llm-d/blob/main/docs/architecture/router/scheduling.md); [llm-d-router Issue #3440](https://github.com/llm-d/llm-d-router/issues/3440) |
+| Routing | Age-discounted | Discounts stale peer-load snapshots exponentially with snapshot age (Dahlin, IEEE TPDS 2000). | Structural | Not verifiable | [Dahlin, IEEE TPDS 2000](https://doi.org/10.1109/71.888559); [llm-d docs, router scheduling](https://github.com/llm-d/llm-d/blob/main/docs/architecture/router/scheduling.md); [llm-d-router Issue #3440](https://github.com/llm-d/llm-d-router/issues/3440) |
 <!-- generated:approaches:end -->
 
 Fidelity: **Exact** reproduces a published formula or rule and is tested against it. **Structural** follows the source's mechanism with our own constants, exposed as parameters. **Simplified** is a stand-in whose docstring says what is left out.
@@ -39,5 +41,5 @@ The general rules are in [`../README.md`](../README.md#rules).
 ## Not modelled
 
 - Predicted-latency scoring, LoRA affinity and session stickiness.
-- Scrape lag: the facts are exact and current.
-- Approximate prefix indexes: the router knows exactly what each pod holds.
+- Approximate prefix indexes: when a pod holds a prefix, the router knows which prefix it holds (only load and KV-utilisation snapshots lag by `syncIntervalS`).
+- Continuous asynchronous P2P state gossip with per-link jitter: peer snapshots sync at a fixed `syncIntervalS` cadence.

@@ -5,6 +5,8 @@
  * `ROUTING.approaches`, and add a unit test. See README.md in this directory.
  */
 import { selectApproach, type ApproachMeta, type Concept } from "../approach.js";
+import { ageDiscounted } from "./ageDiscounted.js";
+import { boundedLoadAffinity } from "./boundedLoadAffinity.js";
 import { leastLoaded } from "./leastLoaded.js";
 import { prefixAware } from "./prefixAware.js";
 import { roundRobin } from "./roundRobin.js";
@@ -20,10 +22,22 @@ export interface CandidateFacts {
   cacheLocation: CacheLocation | null;
   /** Share of the pod's KV pool held by running sequences, in [0, 1]. */
   kvUtilisation: number;
-  /** Requests running, waiting or on their way to the pod. */
+  /** Requests running, waiting or on their way to the pod (observed by this router replica). */
   load: number;
   /** Load at which the pod is considered full. */
   capacity: number;
+  /** Exact in-flight count dispatched by this router replica (active-active mode). */
+  ownLoad?: number;
+  /** Sum of peer replicas' in-flight counts from the last sync snapshot. */
+  peerLoad?: number;
+  /** Seconds elapsed since the last cross-replica peer sync snapshot. */
+  peerStateAgeS?: number;
+  /** Mean observed load across ready candidates for this decision. */
+  meanObservedLoad?: number;
+  /** Mirrokni et al. overload cap slack `1 + epsilon`. */
+  boundedLoadEpsilon?: number;
+  /** Dahlin exponential peer-load decay time constant in seconds. */
+  ageDecayS?: number;
 }
 
 export interface RoutingPolicy extends ApproachMeta {
@@ -47,10 +61,10 @@ export const ROUTING: Concept<RoutingPolicy> = {
   module: "routing",
   title: "Routing",
   question: "Which pod gets the next request?",
-  approaches: [roundRobin, leastLoaded, prefixAware]
+  approaches: [roundRobin, leastLoaded, prefixAware, boundedLoadAffinity, ageDiscounted]
 };
 
-export type RoutingId = "round-robin" | "least-loaded" | "prefix-aware";
+export type RoutingId = "round-robin" | "least-loaded" | "prefix-aware" | "bounded-load-affinity" | "age-discounted";
 export const routingPolicy = (id: RoutingId): RoutingPolicy => selectApproach(ROUTING, id);
 
 /**

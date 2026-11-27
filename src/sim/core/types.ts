@@ -62,12 +62,16 @@ export interface Req {
   /** Whether its prompt has been added to the prefix-hit statistics. */
   counted: boolean;
   fromPod: number;
+  /** Active-active router replica index that dispatched this request, when tracked. */
+  routerReplica?: number;
 }
 
 export interface Session {
   id: number;
   /** The conversation's number in the trace it was injected from, when it came from one. */
   traceId?: number;
+  /** Shared system-prompt group when `sharedPrefixTokens > 0`. */
+  prefixGroup?: number;
   hue: number;
   turn: number;
   /** Tokens of conversation so far. */
@@ -138,6 +142,8 @@ export interface Pod {
   tokensOut: number;
   /** Duration of the last decode-only step, to show what a prefill chunk costs running streams. */
   decodeDur: number;
+  /** Shared system-prompt prefixes held in HBM, keyed by `prefixGroup`. */
+  sharedPrefixes?: Map<number, { tokens: number; blocks: number; lastUsed: number }>;
 }
 
 export interface RouteDecision {
@@ -151,7 +157,23 @@ export interface RouteDecision {
   capacity: number;
   /** The policy's carried state before this decision (the round-robin counter). */
   cursor: number;
-  candidates: { podId: number; load: number; cache: number; tier: CacheLocation | null; kvUtilisation: number; score: number }[];
+  /** Active-active router replica index that made this decision, when multi-replica/sync is active. */
+  routerReplica?: number;
+  /** Age of the peer load snapshot at decision time, seconds. */
+  peerStateAgeS?: number;
+  /** Configured peer sync interval, seconds. */
+  syncIntervalS?: number;
+  candidates: {
+    podId: number;
+    load: number;
+    cache: number;
+    tier: CacheLocation | null;
+    kvUtilisation: number;
+    score: number;
+    ownLoad?: number;
+    peerLoad?: number;
+    trueLoad?: number;
+  }[];
 }
 
 export type SimEvent = { t: number; kind: string; podId?: number; sid?: number; reqId?: number; [k: string]: unknown };
@@ -228,4 +250,15 @@ export interface World {
   lastChurn: number;
   /** Requests whose prefill is done and that wait for a decode pod to take their KV. */
   handoff: number[];
+  /** Round-robin cursor distributing arriving requests across active-active router replicas. */
+  routerCursor: number;
+  /** Exact per-replica in-flight request counts per pod id (`ownInFlight[replica].get(podId)`). */
+  ownInFlight: Map<number, number>[];
+  /** Periodic cross-replica peer load and pod KV-utilisation snapshot state. */
+  routerSync: {
+    lastSyncT: number;
+    nextSyncT: number;
+    peerInFlight: Map<number, number>[];
+    podKvUtil: Map<number, number>;
+  };
 }

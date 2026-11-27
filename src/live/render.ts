@@ -199,6 +199,8 @@ export class Scene {
   gatewayNote = "";
   /** Pods whose engine just preempted a request without a block map to flash: pod id and the time on the animation clock. */
   private pulses: { podId: number; t0: number }[] = [];
+  /** Animation clock time of the most recent `router.sync` pulse. */
+  private syncPulseT0 = -99;
 
   /** Forget everything animated and go back to the state of a new scene (a new run replaces the old one). */
   reset(detail: RunDetail): void {
@@ -222,6 +224,10 @@ export class Scene {
     const p = this.podPos.get(pod.id);
     return p ? { x: p.x, y: p.y, w: PW, h: podGeom(pod.spec.tp).h } : null;
   }
+  private gwRect(w: RunWorld): Rect {
+    const multi = w.params.routerReplicas > 1 || w.params.syncIntervalS > 0;
+    return multi ? { x: GW.x, y: GW.y - 10, w: GW.w, h: 158 } : { ...GW };
+  }
   private sessAnchor(sid: number): P {
     const p = this.sessPos.get(sid);
     return p ? { x: p.x + (this.cardMode ? 0 : this.dotR + 3), y: p.y } : { x: 0, y: 0 };
@@ -242,10 +248,16 @@ export class Scene {
   /** World point a callout or the inspector should point at. */
   anchor(w: RunWorld, t: Target): P | null {
     if (t.type === "tokenizer") return this.reveal.tokA > 0.5 ? { x: TOK.x + TOK.w / 2, y: TOK.y + TOK.h } : null;
-    if (t.type === "gateway") return this.reveal.gwA > 0.5 ? { x: GW.x + GW.w / 2, y: GW.y - 30 } : null;
+    if (t.type === "gateway") {
+      const gr = this.gwRect(w);
+      return this.reveal.gwA > 0.5 ? { x: gr.x + gr.w / 2, y: gr.y - 30 } : null;
+    }
     if (t.type === "store") return this.storeA > 0.5 ? { x: STORE.x + STORE.w / 2, y: STORE.y } : null;
     if (t.type === "remote") return this.remote.a > 0.5 ? { x: this.remote.x + PW / 2, y: this.remote.y } : null;
-    if (t.type === "stream") return this.reveal.gwA > 0.5 ? { x: GW.x + GW.w / 2 - 60, y: GW.y + GW.h + 60 } : null;
+    if (t.type === "stream") {
+      const gr = this.gwRect(w);
+      return this.reveal.gwA > 0.5 ? { x: gr.x + gr.w / 2 - 60, y: gr.y + gr.h + 60 } : null;
+    }
     if (t.type === "session") {
       const p = this.sessPos.get(t.id);
       if (!p) return null;
@@ -282,7 +294,7 @@ export class Scene {
       case "tokenizer":
         return this.reveal.tokA > 0.05 ? { ...TOK } : null;
       case "gateway":
-        return this.reveal.gwA > 0.05 ? { ...GW } : null;
+        return this.reveal.gwA > 0.05 ? this.gwRect(w) : null;
       case "store":
         return this.storeA > 0.05 ? { ...STORE } : null;
       case "remote":
@@ -426,7 +438,7 @@ export class Scene {
       return { type: "pod", id: pod.id, part };
     }
     if (this.reveal.tokA > 0.5 && inside(TOK)) return { type: "tokenizer" };
-    if (this.reveal.gwA > 0.5 && inside(GW)) return { type: "gateway" };
+    if (this.reveal.gwA > 0.5 && inside(this.gwRect(w))) return { type: "gateway" };
     if (this.storeA > 0.5 && inside(STORE)) return { type: "store" };
     if (this.remote.a > 0.5 && inside({ x: this.remote.x, y: this.remote.y, w: PW, h: REMOTE_H })) return { type: "remote" };
     for (const [id, s] of this.sessPos) {
@@ -546,7 +558,10 @@ export class Scene {
     if (w.sessions.size) add(TOK.x, TOK.y, TOK.w, TOK.h);
     if (w.seen.tokenizer && this.detail === "blocks") add(STORE.x, STORE.y - 30, STORE.w, STORE.h);
     if (this.remote.seen) add(this.remote.x, this.remote.y, PW, REMOTE_H);
-    if (w.seen.tokenizer) add(GW.x, GW.y - 40, GW.w, GW.h + 40);
+    if (w.seen.tokenizer) {
+      const gr = this.gwRect(w);
+      add(gr.x, gr.y - 40, gr.w, gr.h + 40);
+    }
     for (const pod of w.pods) {
       const r = this.podRect(pod);
       if (r) add(r.x, r.y - 64, r.w, r.h + 64);
@@ -625,6 +640,8 @@ export class Scene {
         for (let i = 0; i < 3; i++) this.spawn({ x: STORE.x + STORE.w / 2, y: STORE.y + STORE.h }, { x: TOK.x + TOK.w / 2, y: TOK.y }, C.sub, { dur: 0.8, size: 4, delay: i * 0.08 });
       } else if (e.kind === "store.append" && this.parts.length < 300) {
         for (let i = 0; i < 2; i++) this.spawn({ x: GW.x + 20, y: GW.y }, { x: STORE.x + STORE.w, y: STORE.y + STORE.h / 2 }, C.sub, { dur: 1.0, size: 4, delay: 0.5 + i * 0.08, bend: -40 });
+      } else if (e.kind === "router.sync") {
+        this.syncPulseT0 = this.vt;
       }
     }
   }
@@ -960,22 +977,86 @@ export class Scene {
 
   private gateway(ctx: CanvasRenderingContext2D, w: RunWorld): void {
     ctx.globalAlpha = this.reveal.gwA;
-    this.box(ctx, GW.x, GW.y, GW.w, GW.h, 14, this.selected?.type === "gateway");
-    this.text(ctx, "Router", GW.x + 14, GW.y + 22, { size: 13, weight: 650, color: C.ink });
-    this.text(ctx, `hop 3 · ${w.params.routing}`, GW.x + 14, GW.y + 36, { size: 9.5, color: C.mute });
+    const gr = this.gwRect(w);
+    const multi = w.params.routerReplicas > 1 || w.params.syncIntervalS > 0;
+    this.box(ctx, gr.x, gr.y, gr.w, gr.h, 14, this.selected?.type === "gateway");
+    this.text(ctx, "Router", gr.x + 14, gr.y + 22, { size: 13, weight: 650, color: C.ink });
+    if (multi && w.params.routerReplicas > 1) {
+      this.text(ctx, `${w.params.routerReplicas}× active`, gr.x + gr.w - 14, gr.y + 22, { size: 9.5, weight: 600, color: C.decode, align: "right" });
+    }
+    this.text(ctx, `hop 3 · ${w.params.routing}`, gr.x + 14, gr.y + 36, { size: 9.5, color: C.mute });
     const q = w.gatewayQueue.length;
-    this.text(ctx, fmtInt(q), GW.x + 14, GW.y + 70, { size: 24, weight: 650, color: q ? C.ink : C.mute, mono: true });
-    if (q && this.gatewayNote) this.text(ctx, this.gatewayNote, GW.x + 14, GW.y + 84, { size: 9.5, weight: 650, color: C.evict });
-    else this.text(ctx, "queued, waiting for a pod", GW.x + 14, GW.y + 84, { size: 9.5, color: C.mute });
     const lr = w.lastRoute;
-    if (lr) this.text(ctx, `last → pod-${lr.chosen}${lr.policy === "prefix-aware" ? ` · cache ${(100 * (lr.candidates.find((c) => c.podId === lr.chosen)?.cache ?? 0)).toFixed(0)}%` : ""}`, GW.x + 14, GW.y + 102, { size: 9.5, color: C.sub });
+    const showCache = lr && (lr.policy === "prefix-aware" || lr.policy === "bounded-load-affinity" || lr.policy === "age-discounted");
+    const lastText = lr ? `last → pod-${lr.chosen}${showCache ? ` · cache ${(100 * (lr.candidates.find((c) => c.podId === lr.chosen)?.cache ?? 0)).toFixed(0)}%` : ""}` : "";
+
+    if (multi) {
+      // M_r stacked mini-replica badges R0..R{M-1}
+      const m = Math.max(1, w.params.routerReplicas);
+      const gap = m > 4 ? 2 : 4;
+      const bw = (gr.w - 28 - (m - 1) * gap) / m;
+      const by = gr.y + 44;
+      for (let k = 0; k < m; k++) {
+        const bx = gr.x + 14 + k * (bw + gap);
+        const active = lr?.routerReplica === k;
+        ctx.fillStyle = active ? C.decode : C.soft;
+        ctx.beginPath();
+        ctx.roundRect(bx, by, bw, 16, 4);
+        ctx.fill();
+        this.text(ctx, `R${k}`, bx + bw / 2, by + 11.5, { size: m > 4 ? 8 : 9, weight: active ? 700 : 500, color: active ? "#ffffff" : C.sub, align: "center", mono: true });
+      }
+      // sync window progress bar & age readout
+      const sy = gr.y + 68;
+      const sw = gr.w - 28;
+      const pulsing = this.vt - this.syncPulseT0 < 0.45;
+      ctx.fillStyle = C.soft;
+      ctx.beginPath();
+      ctx.roundRect(gr.x + 14, sy, sw, 5, 2.5);
+      ctx.fill();
+      if (w.params.syncIntervalS > 0) {
+        const ageS = Math.max(0, w.t - w.routerSync.lastSyncT);
+        const frac = clamp(ageS / w.params.syncIntervalS, 0, 1);
+        ctx.fillStyle = pulsing ? C.dram : C.remote;
+        ctx.beginPath();
+        ctx.roundRect(gr.x + 14, sy, Math.max(2, sw * frac), 5, 2.5);
+        ctx.fill();
+        if (pulsing) {
+          ctx.save();
+          ctx.globalAlpha = this.reveal.gwA * clamp(1 - (this.vt - this.syncPulseT0) / 0.45, 0, 1);
+          ctx.strokeStyle = C.dram;
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.roundRect(gr.x + 12, sy - 2, sw + 4, 9, 4);
+          ctx.stroke();
+          ctx.restore();
+        }
+        const syncMs = Math.round(w.params.syncIntervalS * 1000);
+        const ageMs = Math.round(ageS * 1000);
+        this.text(ctx, `sync ${syncMs} ms · age ${ageMs} ms`, gr.x + 14, sy + 16, { size: 9, weight: pulsing ? 600 : 400, color: pulsing ? C.dram : C.sub, mono: true });
+      } else {
+        ctx.fillStyle = C.dram;
+        ctx.beginPath();
+        ctx.roundRect(gr.x + 14, sy, sw, 5, 2.5);
+        ctx.fill();
+        this.text(ctx, "sync live · 0 ms lag", gr.x + 14, sy + 16, { size: 9, color: C.dram, mono: true });
+      }
+      this.text(ctx, fmtInt(q), gr.x + 14, gr.y + 114, { size: 20, weight: 650, color: q ? C.ink : C.mute, mono: true });
+      if (q && this.gatewayNote) this.text(ctx, this.gatewayNote, gr.x + 14, gr.y + 127, { size: 9, weight: 650, color: C.evict });
+      else this.text(ctx, "queued, waiting for a pod", gr.x + 14, gr.y + 127, { size: 9, color: C.mute });
+      if (lastText) this.text(ctx, lastText, gr.x + 14, gr.y + 144, { size: 9, color: C.sub });
+    } else {
+      this.text(ctx, fmtInt(q), gr.x + 14, gr.y + 70, { size: 24, weight: 650, color: q ? C.ink : C.mute, mono: true });
+      if (q && this.gatewayNote) this.text(ctx, this.gatewayNote, gr.x + 14, gr.y + 84, { size: 9.5, weight: 650, color: C.evict });
+      else this.text(ctx, "queued, waiting for a pod", gr.x + 14, gr.y + 84, { size: 9.5, color: C.mute });
+      if (lastText) this.text(ctx, lastText, gr.x + 14, gr.y + 102, { size: 9.5, color: C.sub });
+    }
     // queue stack above the node
     for (let i = 0; i < Math.min(q, 60); i++) {
       const r = w.reqs.get(w.gatewayQueue[i]!);
       if (!r) continue;
       ctx.fillStyle = sessionColor(r.sid);
       ctx.beginPath();
-      ctx.roundRect(GW.x + 8 + (i % 15) * 11, GW.y - 14 - Math.floor(i / 15) * 11, 8, 8, 2);
+      ctx.roundRect(gr.x + 8 + (i % 15) * 11, gr.y - 14 - Math.floor(i / 15) * 11, 8, 8, 2);
       ctx.fill();
     }
     ctx.globalAlpha = 1;

@@ -7,6 +7,7 @@ import { emit } from "../core/world.js";
 import { BLOCK_TOKENS, blocksFor } from "./blocks.js";
 import { releaseHbm, syncCells } from "./hbm.js";
 import { preemptNewest } from "./preemption.js";
+import { pruneSharedPrefixes } from "./prefix.js";
 import { demote, evictionVictim } from "./tiers.js";
 
 /** The preemption policy in use. With a second approach this becomes a parameter. */
@@ -43,6 +44,7 @@ export function preempt(w: World, pod: Pod, r: Req, why: string): void {
       cells = releaseHbm(pod, e);
       pod.entries.delete(r.sid);
     }
+    pruneSharedPrefixes(w, pod);
   }
   pod.running.splice(pod.running.indexOf(r.id), 1);
   pod.waiting.unshift(r.id);
@@ -75,6 +77,7 @@ export function makeRoom(w: World, pod: Pod, need: number, requester: Req, allow
     if (idle?.preempted) {
       trimBlocks(pod, idle, need - (pod.budget.poolBlocks - pod.usedBlocks));
       if (idle.blocks === 0) pod.entries.delete(idle.sid);
+      pruneSharedPrefixes(w, pod);
       continue;
     }
     if (idle) {

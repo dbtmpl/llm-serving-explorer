@@ -62,6 +62,12 @@ _Where:_ Right menu, group "Routing and autoscaling", under the sliders.
 ### text
 Real cold starts take tens of seconds to minutes; the default is short so the animation keeps moving.
 
+## `routing.stale` Active-active routers and stale state
+_Where:_ Right menu, group "Routing and autoscaling", under the active-active router controls.
+
+### text
+With several active-active router replicas, each replica sees its own in-flight requests at once while peer counts lag by the sync interval ([llm-d Issue #3440][@llmdIssue3440], [PR #4077][@llmdPr4077]). Shared prefixes make concurrent arrivals herd onto one warm pod until bounded-load caps ([@mirrokni2018]) or age discounting ([@dahlin2000]) curb the stampede.
+
 ## `tiers.measured` Measured copy rates
 _Where:_ Right menu, group "Memory tiers", under the sliders.
 
