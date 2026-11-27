@@ -63,6 +63,18 @@ export interface Params {
 
   /* ---- routing, fleet and flow control (see routing/, autoscaling/, flowcontrol/) ---- */
   routing: RoutingId;
+  /** Active-active router replicas behind a round-robin gateway load balancer. */
+  routerReplicas: number;
+  /** Cross-replica peer load snapshot sync interval in seconds (0 = exact live state). */
+  syncIntervalS: number;
+  /** Shared system-prompt prefix length in tokens across sessions in a group (0 = strictly per-session KV). */
+  sharedPrefixTokens: number;
+  /** Number of shared system-prompt groups when `sharedPrefixTokens > 0`. */
+  sharedPrefixGroups: number;
+  /** Mirrokni et al. bounded-load overload cap slack `1 + epsilon`. */
+  boundedLoadEpsilon: number;
+  /** Dahlin exponential peer-load staleness decay time constant in seconds. */
+  ageDecayS: number;
   minPods: number;
   maxPods: number;
   /** Seconds from pod creation to ready. Real cold starts take minutes; shortened to be watchable. */
@@ -133,6 +145,12 @@ export const DEFAULT_PARAMS: Params = {
   launchUs: 32,
   launchEagerUs: 102,
   routing: "prefix-aware",
+  routerReplicas: 1,
+  syncIntervalS: 0,
+  sharedPrefixTokens: 0,
+  sharedPrefixGroups: 1,
+  boundedLoadEpsilon: 0.5,
+  ageDecayS: 0.2,
   minPods: 0,
   maxPods: 16,
   coldStartS: 2,

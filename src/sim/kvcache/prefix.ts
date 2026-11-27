@@ -2,7 +2,8 @@
  * Prefix reuse: how much of a new request's context can be served from KV that is already cached.
  */
 import type { ApproachMeta } from "../approach.js";
-import { BLOCK_TOKENS } from "./blocks.js";
+import type { Pod, Req, World } from "../core/types.js";
+import { BLOCK_TOKENS, blocksFor } from "./blocks.js";
 
 export interface PrefixMatcher extends ApproachMeta {
   /**
@@ -39,3 +40,43 @@ export const blockHashPrefix: PrefixMatcher = {
   verification: ["prefix-cache", "routing-prefix-aware", "eviction-pressure", "routing-prefix-vs-round-robin", "lss-prefix-cache"],
   reusableTokens: (cachedTokens, contextTokens) => Math.floor(Math.min(cachedTokens, contextTokens - 1) / BLOCK_TOKENS) * BLOCK_TOKENS
 };
+
+/** Tokens of a request's prompt that belong to a shared system-prompt group, capped below the last block. */
+export function sharedPrefixTokensFor(w: Pick<World, "params" | "sessions">, r: Pick<Req, "sid" | "lIn">): number {
+  if (!w.params.prefixCaching || w.params.sharedPrefixTokens <= 0) return 0;
+  const s = w.sessions.get(r.sid);
+  if (!s || s.prefixGroup === undefined) return 0;
+  return Math.min(w.params.sharedPrefixTokens, Math.max(0, r.lIn - BLOCK_TOKENS));
+}
+
+/** Record that `pod` now holds the shared system-prompt prefix for `r`'s group in HBM. */
+export function recordSharedPrefix(w: Pick<World, "t" | "params" | "sessions">, pod: Pod, r: Pick<Req, "sid" | "lIn">, filledTokens: number): void {
+  const shared = sharedPrefixTokensFor(w, r);
+  if (shared < BLOCK_TOKENS || filledTokens < shared) return;
+  const g = w.sessions.get(r.sid)?.prefixGroup;
+  if (g === undefined) return;
+  const usable = Math.floor(shared / BLOCK_TOKENS) * BLOCK_TOKENS;
+  if (usable < BLOCK_TOKENS) return;
+  const map = (pod.sharedPrefixes ??= new Map());
+  const prev = map.get(g);
+  if (!prev || usable > prev.tokens) {
+    map.set(g, { tokens: usable, blocks: blocksFor(usable), lastUsed: w.t });
+  } else {
+    prev.lastUsed = w.t;
+  }
+}
+
+/** Drop shared-prefix index entries on `pod` whose blocks are no longer backed by any HBM entry. */
+export function pruneSharedPrefixes(w: Pick<World, "sessions">, pod: Pod): void {
+  if (!pod.sharedPrefixes?.size) return;
+  for (const [g, sp] of pod.sharedPrefixes) {
+    let kept = false;
+    for (const e of pod.entries.values()) {
+      if (e.tier === "hbm" && e.tokens >= sp.tokens && w.sessions.get(e.sid)?.prefixGroup === g) {
+        kept = true;
+        break;
+      }
+    }
+    if (!kept) pod.sharedPrefixes.delete(g);
+  }
+}

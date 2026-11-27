@@ -30,6 +30,23 @@ $$\text{score}(p) = [[wCache]]\,c_p + [[wKv]]\,m_p + [[wQueue]]\,q_p$$
 
 Here $c_p$ is the share of the prompt that pod $p$ already has cached (scaled down by the memory tier it sits in), $m_p$ the share of its KV memory that is free and $q_p$ the share of its request capacity that is free; each is between 0 and 1. The weights are [llm-d's recommended profile][@llmdScheduling] on the [Gateway API Inference Extension][@gatewayInferenceExtension]; how much a copy in HBM, DRAM, SSD or the remote pool counts (HBM most) is this model's own choice. So a pod holding the cache wins unless it is too busy (the other pods lead on $m$ and $q$ together by more than the cache term $[[wCache]]\,c_p$ is worth), and a pod at capacity (`max_num_seqs` plus a short queue allowance) is not a candidate. Least-loaded sends the request to the pod with the fewest requests, like [Envoy's least-request balancer][@envoyLoadBalancing]; round-robin takes the pods in turn, so returning sessions land on cold pods and prefill again.
 
+### stale-state
+With multiple active-active router replicas ([@llmdIssue3440], [@llmdPr4077], [@goren2020]), each replica knows its own exact in-flight count $L_{\text{own}}(p)$ immediately while peer counts $L_{\text{peer}}(p)$ lag by the sync window $\Delta t$. The observed load $L_{\text{own}} + L_{\text{peer}}$ can therefore fall far below the pod's true load during a burst, causing replicas to herd onto the same warm pod.
+
+### bounded-load
+Bounded-load affinity adds a [Mirrokni et al. (SODA 2018)][@mirrokni2018] overload cap on top of the prefix-aware score:
+
+$$\text{capLoad} = (1 + \varepsilon)\,\max(\bar{L},\, 1)$$
+
+Any pod whose observed load exceeds $\text{capLoad}$ loses an overload penalty larger than the score range, shedding excess traffic to cooler pods.
+
+### age-discounted
+Age-discounted routing applies [Dahlin (IEEE TPDS 2000)][@dahlin2000] exponential decay to stale peer load while keeping exact local load:
+
+$$L_{\text{eff}}(p) = L_{\text{own}}(p) + L_{\text{peer}}(p)\,e^{-\Delta t / \tau}$$
+
+When peer snapshots age out ($\Delta t \gg \tau$), stale peer reports stop blocking warm-pod affinity on sequential turns.
+
 ## `store.note` Conversation store
 _Where:_ Dive-in panel of the conversation store, below its counters.
 

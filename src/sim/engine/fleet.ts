@@ -8,6 +8,7 @@ import { memoryBudget } from "../cost/memory.js";
 import { MIN_PODS_WHEN_SPLIT, nextPodRole } from "../disaggregation/index.js";
 import { DISPLAY_CELLS } from "../kvcache/hbm.js";
 import { COLD_START_SHARES, DRAIN_S, MAX_STEPS_PER_TICK } from "./constants.js";
+import { releaseRouterInFlight } from "./router.js";
 import { applyPlan, planStep } from "./step.js";
 
 function createPod(w: World): Pod {
@@ -59,6 +60,7 @@ function setPodState(w: World, pod: Pod, state: PodState): void {
 
 /** Send a request back to the router's queue; any progress on a pod is lost. */
 export function requeue(w: World, r: Req): void {
+  releaseRouterInFlight(w, r);
   r.stage = "queued";
   r.stageStart = w.t;
   r.podId = -1;
@@ -88,6 +90,9 @@ export function restartFleet(w: World): void {
     }
   }
   w.handoff = [];
+  for (const m of w.ownInFlight) m.clear();
+  for (const m of w.routerSync.peerInFlight) m.clear();
+  w.routerSync.podKvUtil.clear();
   emit(w, "fleet.restart", { requeued, inFlight: w.reqs.size });
 }
 

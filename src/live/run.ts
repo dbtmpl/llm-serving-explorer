@@ -12,7 +12,7 @@ import { advance, type World } from "../sim/index.js";
 /** The fields of `World` that the interface reads. Anything else (random state, workload queues, the trace) stays out of reach. */
 export type RunWorld = Pick<
   World,
-  "t" | "params" | "sessions" | "reqs" | "pods" | "gatewayQueue" | "events" | "lastRoute" | "routeLog" | "m" | "tokWindow" | "startedAt" | "seen" | "store" | "remote" | "remoteBytes" | "pending"
+  "t" | "params" | "sessions" | "reqs" | "pods" | "gatewayQueue" | "events" | "lastRoute" | "routeLog" | "m" | "tokWindow" | "startedAt" | "seen" | "store" | "remote" | "remoteBytes" | "pending" | "routerSync"
 >;
 
 /** How much of a pod's inside the run knows: every KV block, or only how full the pool is. */

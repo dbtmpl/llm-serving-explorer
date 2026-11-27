@@ -70,16 +70,18 @@ function routeValues(e: SimEvent, w: World, policy: Routing) {
   // the chosen pod first, then the best of the rest, so a long list stays readable
   const rest = d.candidates.filter((c) => c !== chosen).sort((a, b) => b.score - a.score);
   const shown = [chosen, ...rest.slice(0, TABLE_ROWS - 1)].sort((a, b) => a.podId - b.podId);
+  const scored = policy === "prefix-aware" || policy === "bounded-load-affinity" || policy === "age-discounted";
+  const tablePolicy = scored ? "prefix-aware" : policy;
   const row = (c: Candidate): string => {
     const win = c === chosen ? "-chosen" : "";
     const base = { podId: c.podId };
-    if (policy === "prefix-aware") {
+    if (scored) {
       const t = termsOf(c, decision.capacity);
-      return fill(stepField("walk.picked", `row-${policy}${win}`), { ...base, c: two(t.cache.share), m: two(t.kv.share), q: two(t.queue.share), score: two(c.score) });
+      return fill(stepField("walk.picked", `row-${tablePolicy}${win}`), { ...base, c: two(t.cache.share), m: two(t.kv.share), q: two(t.queue.share), score: two(c.score) });
     }
-    return fill(stepField("walk.picked", `row-${policy}${win}`), { ...base, load: c.load });
+    return fill(stepField("walk.picked", `row-${tablePolicy}${win}`), { ...base, load: c.load });
   };
-  const table = [stepField("walk.picked", `head-${policy}`), ...shown.map(row)].join("\n");
+  const table = [stepField("walk.picked", `head-${tablePolicy}`), ...shown.map(row)].join("\n");
   const more = n - shown.length;
   const out: Record<string, string | number> = { table };
   const notes: string[] = [];

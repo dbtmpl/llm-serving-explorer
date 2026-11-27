@@ -5491,9 +5491,9 @@
     ]
   },
   "approaches": {
-    "total": 28,
+    "total": 30,
     "verified": 22,
-    "notVerifiable": 6
+    "notVerifiable": 8
   },
   "verified": [
     "admission/on-demand",
@@ -5535,6 +5535,14 @@
     {
       "approach": "kvcache/adaptive",
       "reason": "BLIS reloads whenever its host-memory tier holds the prefix; it has no decision between copying and recomputing to compare. The scenario that exercises the tier (tiers-offload) is a check of the tiers, not of this rule."
+    },
+    {
+      "approach": "routing/age-discounted",
+      "reason": "BLIS and LLMServingSim do not implement Dahlin exponential staleness decay on peer router snapshots; checked against Dahlin's age-discounting rule by unit and engine tests."
+    },
+    {
+      "approach": "routing/bounded-load-affinity",
+      "reason": "BLIS and LLMServingSim do not implement Mirrokni bounded-load caps on top of llm-d's prefix-aware scorer; checked against the SODA 2018 cap formula by unit and engine tests."
     },
     {
       "approach": "workload/closed-loop-sessions",

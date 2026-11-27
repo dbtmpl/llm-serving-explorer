@@ -109,7 +109,22 @@ export interface FixedLengths {
 
 export function newSession(w: World, fixed?: FixedLengths, traceId?: number): void {
   const id = w.nextId++;
-  const s: Session = { id, ...(traceId === undefined ? {} : { traceId }), hue: (id * HUE_STEP_DEGREES) % 360, turn: 0, ctxTokens: 0, reqId: null, state: "active", nextTurnAt: 0, born: w.t, lastPod: -1, lastTtft: 0, lastTpot: 0 };
+  const prefixGroup = w.params.sharedPrefixTokens > 0 ? (id - 1) % Math.max(1, w.params.sharedPrefixGroups) : undefined;
+  const s: Session = {
+    id,
+    ...(traceId === undefined ? {} : { traceId }),
+    ...(prefixGroup === undefined ? {} : { prefixGroup }),
+    hue: (id * HUE_STEP_DEGREES) % 360,
+    turn: 0,
+    ctxTokens: 0,
+    reqId: null,
+    state: "active",
+    nextTurnAt: 0,
+    born: w.t,
+    lastPod: -1,
+    lastTtft: 0,
+    lastTpot: 0
+  };
   w.sessions.set(id, s);
   emit(w, "session.new", { sid: id });
   newRequest(w, s, fixed);
@@ -127,7 +142,10 @@ export function newSession(w: World, fixed?: FixedLengths, traceId?: number): vo
 export function newRequest(w: World, s: Session, fixed?: FixedLengths): void {
   const p = w.params;
   w.startedAt ??= w.t;
-  const fresh = fixed ? fixed.newTokens : s.turn === 0 ? Math.round(p.promptTokens * uniform(w, LENGTH_JITTER.firstPrompt)) : Math.max(1, Math.round(p.followTokens * uniform(w, LENGTH_JITTER.followUp)));
+  let fresh = fixed ? fixed.newTokens : s.turn === 0 ? Math.round(p.promptTokens * uniform(w, LENGTH_JITTER.firstPrompt)) : Math.max(1, Math.round(p.followTokens * uniform(w, LENGTH_JITTER.followUp)));
+  if (!fixed && s.turn === 0 && s.prefixGroup !== undefined && p.sharedPrefixTokens > 0) {
+    fresh = Math.max(fresh, p.sharedPrefixTokens + 64);
+  }
   const r: Req = {
     id: w.nextId++,
     sid: s.id,

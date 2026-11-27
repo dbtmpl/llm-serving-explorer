@@ -85,3 +85,15 @@ Adds the remaining common levers. Speculative decoding emits several tokens per 
 
 ### source
 Speculative decoding ([Leviathan et al., ICML 2023][@leviathan2023]), now built into [vLLM][@vllmRepo], [SGLang][@sglangRepo] and [TensorRT-LLM][@tensorrtLlm]; asynchronous scheduling in [SGLang][@sglangRepo] and [vLLM][@vllmRepo]; flow control in [llm-d][@llmdFlowControl] and [Dynamo][@dynamoRepo].
+
+## `active-active` Active-active routers (stale state)
+_Where:_ Left menu, "Serving architecture" panel, shown under "What this step adds" while this architecture is selected.
+
+### name
+Active-active routers with stale peer state
+
+### adds
+Four independent router replicas sit behind a round-robin gateway, each seeing its own exact in-flight counts while peer load snapshots sync every 200 ms. When requests share a 1,536-token system prompt, naive prefix-aware routing herds concurrent bursts onto one warm pod during the blind window. Switch to Bounded-load affinity or Age-discounted (or tighten the sync lag to 20 ms) to watch the stampede break.
+
+### source
+[llm-d-router Issue #3440][@llmdIssue3440] and [PR #4077][@llmdPr4077]; bounded-load consistent hashing ([Mirrokni et al., SODA 2018][@mirrokni2018]); stale load discounting ([Dahlin, IEEE TPDS 2000][@dahlin2000]); multi-dispatcher load balancing ([Goren et al., 2020][@goren2020]).

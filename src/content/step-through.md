@@ -239,6 +239,12 @@ Routed to pod-{podId}
 ### how-prefix-aware
 Prefix-aware: each ready pod gets a score and the highest wins. A pod already holding this conversation's saved work (its KV cache) scores well, unless it is too busy: busier than another pod by more than the cache saves.
 
+### how-bounded-load-affinity
+Bounded-load affinity: scores pods like prefix-aware, then penalises any pod whose observed load exceeds $(1 + \varepsilon)\,\max(\bar{L}, 1)$ so hot pods shed overflow traffic [@mirrokni2018].
+
+### how-age-discounted
+Age-discounted: scores pods like prefix-aware, while decaying stale peer load snapshots exponentially by $e^{-\Delta t / \tau}$ so aged reports stop blocking cache affinity [@dahlin2000].
+
 ### how-least-loaded
 Least-loaded: the pod with the fewest requests running, waiting or on their way, like the least-request balancer of [Envoy][@envoyLoadBalancing].
 
@@ -269,6 +275,12 @@ Every share is between 0 and 1, so the cache term is worth at most [[wCache]] po
 
 ### detail-least-loaded
 The router counts each pod's running, waiting and inbound requests and takes the smallest. It ignores what the pods hold, so a returning conversation may land on a pod that has to compute its history again.
+
+### detail-bounded-load-affinity
+Scores candidates with the llm-d prefix-aware formula and computes the [Mirrokni et al.][@mirrokni2018] load cap $(1 + [[eps]])\,\max(\bar{L}, 1)$. Any pod above that cap is penalised so overflow spreads across cooler pods while warm pods keep affinity up to the cap.
+
+### detail-age-discounted
+Scores candidates with the llm-d prefix-aware formula using [Dahlin's][@dahlin2000] age-discounted load $L_{\text{own}} + L_{\text{peer}}\,e^{-\Delta t / \tau}$ with time constant {decayMs} ms. Exact local counts never decay, while stale peer snapshots fade with snapshot age.
 
 ### detail-round-robin
 The router keeps a counter and sends the next request to the next pod. It ignores load and cache, so a returning conversation usually lands on a pod that has to compute its history again.
